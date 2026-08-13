@@ -1,0 +1,59 @@
+<timestamp>Tuesday, Aug 11, 2026, 4:59 PM (UTC-6)</timestamp>
+
+# Prototype residual architecture A×C1 (Hub + evidence fuse) — R/G TDD
+
+You are in an isolated git worktree of the `residual` Rust CLI repo (NKP residuality tool). `flake.nix` is present: always run toolchain commands as `nix develop -c cargo …`.
+
+## Goal
+Implement a working **code-structure prototype** of architecture **A×C1** so it can later be compared via `residual matrix ri`. This is a real compile+test refactor, not a doc-only change.
+
+## Architecture A×C1 (must implement)
+
+**Shared fusions (all arches):**
+- `skill-install` + `skill-check` → module `skill_lifecycle`
+- `skill-list` + `skill-show` → module `skill_catalog` (may live under lifecycle)
+- `matrix-show` + `group-filter` + `nkp-matrix` → module `matrix_view` (thin façade over existing `nkp/`)
+
+**A — Hub:** consolidate into `src/session_hub/`:
+- skill-data / skill context loading
+- skill-interface concerns used by CLI skill commands
+- verify-all orchestration (call into verify, but hub owns “session trust” entrypoint)
+- session-lock (NEW minimal lockfile under residual/ with acquire/release/ttl helpers — does not exist yet)
+- config load access used by session flows
+
+**C1 — Evidence fuse:** `src/evidence/` owns both research + personas (move or re-export `storage/research.rs` + `storage/personas.rs` behind `evidence`).
+
+Also introduce:
+- `src/lexicon/` façade for terminology + trait verification entry used by verify traits
+- `residual/components.csv` with columns at least: `name,description,status,architecture_set` where `architecture_set=A-C1` and `status=proposed` for every component in this architecture’s set
+
+**A×C1 component set (record in components.csv):**
+skill-lifecycle, session-hub, verify-traits, terminology, storage-append, change-detection, cli-add, storage-init, skill-catalog, git-hook, tag-scan, verify-links, storage-io, stressor-schema, components-registry, residues-csv, matrix-view, evidence, storage-attractors, lexicon (optional if you keep verify-traits/terminology as names — prefer listing the fused/neighborhood names actually used in code)
+
+Include **change-detection** as a NEW minimal API under session_hub or a small `src/storage/change_detection.rs` used by hub (SHA/hash of managed residual files before write) — stub is fine if tested.
+
+## R/G TDD rules (mandatory)
+1. Write failing tests FIRST naming the behavior (e.g. `session_hub_acquires_lockfile`, `evidence_lists_personas_and_research`, `components_csv_loads_A_C1_set`).
+2. Confirm red: `nix develop -c cargo test <test_name>`
+3. Minimal impl to green.
+4. Refactor under green.
+5. Do not expand beyond this architecture slice.
+6. Keep existing tests passing: `nix develop -c cargo test`
+
+## Wire-up
+- Update `src/main.rs` / `cli.rs` so skill-data / skill-check/install / verify all / matrix show route through the new modules (re-exports OK).
+- Prefer moving code with thin façades over massive rewrites.
+- Add unit tests in the new modules; integration tests OK in `tests/`.
+
+## Deliverables before you finish
+1. All tests green.
+2. `residual/components.csv` present for `A-C1`.
+3. Short `ARCHITECTURE.md` at repo root of the worktree describing module map + how it differs from naive vertical slices.
+4. Commit your work on the worktree branch with a clear message.
+5. In your final message report: branch name, worktree path, commit hash, `cargo test` summary, list of new modules, any known gaps.
+
+## Constraints
+- Do not push to remote.
+- Do not force-push.
+- Do not modify unrelated docs extensively.
+- Binary name stays `residual`.

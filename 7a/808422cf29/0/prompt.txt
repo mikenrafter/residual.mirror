@@ -1,0 +1,51 @@
+<timestamp>Tuesday, Aug 11, 2026, 5:00 PM (UTC-6)</timestamp>
+
+# Prototype residual architecture B×C1 (Fabric-first + evidence fuse) — R/G TDD
+
+Isolated git worktree of `residual` Rust CLI. `flake.nix` → always `nix develop -c cargo …`.
+
+## Goal
+Working **code-structure prototype** of **B×C1** for later Ri comparison.
+
+## Architecture B×C1
+
+**Shared fusions:**
+- `skill_lifecycle` (install+check)
+- `skill_catalog` (list+show)
+- `matrix_view` (nkp façade)
+
+**B — Fabric-first → `src/fabric_spine/` (THE SPINE):**
+Owns:
+- storage-io
+- storage-append
+- storage-init
+- **NEW** change-detection (hash/SHA of managed residual files; refuse/warn on drift — tested)
+- verify-all orchestration (verify is invoked FROM the fabric, not from a session hub)
+
+**Clients (NOT absorbed into fabric):**
+- `skill-data` / skills context remain in `skills/`
+- `skill-interface` remains CLI/skills facing
+- session-lock is a **gate on the fabric** (small module or fabric_spine::lock) that skills/clients call before mutating — NOT a peer hub owning verify+skills
+
+**C1 — Evidence fuse:** `src/evidence/` owns research + personas.
+
+Also `src/lexicon/` for terminology + traits.
+
+`residual/components.csv`: `name,description,status,architecture_set` with `architecture_set=B-C1`, `status=proposed`
+
+**B×C1 components:**
+skill-lifecycle, skill-data, verify-traits, terminology, fabric-spine, cli-add, skill-catalog, git-hook, tag-scan, verify-links, stressor-schema, components-registry, residues-csv, matrix-view, skill-interface, evidence, storage-attractors, config, session-lock
+
+## R/G TDD (mandatory)
+Failing test → red (`nix develop -c cargo test <name>`) → minimal green → refactor → full `nix develop -c cargo test` green.
+
+Key tests should prove: fabric owns init/append/change-detection/verify entrypoints; skills are clients; evidence unifies personas+research.
+
+## Wire-up
+CLI `init`, `add`, `verify all` go through fabric_spine. Skill commands stay in skills but call fabric for mutation gating.
+
+## Deliverables
+Tests green; components.csv; ARCHITECTURE.md; commit; final report with branch, path, hash, test summary, modules, gaps.
+
+## Constraints
+No push. Do NOT create session_hub as the primary owner of verify+skills — that is architecture A. Binary `residual`.

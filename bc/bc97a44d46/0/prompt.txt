@@ -1,0 +1,45 @@
+<timestamp>Tuesday, Aug 11, 2026, 5:00 PM (UTC-6)</timestamp>
+
+# Prototype residual architecture B×C2 (Fabric-first + evidence split) — R/G TDD
+
+Isolated git worktree of `residual` Rust CLI. `flake.nix` → always `nix develop -c cargo …`.
+
+## Goal
+Working **code-structure prototype** of **B×C2** for later Ri comparison.
+
+## Architecture B×C2
+
+**Shared fusions:**
+- `skill_lifecycle` (install+check)
+- `skill_catalog` (list+show)
+- `matrix_view` (nkp façade)
+
+**B — Fabric-first → `src/fabric_spine/`:**
+Owns storage-io, storage-append, storage-init, NEW change-detection, verify-all orchestration.
+session-lock gates the fabric (not a session hub).
+skill-data and skill-interface remain separate clients.
+
+**C2 — Evidence SPLIT:**
+- Keep research and personas separate (no `src/evidence/`)
+- components.csv lists `research-study` and `personas` distinctly
+
+`src/lexicon/` for terminology + traits.
+
+`residual/components.csv`: `architecture_set=B-C2`, `status=proposed`
+
+**B×C2 components:**
+skill-lifecycle, skill-data, verify-traits, terminology, fabric-spine, cli-add, skill-catalog, git-hook, tag-scan, verify-links, stressor-schema, components-registry, residues-csv, matrix-view, skill-interface, research-study, personas, storage-attractors, config, session-lock
+
+## R/G TDD (mandatory)
+Failing test → red → minimal green → refactor → full suite green via `nix develop -c cargo test`.
+
+Prove fabric spine ownership + split evidence (personas/research still separate modules).
+
+## Wire-up
+CLI mutation/verify through fabric_spine; skills as clients.
+
+## Deliverables
+Tests green; components.csv; ARCHITECTURE.md; commit; final report: branch, path, hash, test summary, modules, gaps.
+
+## Constraints
+No push. No session_hub-centric design. No evidence fusion. Binary `residual`.

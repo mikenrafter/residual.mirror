@@ -1,0 +1,15 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "bcbc97a44d46",
+  "strategy": "manual-commit",
+  "checkpoints_count": 0,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/bc/bc97a44d46/0/metadata.json",
+      "transcript": "/bc/bc97a44d46/0/full.jsonl",
+      "content_hash": "/bc/bc97a44d46/0/content_hash.txt",
+      "prompt": "/bc/bc97a44d46/0/prompt.txt"
+    }
+  ]
+}

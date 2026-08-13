@@ -1,0 +1,1 @@
+nix search for command line spreadsheet program - find all you can, not just sc-im

@@ -1,0 +1,51 @@
+<timestamp>Tuesday, Aug 11, 2026, 5:00 PM (UTC-6)</timestamp>
+
+# Prototype residual architecture A×C2 (Hub + evidence split) — R/G TDD
+
+You are in an isolated git worktree of the `residual` Rust CLI repo. `flake.nix` present → always `nix develop -c cargo …`.
+
+## Goal
+Working **code-structure prototype** of **A×C2** for later Ri comparison. Real compile+test refactor.
+
+## Architecture A×C2
+
+**Shared fusions:**
+- `skill_lifecycle`: skill-install + skill-check
+- `skill_catalog`: skill-list + skill-show
+- `matrix_view`: façade over nkp (show/group-filter/nkp-matrix)
+
+**A — Hub → `src/session_hub/`:**
+Owns skill-data/context, skill-interface CLI skill flows, verify-all orchestration, **new** session-lock (lockfile acquire/release/ttl under residual/), config access for session flows.
+
+**C2 — Evidence SPLIT (do NOT fuse):**
+- Keep `storage/research.rs` and `storage/personas.rs` as separate modules
+- No `src/evidence/` module
+- components.csv lists `research-study` and `personas` as distinct components
+
+Also:
+- `src/lexicon/` façade for terminology + trait verification
+- NEW minimal change-detection (hash residual files before write) — tested stub OK
+- `residual/components.csv`: `name,description,status,architecture_set` with `architecture_set=A-C2`, `status=proposed`
+
+**A×C2 components to register:**
+skill-lifecycle, session-hub, verify-traits, terminology, storage-append, change-detection, cli-add, storage-init, skill-catalog, git-hook, tag-scan, verify-links, storage-io, stressor-schema, components-registry, residues-csv, matrix-view, research-study, personas, storage-attractors
+
+## R/G TDD (mandatory)
+1. Failing test first (behavior-named).
+2. Red: `nix develop -c cargo test <name>`
+3. Minimal green.
+4. Refactor under green.
+5. Full suite green: `nix develop -c cargo test`
+
+## Wire-up
+Route skill-data / skill lifecycle / verify all / matrix through new modules. Thin façades preferred.
+
+## Deliverables
+1. Tests green
+2. components.csv for A-C2
+3. `ARCHITECTURE.md` module map
+4. Commit on worktree branch
+5. Final report: branch, worktree path, commit hash, test summary, modules, gaps
+
+## Constraints
+No push/force-push. Binary name `residual`. Do not fuse research+personas.

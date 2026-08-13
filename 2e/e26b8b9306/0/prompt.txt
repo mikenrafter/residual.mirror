@@ -1,0 +1,5 @@
+<timestamp>Wednesday, Aug 12, 2026, 5:47 AM (UTC-6)</timestamp>
+
+Attractor A-05 (Residuals Incongruence) in /home/v0id/Documents/repos/residual
+
+Review all forces in residual/forces.csv with attractor_id A-05. Determine which outcomes are not fully implemented. For gaps, use rg-implement from /home/v0id/Documents/repos/phoe-nix/.agents/skills/rg-implement/SKILL.md in this worktree only. Do not merge to main.

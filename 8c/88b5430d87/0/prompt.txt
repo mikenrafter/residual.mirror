@@ -1,0 +1,3 @@
+<timestamp>Thursday, Aug 13, 2026, 12:47 AM (UTC-6)</timestamp>
+
+Update the readme to be more user friendly, to give a slightly gentler introduction to the concepts, to point readers where they can learn more about the method (find the leanpub link) and update the initial blurb to properly reflect the changes in recent iterations.

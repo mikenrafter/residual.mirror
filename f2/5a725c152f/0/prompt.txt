@@ -1,0 +1,118 @@
+<timestamp>Tuesday, Aug 11, 2026, 9:28 PM (UTC-6)</timestamp>
+
+# Prototype residual architecture Iteration 4 v3 — fully-qualified names (R/G TDD)
+
+Isolated git worktree of `residual` Rust CLI. `flake.nix` present → always `nix develop -c cargo …`.
+
+## Goal
+Working code-structure prototype of **iteration 4 v3**. Real compile+test refactor. Prefer creating worktree/branch named clearly, e.g. `prototype/iter4-cli-hub-v3` and directory `.claude/worktrees/prototype-iter4-v3` if you control naming.
+
+**IMPORTANT:** Worktree starts from HEAD and will NOT have the parent repo's dirty `residual/iterations/4.md`. Treat THIS PROMPT as authoritative.
+
+## Fully-qualified component names (MUST use these exact strings in components.csv and ARCHITECTURE.md)
+
+```
+research-study                          # STANDALONE, NOT RUNTIME — registry + terminology only
+
+cli
+cli-help
+
+skills-personas
+skills-research
+skills-phases                           # owns skill-list, skill-show, skill-data, ATAM+FMEA prose
+skills-installer                        # skill-install, skill check-install
+
+verification                            # reads storage-config; NO verification-config module
+verification-git-hook
+
+structure                               # EXTERNAL filter/sort/group API (default group=attractor)
+structure-analysis                      # NKP only — NOT ATAM/FMEA
+structure-analysis-tag-scan             # suggestions, not enforcement
+structure-analysis-force                # force = 1/2 of residue (purpose XOR stressor)
+structure-analysis-purposes             # :: Force — naive_change + outcomes, NOT traits
+structure-analysis-stressors            # :: Force — naive_change + outcomes, NOT traits
+structure-analysis-attractors           # +/− states, NO valence
+structure-analysis-residues             # force ↔ component mapping
+
+structure-definition-lexicon
+structure-definition-components
+structure-definition-iterations
+
+storage
+storage-config                          # THE config (v3 TOML): app + verify policy keys
+storage-sessions                        # locks, change-detection, append, diff/--force
+storage-migration                       # naive → v3 only
+storage-format                          # CSV ↔ structure.analysis.* + structure.definition.*
+```
+
+## Architecture rules
+1. **CLI** is thin hub. Process/fluency text lives **beside each clap action**, not a shared preamble. Whole-system-residue reminder is text next to add force/residue.
+2. **cli-help** owns completions / man / generate help.
+3. **skills-phases** owns list + show + data + ATAM/FMEA skill content.
+4. **skills-personas** and **skills-research** stay SPLIT. Do NOT fuse. research-study is NOT a runtime module.
+5. **verification** pulls policy from **storage-config** (super-strict, token_warn, etc.). No `verification/config.rs`.
+6. Lexicon continuity: ≥1 terminology word in each force **outcome** AND ≥1 in each force **shortname**.
+7. Tag rule: metadata-only OK; tagged-in-code ⇒ must exist in metadata. Tag scan suggests; verification enforces one-way.
+8. Personas: verification requires min:2 personas until α/β exist.
+9. **structure** is the only external grouping API. Analysis and Definition types know grouping internally; callers use `structure`.
+10. Analysis = NKP + tag-scan + force/residue schemas. ATAM/FMEA only in skills-phases.
+11. Storage supports read / write / **mutate** (not append-only).
+12. Migration: naive → v3 only. Alternate backends deferred.
+
+## Suggested module layout
+```
+src/cli.rs
+src/cli/help.rs
+src/skills/{mod,personas,research,phases,installer}.rs
+src/verification/{mod,git_hook}.rs
+src/structure/mod.rs
+src/structure/analysis/{mod,nkp,tag_scan,force,purposes,stressors,attractors,residues}.rs
+src/structure/definition/{mod,lexicon,components,iterations}.rs
+src/storage/{mod,config,format}.rs
+src/storage/integrity/{mod,sessions,migration}.rs
+```
+Thin façades over existing code OK. Prefer move+reexport.
+
+## Types / tests to encode (R/G TDD mandatory)
+Write failing tests FIRST, then green, then refactor. Use `nix develop -c cargo test <name>` to confirm red then green. Full suite must pass: `nix develop -c cargo test`.
+
+Required behaviors (name tests after them):
+- `force_is_half_of_residue`
+- `purposes_and_stressors_carry_outcomes_not_traits`
+- `attractors_have_positive_and_negative_state_not_valence`
+- `lexicon_requires_term_in_outcome_and_shortname`
+- `verification_allows_metadata_without_tags_but_not_tags_without_metadata`
+- `verification_requires_min_two_personas`
+- `verification_reads_policy_from_storage_config`
+- `sessions_require_force_flag_on_drift`
+- `migration_naive_to_v3`
+- `format_roundtrips_force_and_lexicon`
+- `structure_groups_by_attractor_as_external_api`
+- `skills_phases_owns_list_show_and_data`
+- `installer_check_install_subcommand`
+- `cli_process_lives_beside_actions`
+- `components_csv_uses_fully_qualified_names` (assert skills-personas etc. present, bare "personas" absent)
+
+## Also create
+- `residual/components.csv` with `name,description,status,architecture_set`
+  status=proposed, architecture_set=iter4-cli-hub, ALL 25 fully-qualified names above
+- `ARCHITECTURE.md` with the tree, naming rule, research-study standalone note, config split, gaps
+- Optionally copy a short `residual/iterations/4.md` stub pointing at ARCHITECTURE.md
+
+## Wire-up
+- skill-list/show/data → skills::phases
+- skill-install / check-install (alias skill-check OK) → skills::installer
+- verify * → verification (uses storage_config)
+- matrix * → structure::analysis (via structure if needed)
+- init/add → storage via storage-sessions
+- tag scan → structure-analysis-tag-scan
+- generate completions/man → cli::help
+
+## Deliverables
+1. Tests green
+2. components.csv + ARCHITECTURE.md
+3. Commit on worktree branch
+4. Final report MUST include: **absolute worktree path**, branch name, commit hash, cargo test summary, module list, gaps
+
+## Constraints
+No push. Binary `residual`. Do not fuse skills-personas + skills-research. No verification-config module. No ATAM/FMEA under structure-analysis. No runtime research-study module.

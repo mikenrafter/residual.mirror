@@ -1,0 +1,3 @@
+<timestamp>Tuesday, Aug 11, 2026, 4:37 AM (UTC-6)</timestamp>
+
+Pull claude's 061e1c02-17a7-43c7-9f0d-b89638191f0e and update the trait for S-13 to include format version migration (and a version number as a key mechanism)

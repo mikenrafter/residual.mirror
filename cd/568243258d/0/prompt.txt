@@ -1,0 +1,124 @@
+<timestamp>Tuesday, Aug 11, 2026, 8:54 PM (UTC-6)</timestamp>
+
+# Prototype residual architecture Iteration 4 — CLI hub + Structure/Storage tree (R/G TDD)
+
+You are in an isolated git worktree of the `residual` Rust CLI. `flake.nix` is present → always run `nix develop -c cargo …`.
+
+## Goal
+Implement a **working code-structure prototype** of iteration 4 so it can be compared later. Real compile+test refactor, not docs-only.
+
+Read `residual/iterations/4.md` in the **parent repo** if the worktree does not have it yet (worktree starts from HEAD; iteration 4 may only exist on the dirty main tree). If `residual/iterations/4.md` is missing from THIS worktree, recreate the module map from this prompt (authoritative).
+
+## Architecture (must match)
+
+```
+CLI  — thin hub. Crucially does NOT include process details; process text is embedded next to each clap action so a-la-carte use doesn't load unused ceremony.
+
+Skills
+  Personas   — save/retrieve personas. Verification (not this module) enforces min:2 personas (alpha/beta later).
+  Research   — save/retrieve research used by walks+personas. DISTINCT from research-study alpha/beta values. Do NOT fuse with Personas.
+  Phases     — all phase skills in stub + full form + data each phase skill needs. Owns skill-show and skill-data.
+  Installer  — skill-install and skill check-install (rename from skill-check).
+
+Verification — criticality, link + lexicon continuity, one-way tag rule:
+  metadata MAY exist without codebase tags; if tagged in code, MUST exist in metadata.
+  Git Hook + install
+  Config — verification-policy keys only (super-strict, token_warn, …)
+
+Structure — filter subsets (parallel architecture sets), sort (NOT creation order; default group = attractor; grouping flexible)
+  Analysis — NKP, ATAM, FMEA entrypoints
+    Tag Scanning — suggestions, not enforcement
+    Force schema — NEW: a force is 1/2 of a residue (the purpose/stressor inside the residue)
+    Purposes schema :: Force — naive_change + outcomes, NOT traits
+    Stressors schema :: Force — naive_change + outcomes, NOT traits
+    Attractors schema — NO valence; positive_state + negative_state
+    +/- Residues schema — holds purpose/stressor (force) ↔ component mapping
+  Definition
+    Lexicon schema (terms)
+    Components schema
+    Iterations schema (iteration-complete + component name list)
+
+Storage — read, write, AND mutate (not append-only)
+  Config — whole-application config; v3 TOML; same integrity + format logic
+  Integrity
+    Sessions — locks, change detection, append logic, flag when diff/--force is needed
+    Migration — naive → v3 only for now
+  Format — current multi-file CSV; round-trip structure.analysis.* and structure.definition.* ↔ CSV
+```
+
+Suggested layout (adjust if cleaner, keep names):
+
+```
+src/cli.rs
+src/skills/{mod,personas,research,phases,installer}.rs
+src/verification/{mod,git_hook,config}.rs
+src/structure/mod.rs
+src/structure/analysis/{mod,nkp,tag_scan,force,purposes,stressors,attractors,residues}.rs
+src/structure/definition/{mod,lexicon,components,iterations}.rs
+src/storage/{mod,config,format}.rs
+src/storage/integrity/{mod,sessions,migration}.rs
+```
+
+Thin façades over existing `storage/*`, `nkp/`, `verify.rs`, `skills/`, `tags.rs` are OK. Prefer move+reexport over rewrite.
+
+## Schema / type rules to encode in types + tests
+- `Force` is an enum or tagged struct: Purpose | Stressor; fields naive_change + outcomes; NO traits; NO component lists.
+- `Residue` = force id + component id (+ status/notes).
+- `Attractor` has positive_state + negative_state; no valence field in the new type (legacy CSV may still have it until migration).
+- Verification one-way tags: tagged-in-code ⇒ must be in metadata; metadata-only is OK.
+- Personas: Verification rejects walks/sessions when fewer than 2 personas (until alpha/beta exist).
+- Sessions: lockfile + change-detection hash; on drift require `--force` or show diff flag.
+- Migration: naive → v3 function exists and is tested (even if naive is current CSV + old config.toml).
+- Storage.Config parses v3 TOML.
+- Structure can filter/sort/group records by attractor (default), not only creation order.
+- CLI: grep/test that process/fluency guidance is NOT in a single shared preamble module; it is per-subcommand help/about.
+
+## R/G TDD (mandatory)
+1. Write failing tests FIRST, named after behavior
+   (e.g. `force_is_half_of_residue`, `purposes_carry_outcomes_not_traits`,
+   `attractors_have_positive_and_negative_state_not_valence`,
+   `verification_allows_metadata_without_tags_but_not_tags_without_metadata`,
+   `verification_requires_min_two_personas`,
+   `sessions_require_force_flag_on_drift`,
+   `migration_naive_to_v3`,
+   `format_roundtrips_force_and_lexicon`,
+   `structure_groups_by_attractor`,
+   `installer_check_install_subcommand`,
+   `cli_process_lives_beside_actions`).
+2. Confirm red: `nix develop -c cargo test <test_name>`
+3. Minimal impl to green.
+4. Refactor under green.
+5. Full suite: `nix develop -c cargo test` must pass.
+
+## Also create
+- `residual/components.csv` with columns `name,description,status,architecture_set`
+  `status=proposed`, `architecture_set=iter4-cli-hub`, one row per component:
+  cli, personas, research, phases, installer, verification, git-hook, verification-config,
+  structure, analysis, tag-scan, force-schema, purposes-schema, stressors-schema,
+  attractors-schema, residues-schema, lexicon-schema, components-schema, iterations-schema,
+  storage, storage-config, sessions, migration, format
+- `ARCHITECTURE.md` describing the tree, CLI-as-hub rule, force/residue, two configs split
+  (verification-config vs storage-config), and gaps (research-study unhomed, skill-list home, generate completions/man).
+
+## Wire-up
+Update `src/main.rs` / `cli.rs` so:
+- `skill-show` / `skill-data` → skills::phases
+- `skill-install` / `skill check-install` (keep old `skill-check` as alias if needed) → skills::installer
+- `verify *` → verification
+- `matrix *` → structure::analysis
+- `init` / `add` → storage (via sessions integrity)
+- `tag scan` → analysis::tag_scan (suggestions)
+
+## Deliverables
+1. Tests green
+2. components.csv + ARCHITECTURE.md
+3. Commit on the worktree branch
+4. Final report: branch, worktree path, commit hash, cargo test summary, module list, known gaps
+
+## Constraints
+- No push / no force-push
+- Binary name remains `residual`
+- Do NOT fuse personas + research
+- Do NOT put process/fluency essay in CLI hub
+- Do NOT put super-strict in storage-config (that's verification-config)
+- Do NOT put format version / change_detection in verification-config (that's storage-config)

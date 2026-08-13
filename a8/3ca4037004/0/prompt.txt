@@ -1,0 +1,3 @@
+<timestamp>Wednesday, Aug 12, 2026, 1:40 AM (UTC-6)</timestamp>
+
+rg-tdd-implement S-26: operator reads coupling density, row/column totals, and force labels without losing orientation in the matrix viewport

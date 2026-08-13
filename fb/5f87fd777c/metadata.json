@@ -1,0 +1,15 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "fb5f87fd777c",
+  "strategy": "manual-commit",
+  "checkpoints_count": 0,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/fb/5f87fd777c/0/metadata.json",
+      "transcript": "/fb/5f87fd777c/0/full.jsonl",
+      "content_hash": "/fb/5f87fd777c/0/content_hash.txt",
+      "prompt": "/fb/5f87fd777c/0/prompt.txt"
+    }
+  ]
+}

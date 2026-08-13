@@ -1,0 +1,2 @@
+{"role":"user","message":{"content":[{"type":"text","text":"<timestamp>Wednesday, Aug 12, 2026, 1:41 AM (UTC-6)</timestamp>\n<user_query>\nrg-tdd-implement P-13: operator computes criticality and Ri from residual artifacts after stressor exposure\n</user_query>"}]}}
+{"type":"error","error":"WritableIterable is closed"}

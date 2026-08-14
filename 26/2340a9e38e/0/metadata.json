@@ -1,0 +1,137 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "262340a9e38e",
+  "session_id": "6e9c6c52-0c65-4408-b91f-fdee5dcd9ff6",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-14T00:31:18.675023569Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/verify.rs",
+    "tests/a06_fluent_capture.rs",
+    "tests/integration.rs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "9fdcc5728148",
+  "checkpoint_transcript_start": 654,
+  "transcript_lines_at_start": 654,
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 10081,
+    "cache_read_tokens": 1161141,
+    "output_tokens": 4634,
+    "api_call_count": 16
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01Rt9f2KUD4fvkHhAa3t1rK9",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9fdcc5728148",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 179,
+        "end": 180,
+        "entry_ids": [
+          "1a9d3544-1867-4c86-b8d2-21279323e293"
+        ],
+        "tool_use_id": "toolu_01Rt9f2KUD4fvkHhAa3t1rK9"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Rt9f2KUD4fvkHhAa3t1rK9"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01NZVR9xiXwairtZjWKmmz6W",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9fdcc5728148",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 191,
+        "end": 192,
+        "entry_ids": [
+          "5bc2b6f5-4e0a-4ae4-9c53-7fb3682cc5c0"
+        ],
+        "tool_use_id": "toolu_01NZVR9xiXwairtZjWKmmz6W"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01NZVR9xiXwairtZjWKmmz6W"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01TZQFrch1XiN93mgRBp96GB",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9fdcc5728148",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 196,
+        "end": 197,
+        "entry_ids": [
+          "7f7e2dd6-392d-434b-815d-8dacbcc8e8b5"
+        ],
+        "tool_use_id": "toolu_01TZQFrch1XiN93mgRBp96GB"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01TZQFrch1XiN93mgRBp96GB"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-14T00:31:18.642337656Z",
+    "agent_lines": 17,
+    "agent_removed": 3,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 17,
+    "total_lines_changed": 20,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}

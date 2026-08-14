@@ -1,0 +1,13 @@
+Actually migrate `residual/` to the latest version and drop forces.csv + terminology.csv
+
+---
+
+`skill-install` vs `skill install`? the devshell isn't seeing this fix
+
+---
+
+`skill-install` vs `skill install`? the devshell isn't seeing that fix
+
+---
+
+Via test, ensure the completions always match the underlying CLI.

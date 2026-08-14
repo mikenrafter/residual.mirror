@@ -1,0 +1,55 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "c648df0b37a7",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "residual/.storage-hashes",
+    "residual/forces.csv",
+    "residual/purposes.csv",
+    "residual/stressors.csv",
+    "residual/terminology.csv",
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/nkp/criticality.rs",
+    "src/nkp/matrix.rs",
+    "src/nkp/mod.rs",
+    "src/skills/context.rs",
+    "src/skills/definitions/atam.md",
+    "src/skills/definitions/fmea.md",
+    "src/skills/definitions/integrate.md",
+    "src/skills/definitions/naive_draft.md",
+    "src/skills/definitions/purpose_walk.md",
+    "src/skills/definitions/stressor_walk.md",
+    "src/skills/mod.rs",
+    "src/storage/format.rs",
+    "src/storage/integrity/migration.rs",
+    "src/storage/integrity/sessions.rs",
+    "src/storage/mod.rs",
+    "src/storage/purposes.rs",
+    "src/storage/residues.rs",
+    "src/storage/stressors.rs",
+    "src/storage/terminology.rs",
+    "src/verification/commit_msg.rs",
+    "src/verify.rs",
+    "tests/a02_terminology_drift.rs",
+    "tests/completions_coverage.rs",
+    "tests/integration.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/c6/48df0b37a7/0/metadata.json",
+      "transcript": "/c6/48df0b37a7/0/full.jsonl",
+      "content_hash": "/c6/48df0b37a7/0/content_hash.txt",
+      "prompt": "/c6/48df0b37a7/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 63,
+    "cache_creation_tokens": 85430,
+    "cache_read_tokens": 3493920,
+    "output_tokens": 35354,
+    "api_call_count": 55
+  }
+}

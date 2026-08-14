@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "590ca4002eb1",
+  "session_id": "076b5d6e-748e-4517-803b-50cbe71e4cbf",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-14T06:00:11.780700187Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/cli.rs",
+    "src/nkp/criticality.rs",
+    "src/nkp/matrix.rs",
+    "src/nkp/mod.rs",
+    "src/skills/context.rs",
+    "src/verification/commit_msg.rs",
+    "src/verify.rs"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "9e4158a0a5da",
+  "checkpoint_transcript_start": 289,
+  "transcript_lines_at_start": 289,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 744,
+    "cache_read_tokens": 204326,
+    "output_tokens": 497,
+    "api_call_count": 2
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-14T06:00:11.758529008Z",
+    "agent_lines": 89,
+    "agent_removed": 110,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 89,
+    "total_lines_changed": 199,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}

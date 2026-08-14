@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "590ca4002eb1",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/cli.rs",
+    "src/nkp/criticality.rs",
+    "src/nkp/matrix.rs",
+    "src/nkp/mod.rs",
+    "src/skills/context.rs",
+    "src/verification/commit_msg.rs",
+    "src/verify.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/59/0ca4002eb1/0/metadata.json",
+      "transcript": "/59/0ca4002eb1/0/full.jsonl",
+      "content_hash": "/59/0ca4002eb1/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 744,
+    "cache_read_tokens": 204326,
+    "output_tokens": 497,
+    "api_call_count": 2
+  }
+}

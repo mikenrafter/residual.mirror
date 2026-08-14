@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "7c5b8c7415ec",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/cli/help.rs",
+    "src/skills/definitions/atam.md",
+    "src/skills/definitions/fmea.md",
+    "src/skills/definitions/integrate.md",
+    "src/skills/definitions/naive_draft.md",
+    "src/skills/definitions/purpose_walk.md",
+    "src/skills/definitions/stressor_walk.md",
+    "src/skills/mod.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7c/5b8c7415ec/0/metadata.json",
+      "transcript": "/7c/5b8c7415ec/0/full.jsonl",
+      "content_hash": "/7c/5b8c7415ec/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 1135,
+    "cache_read_tokens": 205861,
+    "output_tokens": 758,
+    "api_call_count": 2
+  }
+}

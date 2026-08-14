@@ -1,0 +1,4 @@
+Pull the last tidbit from the most recent claude chat and see the staged & unstaged changes... I would like for you to enforce the no unwrap programmatically via the rust/cargo/clippy config.
+
+I want you to run the verify command, S-30 isn't included... Also, why is forces.csv holding the shortnames? purposes.csv and stressors.csv should be holding those... In fact, what purpose does forces.csv really hold compared to purposes.csv and stressors.csv? It seems like one version is out of date...
+I would then like for you to /residual-tdd-implement the new set of forces.

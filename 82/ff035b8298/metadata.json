@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "82ff035b8298",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "demos/naive-draft-dogfood.md",
+    "demos/purpose-walk-product-purposes.md",
+    "demos/stressor-walk-session-lifecycle.md",
+    "residual/.storage-hashes",
+    "residual/attractors.csv",
+    "residual/forces.csv",
+    "residual/purposes.csv",
+    "residual/stressors.csv",
+    "src/cli.rs",
+    "src/main.rs",
+    "src/skills/definitions/tdd_implement.md",
+    "src/skills/install.rs",
+    "src/skills/mod.rs",
+    "src/storage/format.rs",
+    "tests/a06_fluent_capture.rs",
+    "tests/a07_software_only_tunnel_vision.rs",
+    "tests/architecture_iter4_v3.rs",
+    "tests/integration.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/82/ff035b8298/0/metadata.json",
+      "transcript": "/82/ff035b8298/0/full.jsonl",
+      "content_hash": "/82/ff035b8298/0/content_hash.txt",
+      "prompt": "/82/ff035b8298/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 490,
+    "cache_creation_tokens": 217904,
+    "cache_read_tokens": 3903853,
+    "output_tokens": 37907,
+    "api_call_count": 51
+  }
+}

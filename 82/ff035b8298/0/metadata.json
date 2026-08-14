@@ -1,0 +1,212 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "82ff035b8298",
+  "session_id": "6e9c6c52-0c65-4408-b91f-fdee5dcd9ff6",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-14T00:02:59.189679886Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "Cargo.toml",
+    "LICENSE",
+    "README.md",
+    "demos/naive-draft-dogfood.md",
+    "demos/purpose-walk-product-purposes.md",
+    "demos/stressor-walk-session-lifecycle.md",
+    "residual/.storage-hashes",
+    "residual/attractors.csv",
+    "residual/forces.csv",
+    "residual/purposes.csv",
+    "residual/stressors.csv",
+    "src/cli.rs",
+    "src/main.rs",
+    "src/skills/definitions/tdd_implement.md",
+    "src/skills/install.rs",
+    "src/skills/mod.rs",
+    "src/storage/format.rs",
+    "tests/a06_fluent_capture.rs",
+    "tests/a07_software_only_tunnel_vision.rs",
+    "tests/architecture_iter4_v3.rs",
+    "tests/integration.rs"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "9fdcc5728148",
+  "token_usage": {
+    "input_tokens": 490,
+    "cache_creation_tokens": 217904,
+    "cache_read_tokens": 3903853,
+    "output_tokens": 37907,
+    "api_call_count": 51
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01Rt9f2KUD4fvkHhAa3t1rK9",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9fdcc5728148",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 179,
+        "end": 180,
+        "entry_ids": [
+          "1a9d3544-1867-4c86-b8d2-21279323e293"
+        ],
+        "tool_use_id": "toolu_01Rt9f2KUD4fvkHhAa3t1rK9"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Rt9f2KUD4fvkHhAa3t1rK9"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01NZVR9xiXwairtZjWKmmz6W",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9fdcc5728148",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 191,
+        "end": 192,
+        "entry_ids": [
+          "5bc2b6f5-4e0a-4ae4-9c53-7fb3682cc5c0"
+        ],
+        "tool_use_id": "toolu_01NZVR9xiXwairtZjWKmmz6W"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01NZVR9xiXwairtZjWKmmz6W"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01TZQFrch1XiN93mgRBp96GB",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9fdcc5728148",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 196,
+        "end": 197,
+        "entry_ids": [
+          "7f7e2dd6-392d-434b-815d-8dacbcc8e8b5"
+        ],
+        "tool_use_id": "toolu_01TZQFrch1XiN93mgRBp96GB"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01TZQFrch1XiN93mgRBp96GB"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-14T00:02:59.171533064Z",
+    "agent_lines": 0,
+    "agent_removed": 4,
+    "human_added": 0,
+    "human_modified": 20,
+    "human_removed": 83,
+    "total_committed": 13,
+    "total_lines_changed": 116,
+    "agent_percentage": 3.4482758620689653,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 927,
+      "user_lines_removed": 103,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/CLAUDE.md": 30,
+        ".claude/agents/entire-search.md": 25,
+        ".claude/settings.json": 84,
+        ".claude/settings.local.json": 10,
+        ".cursor/hooks.json": 40,
+        ".gitignore": 1,
+        "LICENSE": 21,
+        "README.md": 28,
+        "demos/naive-draft-dogfood.md": 118,
+        "demos/purpose-walk-product-purposes.md": 165,
+        "demos/stressor-walk-session-lifecycle.md": 222,
+        "residual/.storage-hashes": 8,
+        "residual/attractors.csv": 3,
+        "residual/forces.csv": 5,
+        "residual/purposes.csv": 1,
+        "residual/stressors.csv": 2,
+        "src/cli.rs": 6,
+        "src/skills/definitions/tdd_implement.md": 93,
+        "src/skills/install.rs": 9,
+        "src/skills/mod.rs": 41,
+        "tests/a06_fluent_capture.rs": 5,
+        "tests/a07_software_only_tunnel_vision.rs": 3,
+        "tests/integration.rs": 7
+      },
+      "user_removed_per_file": {
+        ".claude/CLAUDE.md": 7,
+        "README.md": 6,
+        "residual/.storage-hashes": 7,
+        "residual/attractors.csv": 2,
+        "residual/forces.csv": 4,
+        "src/cli.rs": 29,
+        "src/skills/install.rs": 8,
+        "src/skills/mod.rs": 19,
+        "tests/a06_fluent_capture.rs": 5,
+        "tests/a07_software_only_tunnel_vision.rs": 3,
+        "tests/architecture_iter4_v3.rs": 6,
+        "tests/integration.rs": 7
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 10,
+      "user_lines_removed": 0,
+      "agent_lines_added": 943,
+      "agent_lines_removed": 107,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 10
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+Why does forces.csv exist?
+
+---
+
+Outcomes NEVER go in residues.csv. Where did that idea come from? Also, I just wanted purposes.csv & stressors.csv to share the same shape... It's much cleaner keeping them separate. Go ahead and fix that so forces.csv is no more, make sure terminology.csv has been fully migrated away from & actually complete the migration.
+
+---
+
+Why did analysis/stressors.rs stop being used? Why has the storage version become the de-facto!?? STOP making decisions like this! Don't just nuke pieces of architecture. The storage module should depend on the analysis module... The analysis module should hold ALL FORCE TYPES! ALSO DON'T DELETE THE FORCE TYPE WTF... I said to delete the csv and place them back in the correct files, not to rework the entire object structure.

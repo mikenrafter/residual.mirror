@@ -1,1 +1,1 @@
-enable and commit w/ super strict mode
+amend in my gitignore change

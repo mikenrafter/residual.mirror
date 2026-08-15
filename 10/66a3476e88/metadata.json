@@ -5,6 +5,7 @@
   "branch": "main",
   "checkpoints_count": 0,
   "files_touched": [
+    ".gitignore",
     "residual/config.toml"
   ],
   "sessions": [
@@ -16,10 +17,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 7,
-    "cache_creation_tokens": 782,
-    "cache_read_tokens": 220677,
-    "output_tokens": 615,
-    "api_call_count": 5
+    "input_tokens": 4,
+    "cache_creation_tokens": 158,
+    "cache_read_tokens": 89823,
+    "output_tokens": 221,
+    "api_call_count": 2
   }
 }

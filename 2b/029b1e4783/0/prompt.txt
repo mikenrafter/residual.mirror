@@ -1,0 +1,43 @@
+A real test of residual on another project surfaced this:
+
+---
+Which part of the skill needs adjustment
+
+Phase 1 — Discuss jumps straight to "surface candidate vertical slices and module boundaries." That presupposes an initialized ledger (attractor gives the target, stressors give the constraints, purposes give the behavioral contracts that slices are sliced from). When the ledger is empty there's nothing to anchor slices against, so the agent naturally gravitates to the most recently touched code — exactly the mistake I made.
+
+The skill needs a Phase 0 — Bootstrap guard: if skill data returns empty purposes/stressors/attractors, halt slice analysis and establish the three primitives first. Something like:
+
+▎ If the ledger is empty, treat this as project onboarding. Before discussing slices: (1) surface the attractor from the system description; (2) elicit stressors; (3) derive purposes. Present all three to the user for approval before any residual add calls.
+
+^ this is a prompt tweak the agent suggested.
+
+Additionally:
+
+---
+Proposed residual entries — seeking your approval before any residual add
+
+Attractor (1)
+
+▎ A human-supervised multi-agent job search system that discovers, evaluates, and pursues positions — generating compliance-ready CDLE activity records and producing application materials grounded in real resume data — while acting only with explicit operator approval for all external outputs.
+
+^ this is definitely not what an attractor is... That's quite clearly a bundled set of purposes... basically that project's mission statement.
+
+I need agents to actually understand the framework going in. I need agents to correctly ascertain what an uninitialized project means (the agent saw the blank data, but didn't act correctly on it)
+
+---
+
+For clarity, I ran naive-draft. But, ALL paths should lead to a proper initialization. The skill subcommand calls should also nudge the agent in the direction of getting things off the ground when: attractors > stressors or 0 == purposes or 0 == attractors or 0 == stressors. When getting things off the ground, the agents should be pushed toward rich understanding of purpose, current structure and pain points (architectural complexity, especially when the vcs highlights it as something the original architecture was naive to)
+
+---
+
+OK, now - what stressor + attractor did we encounter here? The purpose these changes map to? Anything new to add there? We have empirical "it effected these components" data.
+
+---
+
+skill-definitions is part of skill-phases. no need to get more granular there. Yes, drop S-08's storage connection. What's unclear from my model of residuality is whether an instance of an attractor + stressor not needing to change a component that's listed means the stressor needs refinement or refactoring... For now, I'll just operate on a case-by-case basis... Though, cases like this really serve to bolster a stressor - so we should add this to the research pile (the metadata one, not the project bootstrapping research) - and that should be codified, actually. A stressor would be force definitions that don't empirically line up with their suspected patterns - outcome: research logs should be kept of attractor occurences. This one effects skill-phases prmarily. The naive change is a skill modification one.
+
+1. - stressor looks good, we need a new attractor for this one. Architecture clarity is far too broad. Agent framework coherence (-) The agent fails to understand the residuality framework or its terms, (+) The agent understands the residuality framework and its terms. And another: Initialization Completion (-) The agent jumps into framework steps before initialization, (=) The agent initializes before jumping into framework steps.
+2. - yep, point toone of the new attractors.
+3. - see above
+
+delete A-01 and find new homes for its forces. if any don't cleanly map somewhere, bring them to me & we'll discuss.

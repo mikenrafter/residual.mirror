@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "619301906e10",
+  "session_id": "d476f2e4-8991-4c81-9bba-ad664567645b",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-15T11:00:59.532049166Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/skills/context.rs",
+    "src/skills/definitions/atam.md",
+    "src/skills/definitions/fmea.md",
+    "src/skills/definitions/integrate.md",
+    "src/skills/definitions/naive_draft.md",
+    "src/skills/definitions/purpose_walk.md",
+    "src/skills/definitions/stressor_walk.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "406b260f9db3",
+  "checkpoint_transcript_start": 135,
+  "transcript_lines_at_start": 135,
+  "token_usage": {
+    "input_tokens": 1,
+    "cache_creation_tokens": 467,
+    "cache_read_tokens": 43002,
+    "output_tokens": 310,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-15T11:00:59.525275571Z",
+    "agent_lines": 159,
+    "agent_removed": 9,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 159,
+    "total_lines_changed": 168,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}

@@ -1,0 +1,43 @@
+Clean. Exactly 3 remaining A-01 references — all in the research/credibility territory. Now the question for you:
+
+S-22, P-14, P-15 all say the same thing: "the method must have demonstrable, communicable evidence of its efficacy." They don't fit any existing attractor without stretching. I'd propose a third new attractor:
+
+Methodology Credibility
+- (+) The residuality method has demonstrable evidence of efficacy that is communicable to prospects
+- (−) The residuality method looks like ungrounded ceremony — prospects cannot evaluate its claims empirically
+
+That would give all three a clean home and let A-01 be fully deleted. Or you may want a different framing — these are the only three left blocking the delete.
+
+^ from last chat
+
+Currently, there are some journal-published essays on the topic, and it seems to be spreading to other disciplines than SWE. It was released mid-last year. Only time will tell here.
+
+---
+
+Clean. Exactly 3 remaining A-01 references — all in the research/credibility territory. Now the question for you:
+
+S-22, P-14, P-15 all say the same thing: "the method must have demonstrable, communicable evidence of its efficacy." They don't fit any existing attractor without stretching. I'd propose a third new attractor:
+
+Methodology Credibility
+- (+) The residuality method has demonstrable evidence of efficacy that is communicable to prospects
+- (−) The residuality method looks like ungrounded ceremony — prospects cannot evaluate its claims empirically
+
+That would give all three a clean home and let A-01 be fully deleted. Or you may want a different framing — these are the only three left blocking the delete.
+
+^ from last chat
+
+Currently, there are some journal-published essays on the topic, and it seems to be spreading to other disciplines than SWE. It was released mid-last year. Only time will tell here.
+
+So, add that attractor and dissolve A-01. Verify everything looks good and commit (1-3 topical commits)
+
+---
+
+You could also just replace A-01, since its links other than those mentioned here are gone...
+
+---
+
+commit all, not just what you did here
+
+---
+
+commit all, not just what you did here - in 1-3 commits

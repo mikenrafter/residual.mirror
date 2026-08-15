@@ -1,0 +1,72 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "2b029b1e4783",
+  "session_id": "d476f2e4-8991-4c81-9bba-ad664567645b",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-15T10:58:02.307016898Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "residual/.storage-hashes",
+    "residual/attractors.csv",
+    "residual/purposes.csv",
+    "residual/stressors.csv"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "65a4aa3ddf95",
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 20264,
+    "cache_read_tokens": 410880,
+    "output_tokens": 3941,
+    "api_call_count": 17
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-15T10:58:02.298701207Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 1,
+    "human_removed": 20,
+    "total_committed": 0,
+    "total_lines_changed": 21,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 194,
+      "user_lines_removed": 29,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 10,
+        "residual/.storage-hashes": 3,
+        "residual/attractors.csv": 3,
+        "residual/purposes.csv": 14,
+        "residual/stressors.csv": 5,
+        "src/skills/context.rs": 126,
+        "src/skills/definitions/atam.md": 4,
+        "src/skills/definitions/fmea.md": 4,
+        "src/skills/definitions/integrate.md": 4,
+        "src/skills/definitions/naive_draft.md": 13,
+        "src/skills/definitions/purpose_walk.md": 4,
+        "src/skills/definitions/stressor_walk.md": 4
+      },
+      "user_removed_per_file": {
+        "residual/.storage-hashes": 3,
+        "residual/attractors.csv": 1,
+        "residual/purposes.csv": 13,
+        "residual/stressors.csv": 3,
+        "src/skills/definitions/atam.md": 1,
+        "src/skills/definitions/fmea.md": 1,
+        "src/skills/definitions/integrate.md": 1,
+        "src/skills/definitions/naive_draft.md": 4,
+        "src/skills/definitions/purpose_walk.md": 1,
+        "src/skills/definitions/stressor_walk.md": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+Generate a title that will help the user recognize this T3 Code thread weeks later.
+Return JSON with exactly one key: title.
+
+Before answering, silently reduce the request to:
+- Subject: What system, feature, or problem is this really about?
+- Outcome: What does the user ultimately want to understand or change?
+- Incidental instructions: What only describes how the agent should do the work?
+
+Title the subject and outcome. Discard incidental instructions.
+
+Editorial rules:
+- 3-8 words, fewer than 40 characters.
+- Use a compact noun phrase or clear action phrase.
+- Capture the umbrella goal when the request lists several symptoms or steps.
+- Name the product change, not the mock, plan, report, branch, or PR used to produce it.
+- Models, subagents, tools, output formats, and monitoring instructions do not belong in the title unless they are themselves the topic.
+- For reviews, name what is being reviewed and the relevant concern. Avoid generic titles such as "Review PR 123" when linked or attached context reveals the subject.
+- For research, name the question domain rather than the requested research process.
+- Do not claim the work is complete.
+- Do not copy and truncate the user's message.
+- Avoid project names already visible in the UI, quotes, labels, filler, and trailing punctuation.
+- Use attached images as primary context for UI issues.
+- When a URL or attachment is the only source of the subject, use available tools to inspect it. If it cannot be resolved, remain accurate rather than guessing.
+
+User message:
+/residual-stressor-walk Let's do a stressor walk for a few things:
+- LLM Degradation (We'll need to take a leaf from James Phoenix here - stress testing prompts against worse models and iterating until the floor for the cognitive task has been located)
+- AI Bubble Collapse (This tool will need to become decidedly more human-focused. Assuming the economic turmoil isn't so great that software becomes useless then we'll want things like UX that isn't just CLI use and skill files)
+- Management not being on board with residuality (we'll need a way to transmute these forward thinking thoughts into either convincing arguments for the customer to then repeat for us or convincing arguments that don't trigger the anti-waterfall agile-immune-system)
+- Other engineers being anti-documentation-in-codebase (in this and the prior, we'll take an optional leaf from entireio's book)
+- Operators not seeking external input (LLMs, personas and Socratic/Eliza-like systems are helpful but ultimately don't constitute the same degree of creativity and randomness that residuality theory calls for - it's a pale simulacra... Better than 1 person but worse than 3/more)

@@ -3,8 +3,14 @@
   "checkpoint_id": "524d8796595d",
   "strategy": "manual-commit",
   "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
+    "residual/.storage-hashes",
+    "residual/attractors.csv",
+    "residual/lexicon.csv",
+    "residual/purposes.csv",
+    "residual/residues.csv",
+    "residual/stressors.csv",
     "src/skills/definitions/atam.md",
     "src/skills/definitions/fmea.md",
     "src/skills/definitions/framework.md",
@@ -21,13 +27,20 @@
       "compact_transcript": "/52/4d8796595d/0/transcript.jsonl",
       "content_hash": "/52/4d8796595d/0/content_hash.txt",
       "prompt": "/52/4d8796595d/0/prompt.txt"
+    },
+    {
+      "metadata": "/52/4d8796595d/1/metadata.json",
+      "transcript": "/52/4d8796595d/1/full.jsonl",
+      "compact_transcript": "/52/4d8796595d/1/transcript.jsonl",
+      "content_hash": "/52/4d8796595d/1/content_hash.txt",
+      "prompt": "/52/4d8796595d/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 2,
-    "cache_creation_tokens": 13555,
+    "input_tokens": 4,
+    "cache_creation_tokens": 39731,
     "cache_read_tokens": 16779,
-    "output_tokens": 196,
-    "api_call_count": 1
+    "output_tokens": 704,
+    "api_call_count": 2
   }
 }

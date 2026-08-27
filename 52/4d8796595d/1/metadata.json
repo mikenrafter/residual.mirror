@@ -1,0 +1,89 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "524d8796595d",
+  "session_id": "b45f44ef-2f2b-4f91-ba89-8c019c463c94",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-27T02:22:18.766054096Z",
+  "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "residual/.storage-hashes",
+    "residual/attractors.csv",
+    "residual/lexicon.csv",
+    "residual/purposes.csv",
+    "residual/residues.csv",
+    "residual/stressors.csv",
+    "src/skills/definitions/atam.md",
+    "src/skills/definitions/fmea.md",
+    "src/skills/definitions/framework.md",
+    "src/skills/definitions/integrate.md",
+    "src/skills/definitions/naive_draft.md",
+    "src/skills/definitions/purpose_walk.md",
+    "src/skills/definitions/stressor_walk.md",
+    "src/skills/mod.rs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "642557ea9e36",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 26176,
+    "cache_read_tokens": 0,
+    "output_tokens": 508,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-27T02:22:18.761156064Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 2,
+    "human_removed": 118,
+    "total_committed": 20,
+    "total_lines_changed": 120,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 285,
+      "user_lines_removed": 119,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".storage-hashes": 15,
+        "attractors.csv": 3,
+        "iterations/1.md": 8,
+        "iterations/2.md": 8,
+        "lexicon.csv": 10,
+        "purposes.csv": 6,
+        "residual/.storage-hashes": 6,
+        "residual/attractors.csv": 4,
+        "residual/lexicon.csv": 4,
+        "residual/purposes.csv": 6,
+        "residual/residues.csv": 48,
+        "residual/stressors.csv": 14,
+        "src/skills/definitions/atam.md": 7,
+        "src/skills/definitions/fmea.md": 7,
+        "src/skills/definitions/framework.md": 102,
+        "src/skills/definitions/integrate.md": 7,
+        "src/skills/definitions/naive_draft.md": 7,
+        "src/skills/definitions/purpose_walk.md": 7,
+        "src/skills/definitions/stressor_walk.md": 7,
+        "src/skills/mod.rs": 3,
+        "stressors.csv": 6
+      },
+      "user_removed_per_file": {
+        "residual/.storage-hashes": 6,
+        "residual/residues.csv": 111,
+        "src/skills/mod.rs": 2
+      }
+    }
+  ]
+}

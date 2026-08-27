@@ -9,6 +9,7 @@ pub mod phases;
 pub mod research;
 
 pub const SKILLS: &[(&str, &str, u32)] = &[
+    ("framework",       include_str!("definitions/framework.md"),       0),
     ("purpose-walk",    include_str!("definitions/purpose_walk.md"),    0),
     ("naive-draft",     include_str!("definitions/naive_draft.md"),     0),
     ("stressor-walk",   include_str!("definitions/stressor_walk.md"),   0),
@@ -191,9 +192,9 @@ mod tests {
     #[test]
     fn all_skills_present() {
         let names: Vec<&str> = SKILLS.iter().map(|(n, _, _)| *n).collect();
-        for expected in &["purpose-walk", "naive-draft", "stressor-walk", "integrate", "fmea", "atam", "tdd-implement"] {
+        for expected in &["framework", "purpose-walk", "naive-draft", "stressor-walk", "integrate", "fmea", "atam", "tdd-implement"] {
             assert!(names.contains(expected), "missing skill: {}", expected);
         }
-        assert_eq!(SKILLS.len(), 7, "expected exactly 7 skills");
+        assert_eq!(SKILLS.len(), 8, "expected exactly 8 skills");
     }
 }

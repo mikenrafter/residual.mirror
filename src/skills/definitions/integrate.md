@@ -9,6 +9,13 @@ version: 2
 
 Use the NKP matrix to derive the residual architecture. Apply fusion, fission, and criticality analysis. Prototype competing architectures if needed.
 
+## Model
+- **Attractor** — a recurring system *state*, not a goal. Two sides: `positive_state` (healthy) and `negative_state` (broken). One per stable behavioral mode.
+- **Stressor** — a force that pushes the system from positive to negative attractor. Coherence matters, not likelihood. No probability required.
+- **Purpose** — a behavioral contract that must hold for the attractor to stay positive. Uses terms from the project lexicon in its outcomes.
+- **Component** — a coupling label on stressor and purpose records (the `--components` field). Not a first-class entity. There is no `components.csv`. The NKP matrix is derived from which component names co-appear across force records.
+- **Ledger** — five files: `attractors.csv`, `stressors.csv`, `purposes.csv`, `terminology.csv`, `personas.csv`. Nothing else.
+
 ## Interaction Pattern
 This skill is Socratic.
 - **Gather freely**: read commands (`skill data`, `matrix show`, `matrix fusion`, `matrix fission`, `matrix criticality`) run without asking.

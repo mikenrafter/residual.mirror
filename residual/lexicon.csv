@@ -21,3 +21,7 @@ outcome,"what a trait encodes: a desired end state, mode of operation, journey, 
 probability-framing,encoding exploration as likelihoods or risk scores; in non-ergodic hyperliminal systems probabilities are exclusionary opinions — they collapse unseen attractors and block full state-space walks because only pre-weighted futures get attention,methodology,stressor attractor hyperliminal
 prospect,a potential operator who has not yet adopted residuality; may be evaluating efficacy before becoming an operator,tool,operator skill walk
 user,a person or system that uses the application or service being architected; not the residual operator or prospect,architecture,persona operator prospect walk
+ergodic boundary,"The boundary, defined per architecture iteration, between the ergodic core under architectural consideration and the non-ergodic torrent of the hyperliminal; force descriptions primarily beyond it concern architecture, while descriptions within it concern component dynamics.",,
+component dynamic,Behavior explained within an ergodic boundary by the operation and interaction of known components rather than by a force originating primarily beyond that boundary.,,
+architecture iteration,"A time-bounded candidate arrangement of components and boundaries against which forces, attractors, and residues are interpreted.",,
+actor,A human operator or non-human agent whose behavior matters to a force narrative; used when the distinction between them is irrelevant.,,

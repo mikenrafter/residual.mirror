@@ -3,7 +3,7 @@
   "checkpoint_id": "524d8796595d",
   "strategy": "manual-commit",
   "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
-  "checkpoints_count": 2,
+  "checkpoints_count": 20,
   "files_touched": [
     "residual/.storage-hashes",
     "residual/attractors.csv",
@@ -34,13 +34,20 @@
       "compact_transcript": "/52/4d8796595d/1/transcript.jsonl",
       "content_hash": "/52/4d8796595d/1/content_hash.txt",
       "prompt": "/52/4d8796595d/1/prompt.txt"
+    },
+    {
+      "metadata": "/52/4d8796595d/2/metadata.json",
+      "transcript": "/52/4d8796595d/2/full.jsonl",
+      "compact_transcript": "/52/4d8796595d/2/transcript.jsonl",
+      "content_hash": "/52/4d8796595d/2/content_hash.txt",
+      "prompt": "/52/4d8796595d/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 4,
-    "cache_creation_tokens": 39731,
-    "cache_read_tokens": 16779,
-    "output_tokens": 704,
-    "api_call_count": 2
+    "input_tokens": 108,
+    "cache_creation_tokens": 169735,
+    "cache_read_tokens": 5702029,
+    "output_tokens": 93838,
+    "api_call_count": 54
   }
 }

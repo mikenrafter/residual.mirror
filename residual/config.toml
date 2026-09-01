@@ -1,5 +1,5 @@
-# residual v3 configuration (migrated from naive)
-format_version = "v3"
+# residual v4 configuration
+format_version = "v4"
 
 [storage]
 change_detection = true

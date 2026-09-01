@@ -1,4 +1,4 @@
-//! Residue persistence — matrix-shaped residues.csv with append ergonomics.
+//! Residue persistence — matrix-shaped residues.csv (NKP coupling source).
 
 use anyhow::{bail, Result};
 use std::path::Path;
@@ -16,8 +16,8 @@ pub fn append(residual_dir: &Path, residue: Residue) -> Result<()> {
         .iter_mut()
         .find(|r| r.force_id == residue.force_id && r.component_id == residue.component_id)
     {
-        existing.status = residue.status;
-        existing.notes = residue.notes;
+        existing.status = "1".into();
+        existing.notes.clear();
         if existing.id.is_empty() {
             existing.id = residue.id;
         }
@@ -67,6 +67,7 @@ pub fn append_whole_system(
     if !force_exists(residual_dir, force_id)? {
         bail!("force id '{}' not found in stressors or purposes", force_id);
     }
+    merge_force_notes(residual_dir, force_id, notes)?;
     let existing = load(residual_dir)?;
     let id = next_id(&existing);
     append(
@@ -74,4 +75,34 @@ pub fn append_whole_system(
         Residue::whole_system(id.clone(), force_id, notes),
     )?;
     Ok(id)
+}
+
+fn merge_force_notes(residual_dir: &Path, force_id: &str, notes: &str) -> Result<()> {
+    let note = notes.trim();
+    if note.is_empty() {
+        return Ok(());
+    }
+    if let Ok(mut stressors) = crate::storage::stressors::load(residual_dir) {
+        if let Some(s) = stressors.iter_mut().find(|s| s.id == force_id) {
+            if !s.naive_change.contains(note) {
+                if !s.naive_change.is_empty() {
+                    s.naive_change.push(' ');
+                }
+                s.naive_change.push_str(note);
+            }
+            return crate::storage::stressors::write_all_pub(residual_dir, &stressors);
+        }
+    }
+    if let Ok(mut purposes) = crate::storage::purposes::load(residual_dir) {
+        if let Some(p) = purposes.iter_mut().find(|p| p.id == force_id) {
+            if !p.naive_change.contains(note) {
+                if !p.naive_change.is_empty() {
+                    p.naive_change.push(' ');
+                }
+                p.naive_change.push_str(note);
+            }
+            return crate::storage::purposes::write_all_pub(residual_dir, &purposes);
+        }
+    }
+    Ok(())
 }

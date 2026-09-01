@@ -59,18 +59,23 @@ pub fn read_lexicon(residual_dir: &Path) -> Result<Vec<Term>> {
 }
 
 fn parse_residue_cell(cell: &str) -> (String, String) {
-    if let Some((status, notes)) = cell.split_once('|') {
-        (status.trim().to_string(), notes.trim().to_string())
-    } else {
-        (cell.trim().to_string(), String::new())
+    let cell = cell.trim();
+    if cell.is_empty() {
+        return (String::new(), String::new());
     }
+    // Legacy status|notes (pre-NKP-matrix residues).
+    if let Some((status, notes)) = cell.split_once('|') {
+        return (status.trim().to_string(), notes.trim().to_string());
+    }
+    // NKP coupling: any non-empty cell means coupled.
+    ("1".to_string(), String::new())
 }
 
 fn format_residue_cell(status: &str, notes: &str) -> String {
-    if notes.is_empty() {
-        status.to_string()
+    if status.is_empty() && notes.is_empty() {
+        String::new()
     } else {
-        format!("{status}|{notes}")
+        "1".to_string()
     }
 }
 
@@ -91,14 +96,14 @@ fn residues_to_rows(
     let mut components = BTreeSet::new();
     let mut cells: BTreeMap<String, BTreeMap<String, (String, String)>> = BTreeMap::new();
     for r in residues {
-        if r.force_id.is_empty() || r.component_id.is_empty() {
+        if r.force_id.is_empty() || r.component_id.is_empty() || !r.is_coupled() {
             continue;
         }
         components.insert(r.component_id.clone());
         cells
             .entry(r.force_id.clone())
             .or_default()
-            .insert(r.component_id.clone(), (r.status.clone(), r.notes.clone()));
+            .insert(r.component_id.clone(), ("1".into(), String::new()));
     }
     (components.into_iter().collect(), cells)
 }
@@ -304,7 +309,7 @@ mod tests {
     fn format_roundtrips_residues_and_attractors_v3() {
         let dir = tempdir().unwrap();
         let mut residue = Residue::new("R-01", "S-01", "cli");
-        residue.status = "proposed".to_string();
+        residue.status = "1".to_string();
         let attractor = Attractor::new(
             "A-01",
             "Clarity",
@@ -313,7 +318,27 @@ mod tests {
         );
         write_residues(dir.path(), &[residue.clone()]).unwrap();
         write_attractors_v3(dir.path(), &[attractor.clone()]).unwrap();
-        assert_eq!(read_residues(dir.path()).unwrap(), vec![residue]);
+        let read = read_residues(dir.path()).unwrap();
+        assert_eq!(read.len(), 1);
+        assert_eq!(read[0].force_id, "S-01");
+        assert_eq!(read[0].component_id, "cli");
+        assert_eq!(read[0].status, "1");
+        let matrix = std::fs::read_to_string(dir.path().join("residues.csv")).unwrap();
+        assert!(matrix.contains(",1"), "matrix cell should be coupling mark 1");
         assert_eq!(read_attractors_v3(dir.path()).unwrap(), vec![attractor]);
+    }
+
+    #[test]
+    fn parse_residue_cell_treats_one_as_coupled() {
+        let (status, notes) = parse_residue_cell("1");
+        assert_eq!(status, "1");
+        assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn parse_residue_cell_reads_legacy_status_notes() {
+        let (status, notes) = parse_residue_cell("proposed|note");
+        assert_eq!(status, "proposed");
+        assert_eq!(notes, "note");
     }
 }

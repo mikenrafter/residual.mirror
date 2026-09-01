@@ -104,7 +104,7 @@ struct V3VerificationSection {
 }
 
 fn parse_any(raw: &str) -> Result<Config> {
-    // v3 TOML: [verification] / [storage] / format_version. Policy keys map onto
+    // Storage TOML ([verification] / [storage] / format_version v3 or v4). Policy keys map onto
     // the legacy Config fields so the rest of the binary stays stable.
     if raw.contains("format_version") || raw.contains("[verification]") || raw.contains("[storage]")
     {

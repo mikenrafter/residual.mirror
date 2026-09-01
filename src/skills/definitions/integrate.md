@@ -13,8 +13,8 @@ Use the NKP matrix to derive the residual architecture. Apply fusion, fission, a
 - **Attractor** — a recurring system *state*, not a goal. Two sides: `positive_state` (healthy) and `negative_state` (broken). One per stable behavioral mode.
 - **Stressor** — a force that pushes the system from positive to negative attractor. Coherence matters, not likelihood. No probability required.
 - **Purpose** — a behavioral contract that must hold for the attractor to stay positive. Uses terms from the project lexicon in its outcomes.
-- **Component** — a coupling label on stressor and purpose records (the `--components` field). Not a first-class entity. There is no `components.csv`. The NKP matrix is derived from which component names co-appear across force records.
-- **Ledger** — five files: `attractors.csv`, `stressors.csv`, `purposes.csv`, `terminology.csv`, `personas.csv`. Nothing else.
+- **Component** — a fully-qualified name in `components.csv`. Forces do not list components. Coupling is recorded only in `residues.csv` (the NKP matrix) via `residual add residue --force-id … --component-id …`.
+- **Ledger** — `attractors.csv`, `stressors.csv`, `purposes.csv`, `residues.csv`, `components.csv`, `lexicon.csv`, `personas/<name>.md`.
 
 ## Interaction Pattern
 This skill is Socratic.
@@ -22,7 +22,7 @@ This skill is Socratic.
 - **Act only with approval**: any modification — `residual add stressor`, `add iteration`, `matrix ri` — requires explicit user sign-off before executing.
 
 ## Bootstrap Guard
-Check `residual skill data integrate` for a **Bootstrap Required** section. If present, **halt** — the NKP matrix is computed from stressors and components; an empty or underspecified ledger produces a degenerate matrix with nothing to fuse, fission, or compare. Follow the bootstrapping steps in the skill data output before running any matrix commands.
+Check `residual skill data integrate` for a **Bootstrap Required** section. If present, **halt** — the NKP matrix is built from `residues.csv`; an empty or underspecified ledger produces a degenerate matrix with nothing to fuse, fission, or compare. Follow the bootstrapping steps in the skill data output before running any matrix commands.
 
 ## Process
 1. Run `residual matrix show` — identify high-coupling components and hyperliminal pairs.

@@ -32,7 +32,7 @@ fn init_dirs_and_files(cfg: &Config) -> Result<()> {
     fs::create_dir_all(dir.join("personas"))?;
     fs::create_dir_all(dir.join("research"))?;
 
-    // Write v3 config.toml if not present (storage-config owns app + verify policy).
+    // Write config.toml if not present (storage-config; format_version v4 by default).
     let config_path = dir.join("config.toml");
     if !config_path.exists() {
         let toml = crate::storage::config::render_v3(&crate::storage::config::StorageConfig::default());
@@ -41,8 +41,8 @@ fn init_dirs_and_files(cfg: &Config) -> Result<()> {
 
     // Write empty CSVs with headers if not present
     let csvs: &[(&str, &str)] = &[
-        ("stressors.csv", "id,shortname,description,naive_change,outcomes,components,attractor_id"),
-        ("purposes.csv", "id,shortname,description,naive_change,outcomes,components,attractor_id"),
+        ("stressors.csv", "id,shortname,description,naive_change,outcomes,attractor_id"),
+        ("purposes.csv", "id,shortname,description,naive_change,outcomes,attractor_id"),
         ("attractors.csv", "id,name,description,positive_state,negative_state"),
         ("lexicon.csv", "term,definition,domain,aliases"),
         ("residues.csv", "force"),
@@ -73,7 +73,6 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
             naive_change,
             shortname,
             outcomes,
-            components,
             whole_system,
             notes,
         } => {
@@ -95,7 +94,6 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
                 attractor_id,
                 naive_change,
                 outcomes,
-                components,
             })?;
             if whole_system {
                 let residue_id = residues::append_whole_system(dir, &id, &notes)?;
@@ -106,9 +104,8 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
         AddTarget::Residue {
             force_id,
             component_id,
-            status,
-            notes,
             whole_system,
+            notes,
         } => {
             if whole_system {
                 let id = residues::append_whole_system(dir, &force_id, &notes)?;
@@ -118,24 +115,18 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
                     anyhow::bail!("provide --component-id or --whole-system");
                 }
                 if !residues::force_exists(dir, &force_id)? {
-                    anyhow::bail!("force id '{}' not found in stressors, purposes, or forces", force_id);
+                    anyhow::bail!("force id '{}' not found in stressors or purposes", force_id);
                 }
                 let existing = residues::load(dir)?;
                 let id = residues::next_id(&existing);
                 residues::append(
                     dir,
-                    Residue {
-                        id: id.clone(),
-                        force_id,
-                        component_id,
-                        status,
-                        notes,
-                    },
+                    Residue::coupling(id.clone(), force_id, component_id),
                 )?;
-                println!("Added residue {}", id);
+                println!("Added residue coupling {}", id);
             }
         }
-        AddTarget::Purpose { description, attractor_id, naive_change, shortname, outcomes, components } => {
+        AddTarget::Purpose { description, attractor_id, naive_change, shortname, outcomes } => {
             let existing = purposes::load(dir)?;
             let id = purposes::next_id(&existing);
             purposes::append(dir, purposes::Purpose {
@@ -145,7 +136,6 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
                 attractor_id,
                 naive_change,
                 outcomes,
-                components,
             })?;
             println!("Added purpose {}", id);
         }
@@ -298,11 +288,13 @@ fn truncate_state(s: &str) -> String {
 pub fn migrate(cfg: &Config, force: bool) -> Result<()> {
     let report = integrity::migration::migrate_residual_dir(&cfg.residual_dir, force)?;
     println!(
-        "Migrated {} (config={}, attractors={}, lexicon={})",
+        "Migrated {} (config={}, attractors={}, lexicon={}, v4_couplings={}, v4_decoupled={})",
         cfg.residual_dir.display(),
         report.config_migrated,
         report.attractors,
-        report.lexicon_terms
+        report.lexicon_terms,
+        report.v4_residue_couplings,
+        report.v4_forces_decoupled
     );
     Ok(())
 }

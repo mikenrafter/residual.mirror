@@ -11,13 +11,14 @@ residual skill install <name> --agent claude   # install skill to .claude/comman
 residual skill install all --agent claude      # install all skills
 residual skill check-install <name> --agent claude  # verify installed version is current
 
-residual add stressor --description "..." --attractor-id A-01 --naive-change "..." --components "C1,C2"
-residual add purpose  --description "..." --attractor-id A-01 --feature "..." --traits "..."
-residual add attractor --name "..." --valence positive --description "..."
+residual add stressor --description "..." --attractor-id A-01 --naive-change "..." --outcomes "..."
+residual add residue --force-id S-01 --component-id C1
+residual add purpose  --description "..." --attractor-id A-01 --feature "..." --outcomes "..."
+residual add attractor --name "..." --positive-state "..." --negative-state "..." --description "..."
 residual add term --term "..." --definition "..."
 residual add persona --name "..." --role "..."
 
-residual list stressors / purposes / attractors / terminology / personas / iterations
+residual list stressors / purposes / attractors / terminology / residues / personas / iterations
 
 residual matrix show       # NKP matrix with hyperliminal coupling highlights
 residual matrix calc       # N, K, K/N values
@@ -41,7 +42,7 @@ Always run `residual skill data <name>` at the start of a session to get current
 
 **Always use `residual` CLI commands for data operations, even outside a skill session.** Never directly edit `residual/*.csv` files when a CLI command exists for the operation. Direct mutation bypasses ID generation, idempotency guards, and verify. This is a residue of **cli-bypass** (S-29) and the **tooling-circumvention** attractor (A-08).
 
-- Add forces: `residual add stressor / purpose / attractor / term / persona`
+- Add forces: `residual add stressor / purpose / attractor / term / persona`, then `residual add residue` for couplings
 - Read state: `residual list stressors / purposes / attractors / terminology`
 - Check integrity: `residual verify all`
 - Inspect coupling: `residual matrix show / calc / fusion / fission`
@@ -63,6 +64,6 @@ These are craft concerns, not residuality forces — they belong here, not in fo
 
 Stressors replace risks. Never assign probability or impact scores. A stressor only needs a coherent narrative of how the system moves to a different attractor.
 
-## Traits
+## Outcomes
 
-Format: `<subject> <verb> <predicate>`. At least one word must appear in `terminology.csv`. Pipe-separate multiple traits: `trait one | trait two`. Traits that don't reference terminology will fail `residual verify traits` and block commits.
+Format: `<subject> <verb> <predicate>`. At least one word must appear in `lexicon.csv`. Pipe-separate multiple outcomes: `outcome one | outcome two`. Outcomes that don't reference the lexicon will fail `residual verify outcomes` (alias `traits`) and block commits.

@@ -29,39 +29,43 @@ One attractor per stable behavioral mode. If a description lists two concerns jo
 ### Stressor
 A force from the system's environment that pushes it from positive to negative attractor. A stressor does not need to be likely — it only needs a coherent narrative of how the push happens. Sources: business environment, user behavior, operational conditions, regulatory change, team structure, third-party dependencies.
 
-Stressors are linked to an attractor and to the components they stress via `--components`.
+Stressors are linked to an attractor. Map stressed components via `residual add residue` (see Component below).
 
 ### Purpose
 A behavioral contract that must hold for the attractor to remain positive. If a purpose is absent or broken, the system moves toward its negative attractor. Every purpose must produce at least one outcome using terms from the project lexicon. Purposes are anchors for architecture: every vertical slice in the design should map to at least one purpose.
 
 ### Component
-A coupling label — not a first-class ledger entity. **There is no `components.csv`.** Components exist only as names in the `--components` field on stressor and purpose records. The NKP matrix is derived computationally from which component names co-appear across force records.
+A fully-qualified name registered in `components.csv` (implementation status lives there). **Forces do not carry component lists.** Coupling is recorded only in `residues.csv` — the NKP matrix — via `residual add residue --force-id … --component-id …`. `residual matrix show` reads that matrix.
 
 When a stressor affects two components that were not expected to be related, that is *hyperliminal coupling* — the naïve architecture did not anticipate this dependency.
 
-Named concepts, personas, voices, and workflow steps are **not** components unless they appear in a `--components` field on a force record.
+Named concepts, personas, voices, and workflow steps are **not** components unless they appear in the component registry and are coupled via residues.
 
 ### Terminology / Lexicon
-Domain terms that give outcomes their precision. Outcomes in stressors and purposes must use terms from `terminology.csv`. Vague language in outcomes means the outcome can never be verified — push back until the term is defined.
+Domain terms that give outcomes their precision. Outcomes in stressors and purposes must use terms from `lexicon.csv` (legacy `terminology.csv` is migrated by `residual migrate`). Vague language in outcomes means the outcome can never be verified — push back until the term is defined.
 
 ## The Ledger
 
-Five CSV files — nothing else belongs to the model:
+Core CSV files — nothing else belongs to the model:
 
 | file | contains |
 |------|----------|
 | `attractors.csv` | system states (positive + negative sides) |
-| `stressors.csv` | forces, each linked to an attractor + components |
-| `purposes.csv` | behavioral contracts, each linked to an attractor |
-| `terminology.csv` | domain vocabulary |
-| `personas.csv` | stakeholder voices (used in stressor-walk, fmea, atam) |
+| `stressors.csv` | stressor forces (outcomes, naïve change, attractor) |
+| `purposes.csv` | purpose forces (outcomes, naïve change, attractor) |
+| `residues.csv` | NKP coupling matrix (force × component, `1`/empty) |
+| `components.csv` | component registry (proposed/actual status) |
+| `lexicon.csv` | domain vocabulary |
+| `personas/<name>.md` | stakeholder voices (used in stressor-walk, fmea, atam) |
 
-**Always use `residual add ...` commands. Never edit CSVs directly** — direct edits bypass ID generation, idempotency guards, and `verify`.
+**Workflow:** `residual add stressor` or `add purpose`, then `residual add residue --force-id … --component-id …` for each coupling.
+
+**Always use `residual add …` commands. Never edit CSVs directly** — direct edits bypass ID generation, idempotency guards, and `verify`.
 
 ## NKP Matrix
 
-N = unique component names + number of stressors  
-K = total component coupling across all stressors  
+N = unique component names + number of forces (stressors + purposes with couplings)  
+K = total `1` marks in `residues.csv`  
 K/N = coupling density
 
 - Low K/N: components are relatively independent (easier to change in isolation)
@@ -83,7 +87,7 @@ Bootstrapping sequence (Socratic — propose each for approval before `residual 
 3. Propose the attractor for approval, then `residual add attractor`
 4. Elicit stressors from archaeological evidence and user discussion; propose each before recording
 5. Derive purposes from the attractor positive state; propose each before recording
-6. Add terminology as concepts emerge
+6. Add lexicon terms as concepts emerge
 
 ## Skill Overview
 

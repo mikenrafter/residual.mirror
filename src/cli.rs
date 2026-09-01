@@ -14,7 +14,7 @@ pub struct Cli {
 pub enum Command {
     /// Initialize residual/ in the current project.
     ///
-    /// Process: idempotent bootstrap — create residual/ CSVs and v3 config
+    /// Process: idempotent bootstrap — create residual/ CSVs and v4 config
     /// without overwriting existing data. Add attractors before forces.
     Init {
         /// Overwrite session snapshot when residual files drifted outside this tool.
@@ -82,7 +82,8 @@ pub enum Command {
     /// Migrate residual/ from legacy on-disk shape to current.
     ///
     /// Process: config → storage-config; terminology.csv → lexicon.csv;
-    /// attractors valence → +/- states; forces.csv deleted if present.
+    /// attractors valence → +/- states; v3 inline force components → residues.csv;
+    /// forces.csv deleted if present.
     Migrate {
         /// Overwrite session snapshot when residual files drifted outside this tool.
         #[arg(long)]
@@ -135,6 +136,7 @@ pub enum SkillCommand {
 #[derive(Subcommand)]
 pub enum AddTarget {
     /// Add a stressor force. Process: whole-system-residue first — record outcomes.
+    /// Map components via `residual add residue --force-id … --component-id …`.
     Stressor {
         #[arg(long)] description: String,
         #[arg(long)] attractor_id: String,
@@ -142,22 +144,22 @@ pub enum AddTarget {
         #[arg(long, default_value = "")] shortname: String,
         #[arg(long, default_value = "", visible_alias = "traits")]
         outcomes: String,
-        #[arg(long, default_value = "")] components: String,
         #[arg(long)]
         whole_system: bool,
         #[arg(long, default_value = "")]
         notes: String,
     },
-    /// Add a residue mapping. Process: whole-system-residue first for non-software zig.
+    /// Add force×component coupling to residues.csv (the NKP matrix).
     Residue {
         #[arg(long)] force_id: String,
         #[arg(long, default_value = "")] component_id: String,
-        #[arg(long, default_value = "proposed")] status: String,
-        #[arg(long, default_value = "")] notes: String,
+        #[arg(long, default_value = "")]
+        notes: String,
         #[arg(long)]
         whole_system: bool,
     },
     /// Add a purpose force. Process: whole-system-residue first — record outcomes.
+    /// Map components via `residual add residue --force-id … --component-id …`.
     Purpose {
         #[arg(long)] description: String,
         #[arg(long)] attractor_id: String,
@@ -166,7 +168,6 @@ pub enum AddTarget {
         #[arg(long, default_value = "")] shortname: String,
         #[arg(long, default_value = "", visible_alias = "traits")]
         outcomes: String,
-        #[arg(long, default_value = "")] components: String,
     },
     Attractor {
         #[arg(long)] name: String,

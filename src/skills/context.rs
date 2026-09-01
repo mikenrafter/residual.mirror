@@ -10,34 +10,17 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
     let terms      = crate::storage::format::read_lexicon(dir).unwrap_or_default();
     let personas   = crate::storage::personas::load_all(dir).unwrap_or_default();
 
-    // NKP summary: N = stressors + unique components (matrix semantics), not entity bag count.
-    let mut component_set = std::collections::BTreeSet::new();
-    for s in &stressors {
-        for c in s.components.split(',') {
-            let c = c.trim();
-            if !c.is_empty() {
-                component_set.insert(c.to_string());
-            }
+    // NKP summary from residues.csv (v4 canonical coupling source).
+    let nkp = crate::nkp::matrix::NkpMatrix::build_from_dir(dir).unwrap_or_else(|_| {
+        crate::nkp::matrix::NkpMatrix {
+            force_ids: vec![],
+            attractor_ids: vec![],
+            components: vec![],
+            cells: vec![],
         }
-    }
-    for p in &purposes {
-        for c in p.components.split(',') {
-            let c = c.trim();
-            if !c.is_empty() {
-                component_set.insert(c.to_string());
-            }
-        }
-    }
-    let n = stressors.len() + component_set.len();
-    let k: usize = stressors
-        .iter()
-        .map(|s| {
-            s.components
-                .split(',')
-                .filter(|c| !c.trim().is_empty())
-                .count()
-        })
-        .sum();
+    });
+    let n = nkp.n();
+    let k = nkp.k();
     let k_per_n = if n == 0 { 0.0 } else { k as f64 / n as f64 };
 
     let want_attractors;
@@ -146,12 +129,12 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
 
     if want_stressors {
         out.push_str("## Stressors\n");
-        out.push_str("| id | description | attractor_id | components |\n");
+        out.push_str("| id | shortname | description | attractor_id |\n");
         out.push_str("|---|---|---|---|\n");
         for s in &stressors {
             out.push_str(&format!(
                 "| {} | {} | {} | {} |\n",
-                s.id, s.description, s.attractor_id, s.components
+                s.id, s.shortname, s.description, s.attractor_id
             ));
         }
         out.push('\n');
@@ -363,8 +346,17 @@ mod tests {
                 attractor_id: "".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system handles auth".to_string(),
-                components: "auth,db".to_string(),
             },
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-01", "S-01", "auth"),
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-02", "S-01", "db"),
         )
         .unwrap();
         let out = build(&cfg, "integrate").unwrap();
@@ -403,7 +395,6 @@ mod tests {
                 attractor_id: "A-01".into(),
                 naive_change: "none".into(),
                 outcomes: "system handles load".into(),
-                components: "api".into(),
             },
         ).unwrap();
         crate::storage::purposes::append(
@@ -415,7 +406,6 @@ mod tests {
                 attractor_id: "A-01".into(),
                 naive_change: "request handling".into(),
                 outcomes: "system serves requests".into(),
-                components: "api".into(),
             },
         ).unwrap();
         let out = build(&cfg, "naive-draft").unwrap();
@@ -443,7 +433,6 @@ mod tests {
                 attractor_id: "A-01".into(),
                 naive_change: "none".into(),
                 outcomes: "system handles load".into(),
-                components: "api".into(),
             },
         ).unwrap();
         let out = build(&cfg, "integrate").unwrap();
@@ -465,8 +454,12 @@ mod tests {
                 attractor_id: "".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "x".to_string(),
             },
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-01", "S-01", "x"),
         )
         .unwrap();
         let out = build(&cfg, "purpose-walk").unwrap();
@@ -492,8 +485,12 @@ mod tests {
                 attractor_id: "".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "x".to_string(),
             },
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-01", "S-01", "x"),
         )
         .unwrap();
         let out = build(&cfg, "purpose-walk").unwrap();

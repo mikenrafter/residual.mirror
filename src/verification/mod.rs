@@ -25,7 +25,7 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
     crate::verify::run(cfg, check)
 }
 
-/// Load verification policy from storage-config (v3 TOML on disk, or defaults).
+/// Load verification policy from storage-config (config.toml on disk, or defaults).
 pub fn policy_from_storage_config(residual_dir: &Path) -> Result<StorageConfig> {
     let path = residual_dir.join("config.toml");
     if !path.exists() {

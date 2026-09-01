@@ -65,7 +65,7 @@ residual skill install purpose-walk --agent claude
 claude
 ```
 
-Coming from an older `residual/` layout? Run `residual migrate` to move to the v3 shape (forces, residues, lexicon, attractor ± states).
+Coming from an older `residual/` layout? Run `residual migrate` to normalize lexicon, attractor ± states, and v4 shape (coupling in `residues.csv`, not on force rows).
 
 ## Workflow
 
@@ -81,13 +81,11 @@ Each step writes into `residual/`:
 
 | File | Contents |
 |---|---|
-| `forces.csv` | Unified forces (purposes and stressors): shortname, naïve change, outcomes, attractor |
-| `residues.csv` | Force × component matrix (the coupling the NKP view uses) |
+| `stressors.csv` / `purposes.csv` | Forces: shortname, naïve change, outcomes, attractor (no component lists) |
+| `residues.csv` | NKP coupling matrix (force × component, `1`/empty) |
+| `components.csv` | Fully-qualified component registry (proposed/actual status) |
 | `attractors.csv` | Attractors with positive and negative states |
-| `components.csv` | Fully-qualified component registry for the architecture set |
 | `lexicon.csv` | Domain terms (with aliases) used by outcome validation |
-| `purposes.csv` / `stressors.csv` | Legacy force views kept during transition |
-| `terminology.csv` | Legacy term store; prefer `lexicon.csv` |
 | `iterations/<n>.md` | Architecture snapshots (N, K, notes, Ri when recorded) |
 | `personas/<name>.md` | Stakeholder voices for walks and ATAM |
 | `research/<source>.md` | Research notes from external documents |

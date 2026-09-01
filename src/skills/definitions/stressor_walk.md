@@ -13,8 +13,8 @@ Socratically discover stressors and attractors by simulating the business enviro
 - **Attractor** — a recurring system *state*, not a goal. Two sides: `positive_state` (healthy) and `negative_state` (broken). One per stable behavioral mode.
 - **Stressor** — a force that pushes the system from positive to negative attractor. Coherence matters, not likelihood. No probability required.
 - **Purpose** — a behavioral contract that must hold for the attractor to stay positive. Uses terms from the project lexicon in its outcomes.
-- **Component** — a coupling label on stressor and purpose records (the `--components` field). Not a first-class entity. There is no `components.csv`. The NKP matrix is derived from which component names co-appear across force records.
-- **Ledger** — five files: `attractors.csv`, `stressors.csv`, `purposes.csv`, `terminology.csv`, `personas.csv`. Nothing else.
+- **Component** — a fully-qualified name in `components.csv`. Forces do not list components. Coupling is recorded only in `residues.csv` (the NKP matrix) via `residual add residue --force-id … --component-id …`. `residual matrix show` reads the matrix.
+- **Ledger** — `attractors.csv`, `stressors.csv`, `purposes.csv`, `residues.csv`, `components.csv`, `lexicon.csv`, `personas/<name>.md`.
 
 ## Interaction Pattern
 This skill is Socratic.
@@ -42,7 +42,8 @@ Run: `residual skill data stressor-walk`
 This provides current personas, attractors, and the naïve architecture.
 
 ## During This Skill
-- `residual add stressor --description "..." --attractor-id A-01 --naive-change "..." --components "C1,C2"`
+- `residual add stressor --description "..." --attractor-id A-01 --naive-change "..." --outcomes "..."`
+- `residual add residue --force-id S-01 --component-id C1` (repeat per component)
 - Prefer `--whole-system --notes "policy zig: ..."` when the surviving change leaves the software boundary
 - `residual add attractor --name "..." --positive-state "..." --negative-state "..." --description "..."`
 - `residual add term --term "..." --definition "..."`

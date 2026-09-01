@@ -33,7 +33,20 @@ fn whole_system_stressor_records_residue() {
     );
     assert!(add.status.success(), "{}", String::from_utf8_lossy(&add.stderr));
     let residues = std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
-    assert!(residues.contains("whole-system-residue"));
+    assert!(residues.contains("whole-system"), "expected whole-system column");
+    let row = residues
+        .lines()
+        .find(|l| l.starts_with("S-01,"))
+        .expect("S-01 residue row");
+    assert!(
+        row.split(',').last() == Some("1"),
+        "expected whole-system coupling mark, row={row}"
+    );
+    let stressors = std::fs::read_to_string(dir.path().join("residual/stressors.csv")).unwrap();
+    assert!(
+        stressors.contains("whole-system-residue"),
+        "notes should land on stressor naive_change"
+    );
 }
 
 #[test]

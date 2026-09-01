@@ -1,11 +1,11 @@
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::cli::{MatrixOp, MatrixSortBy};
 use crate::config::Config;
 
-
 pub mod criticality;
+pub mod forces;
 pub mod matrix;
 pub mod residual_index;
 
@@ -25,6 +25,30 @@ fn attractor_names(residual_dir: &std::path::Path) -> Result<HashMap<String, Str
     Ok(attractors.into_iter().map(|a| (a.id, a.name)).collect())
 }
 
+fn build_matrix(
+    residual_dir: &std::path::Path,
+    filter: &[String],
+    sort_by: MatrixSortBy,
+) -> Result<matrix::NkpMatrix> {
+    let shortnames = force_shortnames(residual_dir)?;
+    let forces = forces::load_force_meta(residual_dir)?;
+    let filtered = matrix::filter_forces(&forces, filter, &shortnames);
+    let ordered = matrix::sort_forces(filtered, sort_by, &shortnames);
+    let residues = crate::storage::format::read_residues(residual_dir)?;
+    let keep: HashSet<String> = ordered.iter().map(|f| f.id.clone()).collect();
+    let residues: Vec<_> = residues
+        .into_iter()
+        .filter(|r| keep.contains(&r.force_id))
+        .collect();
+    let attractor_by_force = forces::attractor_map(residual_dir)?;
+    let mut m = matrix::NkpMatrix::build_from_residues(&residues, &attractor_by_force);
+    m.reorder_rows(&ordered);
+    if sort_by == MatrixSortBy::FusionFission {
+        m.reorder_columns_fusion_fission();
+    }
+    Ok(m)
+}
+
 pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
     match op {
         MatrixOp::Show {
@@ -34,13 +58,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
         } => {
             let shortnames = force_shortnames(&cfg.residual_dir)?;
             let attractor_names = attractor_names(&cfg.residual_dir)?;
-            let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-            let filtered = matrix::filter_stressors(&stressors, &filter, &shortnames);
-            let ordered = matrix::sort_stressors(filtered, sort_by, &shortnames);
-            let mut m = matrix::NkpMatrix::build(&ordered);
-            if sort_by == MatrixSortBy::FusionFission {
-                m.reorder_columns_fusion_fission();
-            }
+            let m = build_matrix(&cfg.residual_dir, &filter, sort_by)?;
             if csv {
                 m.print_csv(&shortnames, &attractor_names, sort_by)?;
             } else {
@@ -48,8 +66,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             }
         }
         MatrixOp::Calc => {
-            let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-            let m = matrix::NkpMatrix::build(&stressors);
+            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
             println!("N (nodes) = {}", m.n());
             println!("K (connections) = {}", m.k());
             println!(
@@ -62,8 +79,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             );
         }
         MatrixOp::Criticality => {
-            let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-            let m = matrix::NkpMatrix::build(&stressors);
+            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
             let report = criticality::assess(&m);
             println!(
                 "N = {}, K = {}, K/N = {:.4}",
@@ -82,8 +98,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             println!("{}", interpretation);
         }
         MatrixOp::Fusion => {
-            let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-            let m = matrix::NkpMatrix::build(&stressors);
+            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
             let candidates = m.fusion_candidates();
             if candidates.is_empty() {
                 println!("No fusion candidates found.");
@@ -95,9 +110,8 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             }
         }
         MatrixOp::Fission => {
-            let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-            let m = matrix::NkpMatrix::build(&stressors);
-            let threshold = (m.stressor_ids.len() / 2).max(1);
+            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
+            let threshold = (m.force_ids.len() / 2).max(1);
             let candidates = m.fission_candidates(threshold);
             if candidates.is_empty() {
                 println!("No fission candidates found (threshold = {}).", threshold);

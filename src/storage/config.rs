@@ -1,4 +1,4 @@
-//! Storage.Config — THE config (v3 TOML): app + verify policy keys.
+//! Storage.Config — THE config TOML (format_version v4; v3 on disk migrated): app + verify policy keys.
 //!
 //! Owns format_version, change_detection, AND verification policy
 //! (super_strict, token_warn). There is no verification-config module.
@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 fn default_format_version() -> String {
-    "v3".to_string()
+    "v4".to_string()
 }
 fn default_change_detection() -> bool {
     true
@@ -100,7 +100,7 @@ pub fn parse_v3(toml_str: &str) -> Result<StorageConfig> {
 /// Render the full v3 document (storage + verify policy sections).
 pub fn render_v3(cfg: &StorageConfig) -> String {
     format!(
-        "# residual v3 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\n",
+        "# residual v4 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\n",
         cfg.format_version, cfg.change_detection, cfg.super_strict, cfg.token_warn, cfg.commit_msg_enforce
     )
 }

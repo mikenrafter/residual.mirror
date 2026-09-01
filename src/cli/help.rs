@@ -14,6 +14,7 @@ complete -c residual -n '__fish_use_subcommand' -a 'matrix' -d 'NKP matrix opera
 complete -c residual -n '__fish_use_subcommand' -a 'skill' -d 'Phase + installer skills'
 complete -c residual -n '__fish_use_subcommand' -a 'tag' -d 'Tag operations'
 complete -c residual -n '__fish_use_subcommand' -a 'generate' -d 'Generate artifacts'
+complete -c residual -n '__fish_use_subcommand' -a 'migrate' -d 'Migrate legacy residual/ layout'
 complete -c residual -n '__fish_use_subcommand' -a 'config' -d 'Show configuration'
 complete -c residual -n '__fish_seen_subcommand_from skill' -a 'show data list install check-install'
 complete -c residual -n '__fish_seen_subcommand_from skill' -a 'purpose-walk naive-draft stressor-walk integrate fmea atam'
@@ -52,10 +53,10 @@ skills are selectable analytical lenses, not mandatory gates.
 Initialize the residual/ directory in the current project.
 .TP
 .B add \fITARGET\fR
-Add a new entry. Targets: stressor, purpose, attractor, term, persona, iteration.
+Add a new entry. Targets: stressor, residue, purpose, attractor, term, persona, iteration.
 .TP
 .B list \fITARGET\fR
-List entries. Targets: stressors, purposes, attractors, terminology, personas, iterations.
+List entries. Targets: stressors, residues, purposes, attractors, terminology, personas, iterations.
 .TP
 .B verify \fICHECK\fR
 Verify data integrity. Checks: outcomes, links, all, commit-msg. Policy from storage-config.
@@ -80,6 +81,9 @@ Write pre-commit and commit-msg hooks (verification-git-hook).
 .TP
 .B commit check / suggest / template
 Validate or compose commit subjects using project vocabulary.
+.TP
+.B migrate [\-\-force]
+Migrate residual/ from legacy on-disk shape (naive→v3, v3→v4 coupling lift).
 .TP
 .B config
 Show the current configuration.

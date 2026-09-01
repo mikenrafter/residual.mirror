@@ -412,7 +412,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system handles auth".to_string(),
-                components: "auth".to_string(),
             },
         )
         .unwrap();
@@ -438,7 +437,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system handles auth".to_string(),
-                components: "auth".to_string(),
             },
         )
         .unwrap();
@@ -464,7 +462,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "widget".to_string(),
             },
         )
         .unwrap();
@@ -488,7 +485,6 @@ mod tests {
                 attractor_id: "A-99".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
             },
         )
         .unwrap();
@@ -521,7 +517,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
             },
         )
         .unwrap();
@@ -571,7 +566,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "x".to_string(),
             },
         )
         .unwrap();
@@ -607,7 +601,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
                 shortname: "".to_string(),
             },
         )
@@ -646,7 +639,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
                 shortname: "cli-bypass".to_string(),
             },
         )

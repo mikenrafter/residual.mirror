@@ -18,6 +18,27 @@ fn init(dir: &TempDir) {
     assert!(out.status.success(), "init failed: {}", String::from_utf8_lossy(&out.stderr));
 }
 
+fn add_couplings(dir: &TempDir, force_id: &str, components: &[&str]) {
+    for component_id in components {
+        let out = run(
+            dir,
+            &[
+                "add",
+                "residue",
+                "--force-id",
+                force_id,
+                "--component-id",
+                component_id,
+            ],
+        );
+        assert!(
+            out.status.success(),
+            "add residue failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
 // --- init ---
 
 #[test]
@@ -132,8 +153,8 @@ fn commit_check_accepts_force_subject() {
     .unwrap();
     std::fs::write(
         dir.path().join("residual/stressors.csv"),
-        "id,shortname,description,naive_change,outcomes,components,attractor_id\n\
-         S-28,lexicon-commit-drift,drift,add hook,git hook enforces lexicon,,A-02\n",
+        "id,shortname,description,naive_change,outcomes,attractor_id\n\
+         S-28,lexicon-commit-drift,drift,add hook,git hook enforces lexicon,A-02\n",
     )
     .unwrap();
     let out = run(
@@ -156,13 +177,13 @@ fn commit_template_prints_scaffold() {
     init(&dir);
     std::fs::write(
         dir.path().join("residual/purposes.csv"),
-        "id,shortname,description,naive_change,outcomes,components,attractor_id\n\
-         P-18,git-log-lexicon,desc,add hook,git log uses lexicon,,A-01\n",
+        "id,shortname,description,naive_change,outcomes,attractor_id\n\
+         P-18,git-log-lexicon,desc,add hook,git log uses lexicon,A-01\n",
     )
     .unwrap();
     std::fs::write(
         dir.path().join("residual/residues.csv"),
-        "id,force_id,component_id,status,notes\nR-1,P-18,verification-git-hook,proposed,hook\n",
+        "force,verification-git-hook\nP-18,1\n",
     )
     .unwrap();
     let out = run(&dir, &["commit", "template", "P-18"]);
@@ -240,8 +261,8 @@ fn matrix_calc_reports_n_k_and_ratio() {
         "--description", "test",
         "--attractor-id", "A-01",
         "--naive-change", "none",
-        "--components", "auth,db",
     ]);
+    add_couplings(&dir, "S-01", &["auth", "db"]);
     let out = run(&dir, &["matrix", "calc"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("N"), "expected 'N' in matrix calc output");
@@ -257,10 +278,10 @@ fn matrix_show_csv_emits_header_and_cells() {
         "--description", "skill versions drift after binary update",
         "--attractor-id", "A-01",
         "--naive-change", "pin skill versions",
-        "--components", "auth,db",
         "--outcomes", "skill residue stays current",
         "--shortname", "skill-version-drift",
     ]);
+    add_couplings(&dir, "S-01", &["auth", "db"]);
     let out = run(&dir, &["matrix", "show", "--csv"]);
     assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -281,18 +302,18 @@ fn matrix_show_filter_keeps_matching_attractor() {
         "--description", "first force hits auth",
         "--attractor-id", "A-01",
         "--naive-change", "none",
-        "--components", "auth",
         "--outcomes", "operator records a stressor against attractor one",
         "--shortname", "alpha-force",
     ]);
+    add_couplings(&dir, "S-01", &["auth"]);
     run(&dir, &["add", "stressor",
         "--description", "second force hits db",
         "--attractor-id", "A-02",
         "--naive-change", "none",
-        "--components", "db",
         "--outcomes", "operator records a stressor against attractor two",
         "--shortname", "beta-force",
     ]);
+    add_couplings(&dir, "S-02", &["db"]);
     let out = run(&dir, &["matrix", "show", "--csv", "--filter", "A-02"]);
     assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -310,18 +331,18 @@ fn matrix_show_sort_by_alphabetical() {
         "--description", "zeta force",
         "--attractor-id", "A-01",
         "--naive-change", "none",
-        "--components", "auth",
         "--outcomes", "operator records residue zeta",
         "--shortname", "zeta-force",
     ]);
+    add_couplings(&dir, "S-01", &["auth"]);
     run(&dir, &["add", "stressor",
         "--description", "alpha force",
         "--attractor-id", "A-01",
         "--naive-change", "none",
-        "--components", "db",
         "--outcomes", "operator records residue alpha",
         "--shortname", "alpha-force",
     ]);
+    add_couplings(&dir, "S-02", &["db"]);
     let out = run(&dir, &["matrix", "show", "--csv", "--sort-by", "alphabetical"]);
     assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -371,7 +392,7 @@ fn residues_csv_is_matrix_shaped_after_write() {
     )
     .unwrap();
     assert!(
-        run(&dir, &["add", "--force", "residue", "--force-id", "S-01", "--component-id", "verification", "--status", "proposed"]).status.success()
+        run(&dir, &["add", "--force", "residue", "--force-id", "S-01", "--component-id", "verification"]).status.success()
     );
     assert!(std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap().starts_with("force,"));
 }
@@ -388,7 +409,7 @@ fn verify_links_accepts_purpose_residue() {
     )
     .unwrap();
     assert!(
-        run(&dir, &["add", "--force", "residue", "--force-id", "P-01", "--component-id", "hook", "--status", "proposed"]).status.success()
+        run(&dir, &["add", "--force", "residue", "--force-id", "P-01", "--component-id", "hook"]).status.success()
     );
     assert!(run(&dir, &["verify", "links"]).status.success());
 }
@@ -540,7 +561,7 @@ fn list_residues_prints_matrix() {
         "name,description,status,architecture_set\ncli,desc,proposed,baseline\n",
     )
     .unwrap();
-    run(&dir, &["add", "--force", "residue", "--force-id", "S-01", "--component-id", "cli", "--status", "active"]);
+    run(&dir, &["add", "--force", "residue", "--force-id", "S-01", "--component-id", "cli"]);
     let list = run(&dir, &["list", "residues"]);
     assert!(list.status.success());
     assert!(String::from_utf8_lossy(&list.stdout).starts_with("force,"));

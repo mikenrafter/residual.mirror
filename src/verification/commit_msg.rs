@@ -415,7 +415,6 @@ mod tests {
                 attractor_id: "".into(),
                 naive_change: "add commit-msg hook".into(),
                 outcomes: "git hook enforces lexicon continuity".into(),
-                components: "verification-git-hook".into(),
             },
         )
         .unwrap();

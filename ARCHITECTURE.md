@@ -5,6 +5,23 @@ Prototype code structure (`architecture_set = iter4-cli-hub`).
 [`residual/iterations/5.md`](residual/iterations/5.md). Component names remain
 **fully-qualified** (e.g. `skills-personas`, not bare `personas`).
 
+## v4 data model
+
+On-disk ledger shape (`format_version = "v4"` in `config.toml`):
+
+| Artifact | Role |
+|----------|------|
+| `residues.csv` | NKP coupling matrix (force × component, `1`/empty) — sole coupling source |
+| `stressors.csv` / `purposes.csv` | Forces: outcomes, naïve change, attractor (no component lists) |
+| `components.csv` | Component registry (proposed/actual status), not coupling |
+| `lexicon.csv` | Domain vocabulary (legacy `terminology.csv` migrated by `residual migrate`) |
+| `personas/<name>.md` | Stakeholder voices |
+| `attractors.csv` | Attractors with positive and negative states |
+
+**Workflow:** `residual add stressor|purpose`, then `residual add residue --force-id … --component-id …` per coupling. `residual matrix show` reads `residues.csv` only — not inline force columns.
+
+The iter4 tree below is the Rust module layout; NKP matrix columns come from `residues.csv` and the component registry, not from force rows.
+
 ## Naming rule
 
 Every registry row in `residual/components.csv` uses the exact fully-qualified string from the
@@ -40,9 +57,9 @@ structure                      ← EXTERNAL filter/sort/group API (default group
    └─ structure-definition-iterations
 
 storage                        ← read / write / mutate
-├─ storage-config              ← THE config (v3 TOML): app + verify policy keys
+├─ storage-config              ← THE config (v4 TOML): format_version + app + verify policy keys
 ├─ storage-sessions
-├─ storage-migration           ← naive → v3 only
+├─ storage-migration           ← naive → v3; v3 → v4 (inline force components → residues.csv)
 └─ storage-format
 ```
 
@@ -52,7 +69,7 @@ storage                        ← read / write / mutate
 **not** a runtime Rust module. `skills-research` stores walk notes only. Do not fuse
 `skills-personas` with `skills-research`.
 
-## Config split (v3)
+## Config split (v4)
 
 | Owner | Keys |
 |-------|------|
@@ -91,8 +108,8 @@ Metadata-only OK. Tagged-in-code ⇒ must exist in metadata. Tag scan suggests; 
 ## Gaps
 
 1. **research-study / alpha-beta** — registry row only; no runtime module until the study lands.
-2. **Legacy CSV traits/valence** — Force/Attractor types are v3-shaped; on-disk CSV may still carry traits/valence until migration catches up.
-3. **Alternate backends** — migration is naive→v3 only; format is CSV. Deferred.
+2. **Legacy on-disk shapes** — `residual migrate` lifts naive→v3 (lexicon, attractor ± states) and v3→v4 (inline force `components` → `residues.csv`). Pre-v3 CSV may still carry `traits`/valence until migrated.
+3. **Alternate backends** — migration covers naive→v3 and v3→v4; format is CSV. Deferred beyond that.
 4. **P-value / interface discipline** — still no component.
 
 See `residual/iterations/4.md` (stub) and `residual/components.csv` (25 fully-qualified names).

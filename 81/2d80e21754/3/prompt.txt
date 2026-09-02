@@ -1,0 +1,45 @@
+/residual-integrate Next steps with the new forces, attractors and components?
+
+Use the `nix develop -c residual` version for this session since the one on $PATH is outdated. You also have `agentgrep` and `rtk` at your disposal.
+
+---
+
+Add another coupling ... storage-format, sessions and migration will all be effected in these residues. You can splice those in as make sense.
+
+We'll be moving de-facto to a git-sidecar/entireio-style storage structure. That way the publicity of the metadata is trivially controllable by the operator as they see fit.
+
+---
+
+Confirm
+
+---
+
+<task-notification>
+<task-id>bazj8x89c</task-id>
+<tool-use-id>toolu_017gtuMHUGX6MJ43cQvzbv1M</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/80c225e8-db97-4102-8338-30ccc49272b9/tasks/bazj8x89c.output</output-file>
+<status>completed</status>
+<summary>Background command "Add 14 residue couplings for defense-* components" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Let's make a new proposed component that takes pressure off of skills-phases. skills-phases will include far less initial text due to many of the situational forces requiring guidance. skills-phases has changed in most commits... It's certainly quite coupled. The new component's name and function: skills-guru/monk/counselor/guide/tour-guide/checklist/copilot... Still workshopping the name, you can choose from those listed or propose your own once you hear what it does:
+
+Many situational forces (such as ) call for instructions that might not be phase-specific and are more likely to change. It would be nice if all phases that leverage these situational behaviors no longer have to redefine these behaviors on repeat. When an agent calls `residual guru before-attractors` it should get details about how attractors are ideally defined and how attractors are not mission statements and how attractors need dual force pressure... A bundled/portable/inline set of framework guidance as to not overwhelm the agent and to be used every so often "residual guru after-attractors" or "residual guru before-stressors" or "residual guru after-stressors" or "residual guru before-purposes" or "residual guru after-purposes"... They would serve as reminders to run personas (a current gap... hint hint, nudge nudge). And given the fluent nature of walks (maybe I'm looking for purposes but I happen to spot a big stressor for an attractor...) this makes the tooling more consistent, reliable and flexible.
+
+---
+
+Invocation would look more like `residual skills-guru before-stressors` or `residual skills-guru after-stressors`... And all agent phase skills would include commentary pointing them to call these commands in situations such as these. They don't have to be so tightly situation bound... There could also be some like `residual skills-guru faq-stressors` that the agent calls if the operator expresses frustration with the agent's suggestions...
+
+---
+
+Add the component, override the direct edit sanction in this single case.
+
+---
+
+I think yes. The original rationale for excluding removal was to prevent agents being inadvertently destructive... But the added structures the project now has make that much less of a problem. So, tell me what you'd log. I also want a `residual add component`... That absence is a hangover from the v3 metadata storage format.
+
+---
+
+confirm

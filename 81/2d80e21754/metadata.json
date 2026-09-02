@@ -3,7 +3,7 @@
   "checkpoint_id": "812d80e21754",
   "strategy": "manual-commit",
   "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
-  "checkpoints_count": 8,
+  "checkpoints_count": 16,
   "files_touched": [
     ".gitignore",
     "Cargo.lock",
@@ -12,6 +12,7 @@
     "residual/.storage-hashes",
     "residual/components.csv",
     "residual/lexicon.csv",
+    "residual/purposes.csv",
     "residual/residues.csv",
     "src/cli.rs",
     "src/cli/help.rs",
@@ -48,14 +49,21 @@
       "compact_transcript": "/81/2d80e21754/2/transcript.jsonl",
       "content_hash": "/81/2d80e21754/2/content_hash.txt",
       "prompt": "/81/2d80e21754/2/prompt.txt"
+    },
+    {
+      "metadata": "/81/2d80e21754/3/metadata.json",
+      "transcript": "/81/2d80e21754/3/full.jsonl",
+      "compact_transcript": "/81/2d80e21754/3/transcript.jsonl",
+      "content_hash": "/81/2d80e21754/3/content_hash.txt",
+      "prompt": "/81/2d80e21754/3/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 262,
-    "cache_creation_tokens": 312404,
-    "cache_read_tokens": 24598109,
-    "output_tokens": 153090,
-    "api_call_count": 131,
+    "input_tokens": 350,
+    "cache_creation_tokens": 455808,
+    "cache_read_tokens": 27988392,
+    "output_tokens": 199097,
+    "api_call_count": 176,
     "subagent_tokens": {
       "input_tokens": 16,
       "cache_creation_tokens": 39986,

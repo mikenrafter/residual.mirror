@@ -195,7 +195,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
         out.push_str(&defense_summary_section(dir)?);
     }
 
-    Ok(out)
+    crate::skills::guru::inject_for_skill(skill_name, &out)
 }
 
 fn defense_summary_section(residual_dir: &std::path::Path) -> Result<String> {

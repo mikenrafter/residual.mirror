@@ -1,0 +1,1 @@
+**Stressors** — forces that push the system from the positive attractor toward the negative. Coherence matters, not likelihood. Archaeological source: `git log --stat --oneline | head -40` surfaces wide-spanning commits (coupling the architecture was naive to) and recurring churn (rework the design did not anticipate).

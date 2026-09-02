@@ -1,0 +1,1 @@
+Purpose-walk and stressor-walk cadence keeps the ledger aligned with evolving force configurations. When overdue, run `residual walk record --kind purpose|stressor --completed` or `--deferred` after review.

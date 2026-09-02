@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use crate::config::Config;
 
 pub mod context;
+pub mod guru;
 pub mod install;
 pub mod installer;
 pub mod personas;

@@ -4,6 +4,7 @@
 pub mod attractors;
 pub mod force;
 pub mod nkp;
+pub mod outsiders;
 pub mod purposes;
 pub mod residues;
 pub mod stressors;

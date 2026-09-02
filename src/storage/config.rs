@@ -105,6 +105,21 @@ pub fn render_v3(cfg: &StorageConfig) -> String {
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SidecarStorageConfig {
+    pub git_sidecar_enabled: bool,
+    pub git_sidecar_branch: String,
+    pub git_sidecar_remote: String,
+    pub config_host: String,
+    pub working_tree_policy: String,
+}
+
+/// Parse [storage] sidecar keys from config TOML.
+pub fn parse_sidecar_section(toml_str: &str) -> Result<SidecarStorageConfig> {
+    let _ = toml_str;
+    todo!("parse git_sidecar_enabled, git_sidecar_branch, config_host, working_tree_policy")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,5 +161,44 @@ token_warn = 777
         assert!(rendered.contains("super_strict"));
         assert!(rendered.contains("token_warn"));
         assert!(rendered.contains("[storage]"));
+    }
+
+    #[test]
+    fn parse_sidecar_section_reads_git_sidecar_enabled() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+change_detection = true
+git_sidecar_enabled = true
+git_sidecar_branch = "residual/metadata"
+git_sidecar_remote = "origin"
+config_host = "parent"
+
+[storage.git_sidecar]
+working_tree_policy = "warn"
+
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(sidecar.git_sidecar_enabled);
+        assert_eq!(sidecar.git_sidecar_branch, "residual/metadata");
+        assert_eq!(sidecar.config_host, "parent");
+        assert_eq!(sidecar.working_tree_policy, "warn");
+    }
+
+    #[test]
+    fn parse_sidecar_section_defaults_disabled() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+change_detection = true
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(!sidecar.git_sidecar_enabled);
     }
 }

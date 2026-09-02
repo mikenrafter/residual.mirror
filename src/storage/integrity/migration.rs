@@ -10,7 +10,7 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::storage::config::StorageConfig;
 use crate::storage::format::{self, write_attractors_v3};
@@ -379,6 +379,19 @@ fn migrate_v3_to_v4_residues(residual_dir: &Path) -> Result<(usize, bool)> {
     Ok((count, decoupled))
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct MigrateSidecarReport {
+    pub sidecar_branch: String,
+    pub config_path: PathBuf,
+    pub lifted_files: usize,
+}
+
+/// Lift inline working-tree residual/ to sidecar branch (migrate --sidecar).
+pub fn migrate_inline_to_sidecar(repo_root: &Path, force: bool) -> Result<MigrateSidecarReport> {
+    let _ = (repo_root, force);
+    todo!("lift inline residual/ to sidecar branch and enable git_sidecar")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,5 +513,66 @@ S-01,alpha,desc,change,outcome text,\"auth,db\",A-01\n",
         assert!(residues.contains("S-01"));
         assert!(residues.contains("auth"));
         assert!(residues.contains("db"));
+    }
+
+    #[test]
+    fn migrate_sidecar_lifts_inline_to_branch() {
+        use std::process::Command;
+
+        let dir = tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir_all(repo.join("residual")).unwrap();
+        std::fs::write(
+            repo.join("residual/config.toml"),
+            "# residual v4 configuration\nformat_version = \"v4\"\n\n[storage]\nchange_detection = true\n\n[verification]\n",
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("residual/stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n\
+S-01,alpha,desc,change,outcome,A-01\n",
+        )
+        .unwrap();
+
+        Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(&repo)
+            .output()
+            .expect("git init");
+        Command::new("git")
+            .args(["config", "user.email", "t@example.com"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.name", "T"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["commit", "-m", "inline residual"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        let report = migrate_inline_to_sidecar(&repo, true).unwrap();
+        assert_eq!(report.sidecar_branch, "residual/metadata");
+        assert!(report.lifted_files > 0, "must lift at least stressors.csv to sidecar");
+
+        let branch_out = Command::new("git")
+            .args(["branch", "--list", "residual/metadata"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let branch_list = String::from_utf8_lossy(&branch_out.stdout);
+        assert!(
+            branch_list.contains("residual/metadata"),
+            "migrate --sidecar must create sidecar branch"
+        );
     }
 }

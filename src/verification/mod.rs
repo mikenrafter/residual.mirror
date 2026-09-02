@@ -14,6 +14,7 @@ use crate::storage::config::{self as storage_config, StorageConfig};
 
 pub mod commit_msg;
 pub mod git_hook;
+pub mod walk_reminder;
 
 #[allow(unused_imports)]
 pub use crate::verify::{

@@ -5,8 +5,11 @@ use crate::cli::{AddTarget, ListTarget};
 use crate::structure::analysis::residues::{tag_naive_change_whole_system, Residue};
 
 pub mod attractors;
+pub mod components;
 pub mod config;
+pub mod defense;
 pub mod format;
+pub mod git_sidecar;
 pub mod integrity;
 pub mod iterations;
 pub mod personas;

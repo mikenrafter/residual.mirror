@@ -174,4 +174,25 @@ mod tests {
         let cfg = parse_with_dir(toml_str, dir.path());
         assert_eq!(cfg.skills.token_warn, 500);
     }
+
+    #[test]
+    fn discover_config_prefers_parent_stealth_over_in_repo() {
+        let dir = tempdir().unwrap();
+        let repo = dir.path().join("myproject");
+        std::fs::create_dir_all(repo.join("residual")).unwrap();
+        std::fs::write(repo.join("residual/config.toml"), "[validation]\nstrict = true\n").unwrap();
+        let parent_residual = dir.path().join("residual");
+        std::fs::create_dir_all(&parent_residual).unwrap();
+        std::fs::write(
+            parent_residual.join("config.toml"),
+            "format_version = \"v4\"\n[storage]\nconfig_host = \"parent\"\n",
+        )
+        .unwrap();
+
+        let discovery = crate::storage::git_sidecar::discover_config(&repo).unwrap();
+        assert_eq!(
+            discovery.source,
+            crate::storage::git_sidecar::ConfigSource::ParentStealth
+        );
+    }
 }

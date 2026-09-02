@@ -464,4 +464,266 @@ mod tests {
             _ => panic!("expected Command::Add(AddTarget::Purpose)"),
         }
     }
+
+    mod cli_integration {
+        use super::*;
+        use crate::config::Config;
+        use crate::storage;
+        use std::process::Command;
+
+        fn isolated_tempdir() -> tempfile::TempDir {
+            tempfile::Builder::new()
+                .tempdir_in("/tmp")
+                .expect("create temp dir under /tmp away from source residual/")
+        }
+
+        fn bin() -> std::path::PathBuf {
+            std::env::var("CARGO_BIN_EXE_residual")
+                .map(std::path::PathBuf::from)
+                .or_else(|_| std::env::current_exe())
+                .expect("resolve residual CLI binary for subprocess tests")
+        }
+
+        fn run(dir: &tempfile::TempDir, args: &[&str]) -> std::process::Output {
+            Command::new(bin())
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .expect("failed to run residual binary")
+        }
+
+        fn init_storage(dir: &tempfile::TempDir) {
+            let residual = dir.path().join("residual");
+            std::fs::create_dir_all(&residual).unwrap();
+            let cfg = Config {
+                validation: crate::config::ValidationConfig { strict: true },
+                skills: crate::config::SkillsConfig { token_warn: 1000 },
+                residual_dir: residual,
+            };
+            storage::init(&cfg, true).expect("storage init in tempdir");
+        }
+
+        #[test]
+        fn add_component_appends_registry_and_extends_residues_header() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+
+            let add = run(
+                &dir,
+                &[
+                    "add",
+                    "component",
+                    "--name",
+                    "storage-git-sidecar",
+                    "--description",
+                    "Git sidecar storage",
+                    "--status",
+                    "proposed",
+                    "--architecture-set",
+                    "iter4-storage",
+                ],
+            );
+            assert!(
+                add.status.success(),
+                "add component: {}",
+                String::from_utf8_lossy(&add.stderr)
+            );
+
+            let components =
+                std::fs::read_to_string(dir.path().join("residual/components.csv")).unwrap();
+            assert!(components.contains("storage-git-sidecar"));
+
+            let header = std::fs::read_to_string(dir.path().join("residual/residues.csv"))
+                .unwrap()
+                .lines()
+                .next()
+                .unwrap()
+                .to_string();
+            assert!(
+                header.contains("storage-git-sidecar"),
+                "residues header must gain component column"
+            );
+        }
+
+        #[test]
+        fn add_component_idempotent_on_same_name() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            let args = [
+                "add",
+                "component",
+                "--name",
+                "cli",
+                "--description",
+                "hub",
+                "--status",
+                "actual",
+                "--architecture-set",
+                "set",
+            ];
+            run(&dir, &args);
+            run(&dir, &args);
+            let components =
+                std::fs::read_to_string(dir.path().join("residual/components.csv")).unwrap();
+            assert_eq!(
+                components.matches("cli,").count(),
+                1,
+                "duplicate add component must be idempotent"
+            );
+        }
+
+        #[test]
+        fn remove_residue_clears_matrix_cell() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            std::fs::write(
+                dir.path().join("residual/components.csv"),
+                "name,description,status,architecture_set\nauth,Auth,actual,set\n",
+            )
+            .unwrap();
+            run(
+                &dir,
+                &[
+                    "add",
+                    "attractor",
+                    "--name",
+                    "X",
+                    "--description",
+                    "d",
+                    "--positive-state",
+                    "ok",
+                    "--negative-state",
+                    "bad",
+                ],
+            );
+            run(
+                &dir,
+                &[
+                    "add",
+                    "stressor",
+                    "--description",
+                    "load",
+                    "--attractor-id",
+                    "A-01",
+                    "--naive-change",
+                    "cache",
+                ],
+            );
+            run(
+                &dir,
+                &[
+                    "add",
+                    "residue",
+                    "--force-id",
+                    "S-01",
+                    "--component-id",
+                    "auth",
+                ],
+            );
+
+            let remove = run(
+                &dir,
+                &[
+                    "remove",
+                    "residue",
+                    "--force-id",
+                    "S-01",
+                    "--component-id",
+                    "auth",
+                ],
+            );
+            assert!(
+                remove.status.success(),
+                "remove residue: {}",
+                String::from_utf8_lossy(&remove.stderr)
+            );
+
+            let residues = std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            assert!(
+                !residues.contains(",1") || !residues.lines().any(|l| l.starts_with("S-01,") && l.contains("1")),
+                "auth cell must be cleared after remove residue"
+            );
+        }
+
+        #[test]
+        fn add_residue_move_to_repoints_coupling() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            std::fs::write(
+                dir.path().join("residual/components.csv"),
+                "name,description,status,architecture_set\n\
+auth,Auth,actual,set\n\
+db,DB,actual,set\n",
+            )
+            .unwrap();
+            run(
+                &dir,
+                &[
+                    "add",
+                    "attractor",
+                    "--name",
+                    "X",
+                    "--description",
+                    "d",
+                    "--positive-state",
+                    "ok",
+                    "--negative-state",
+                    "bad",
+                ],
+            );
+            run(
+                &dir,
+                &[
+                    "add",
+                    "stressor",
+                    "--description",
+                    "load",
+                    "--attractor-id",
+                    "A-01",
+                    "--naive-change",
+                    "cache",
+                ],
+            );
+            run(
+                &dir,
+                &[
+                    "add",
+                    "residue",
+                    "--force-id",
+                    "S-01",
+                    "--component-id",
+                    "auth",
+                ],
+            );
+
+            let move_to = run(
+                &dir,
+                &[
+                    "add",
+                    "residue",
+                    "--force-id",
+                    "S-01",
+                    "--component-id",
+                    "auth",
+                    "--move-to",
+                    "db",
+                ],
+            );
+            assert!(
+                move_to.status.success(),
+                "add residue --move-to: {}",
+                String::from_utf8_lossy(&move_to.stderr)
+            );
+
+            let residues = std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            let row = residues
+                .lines()
+                .find(|l| l.starts_with("S-01,"))
+                .expect("S-01 row");
+            assert!(
+                row.contains("db") && !row.split(',').nth(1).is_some_and(|c| c == "1" && !row.contains("db,1")),
+                "coupling must repoint to db, row={row}"
+            );
+        }
+    }
 }

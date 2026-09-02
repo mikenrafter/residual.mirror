@@ -536,4 +536,34 @@ mod tests {
             &out[..out.len().min(400)]
         );
     }
+
+    #[test]
+    fn build_defense_walk_includes_defense_summary_excludes_main_meta_bleed() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        std::fs::create_dir_all(residual.join("defense")).unwrap();
+        std::fs::write(
+            residual.join("defense/meta-stressors.csv"),
+            "id,shortname,description\nMS-01,meta-only,Defense stressor\n",
+        )
+        .unwrap();
+        std::fs::write(
+            residual.join("stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n\
+S-01,main-only,Main ledger,,,A-01\n",
+        )
+        .unwrap();
+
+        let cfg = cfg_for(&residual);
+        let out = build(&cfg, "defense-walk").unwrap();
+        assert!(
+            out.contains("## Defense") || out.contains("defense summary") || out.contains("MS-01"),
+            "defense-walk skill-data must include defense ledger summary"
+        );
+        assert!(
+            !out.contains("main-only") && !out.contains("S-01"),
+            "defense-walk must exclude main-only meta bleed from stressors section, got: {}",
+            &out[..out.len().min(500)]
+        );
+    }
 }

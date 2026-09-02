@@ -195,7 +195,7 @@ fn bootstrap_sidecar_branch(repo_root: &Path, branch: &str) -> Result<()> {
         .output()
         .ok();
     git(repo_root)
-        .args(["add", "residual/"])
+        .args(["add", "-f", "residual/"])
         .output()
         .context("git add residual")?;
     git(repo_root)

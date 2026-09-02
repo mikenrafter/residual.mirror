@@ -388,7 +388,6 @@ pub struct MigrateSidecarReport {
 
 /// Lift inline working-tree residual/ to sidecar branch (migrate --sidecar).
 pub fn migrate_inline_to_sidecar(repo_root: &Path, force: bool) -> Result<MigrateSidecarReport> {
-    let _ = force;
     let residual_dir = repo_root.join("residual");
     if !residual_dir.is_dir() {
         bail!("no residual/ directory at {}", residual_dir.display());
@@ -398,27 +397,33 @@ pub fn migrate_inline_to_sidecar(repo_root: &Path, force: bool) -> Result<Migrat
     let config_path = residual_dir.join("config.toml");
     let prev = git_current_branch(repo_root)?;
 
-    if !git_branch_exists(repo_root, &branch)? {
-        let out = git_cmd(repo_root)
-            .args(["branch", &branch])
-            .output()
-            .context("git branch sidecar")?;
-        if !out.status.success() {
+    if git_branch_exists(repo_root, &branch)? {
+        if force {
+            let out = git_cmd(repo_root)
+                .args(["branch", "-D", &branch])
+                .output()
+                .context("git branch -D sidecar")?;
+            if !out.status.success() {
+                bail!(
+                    "git branch -D {branch} failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            }
+        } else {
             bail!(
-                "git branch {branch} failed: {}",
-                String::from_utf8_lossy(&out.stderr)
+                "sidecar branch {branch} already exists; use --force to recreate metadata-only branch"
             );
         }
     }
 
-    let checkout = git_cmd(repo_root)
-        .args(["checkout", &branch])
+    let orphan_out = git_cmd(repo_root)
+        .args(["checkout", "--orphan", &branch])
         .output()
-        .context("git checkout sidecar")?;
-    if !checkout.status.success() {
+        .context("git checkout --orphan sidecar")?;
+    if !orphan_out.status.success() {
         bail!(
-            "git checkout {branch} failed: {}",
-            String::from_utf8_lossy(&checkout.stderr)
+            "git checkout --orphan {branch} failed: {}",
+            String::from_utf8_lossy(&orphan_out.stderr)
         );
     }
 
@@ -426,27 +431,63 @@ pub fn migrate_inline_to_sidecar(repo_root: &Path, force: bool) -> Result<Migrat
     fs::write(&config_path, &sidecar_toml)?;
 
     git_cmd(repo_root)
-        .args(["add", "residual/"])
+        .args(["rm", "-rf", "--cached", "."])
+        .output()
+        .ok();
+    git_cmd(repo_root)
+        .args(["add", "-f", "residual/"])
         .output()
         .context("git add residual on sidecar")?;
-    git_cmd(repo_root)
-        .args(["commit", "-m", "migrate inline residual to sidecar branch"])
+    let commit_out = git_cmd(repo_root)
+        .args([
+            "commit",
+            "-m",
+            "storage: S-01: migrate inline residual to sidecar branch",
+        ])
         .output()
         .context("git commit sidecar migration")?;
+    if !commit_out.status.success() {
+        bail!(
+            "git commit sidecar migration failed: {}",
+            String::from_utf8_lossy(&commit_out.stderr)
+        );
+    }
 
     let list_out = git_cmd(repo_root)
-        .args(["ls-tree", "-r", "--name-only", "HEAD", "--", "residual/"])
+        .args(["ls-tree", "-r", "--name-only", "HEAD"])
         .output()
-        .context("git ls-tree lifted files")?;
-    let lifted_files = String::from_utf8_lossy(&list_out.stdout)
+        .context("git ls-tree sidecar branch")?;
+    let tree_raw = String::from_utf8_lossy(&list_out.stdout);
+    let tree_paths: Vec<&str> = tree_raw
         .lines()
-        .filter(|l| !l.is_empty() && !l.ends_with('/'))
+        .filter(|l| !l.is_empty())
+        .collect();
+    if tree_paths.iter().any(|p| !p.starts_with("residual/")) {
+        bail!(
+            "sidecar branch must contain only residual/ paths; found: {}",
+            tree_paths
+                .iter()
+                .filter(|p| !p.starts_with("residual/"))
+                .copied()
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    let lifted_files = tree_paths
+        .iter()
+        .filter(|p| !p.ends_with('/'))
         .count();
 
-    git_cmd(repo_root)
-        .args(["checkout", &prev])
+    let checkout = git_cmd(repo_root)
+        .args(["checkout", "-f", &prev])
         .output()
         .context("git checkout previous branch")?;
+    if !checkout.status.success() {
+        bail!(
+            "git checkout {prev} failed: {}",
+            String::from_utf8_lossy(&checkout.stderr)
+        );
+    }
 
     Ok(MigrateSidecarReport {
         sidecar_branch: branch,
@@ -683,6 +724,23 @@ S-01,alpha,desc,change,outcome,A-01\n",
         assert!(
             branch_list.contains("residual/metadata"),
             "migrate --sidecar must create sidecar branch"
+        );
+
+        let tree_out = Command::new("git")
+            .args(["ls-tree", "-r", "--name-only", "residual/metadata"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let tree = String::from_utf8_lossy(&tree_out.stdout);
+        for line in tree.lines().filter(|l| !l.is_empty()) {
+            assert!(
+                line.starts_with("residual/"),
+                "sidecar branch must be metadata-only; found {line}"
+            );
+        }
+        assert!(
+            !tree.contains("Cargo.toml"),
+            "sidecar branch must not include application source tree"
         );
     }
 }

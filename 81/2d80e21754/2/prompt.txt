@@ -1,0 +1,41 @@
+/residual-integrate ... I need for you to call the version of the residual tools within `nix develop -c` since there have been breaking changes that you need to be on the right side of before we begin this integration walk.
+
+---
+
+Most components actually exist... Their proposed labeling in components.csv is wrong. Go ahead and update those. Your idea to enhance personas with a simulated "outsider" is a good one. I think that can provide meaningful improvement upon a planning workspace for such things. That said, then personas would need scoping. So, perhaps it becomes skills-walk-personas and skills-defense-personas. And structure-defense-strategy + structure-defense-progress + structure-defense-analysis + structure-defense-pitches should be added. Where strategy holds the brainstorming sessions for better outsider communication, progress holds recorded communications - it holds wins/losses/post-mortems, analysis holds meta-stressors and only a few meta-attractors with implied meta-purposes (the project succeeding and those working on the project keeping their good standing) ... meta-stressors are like normal stressors, but they apply to the residual-inside-agile-dogma (or similar) scenario(s) - they concern management decisions, teammate biases and anything else organizationally that hinders residuality specifically instead of the actual project being worked on. meta-attractors are the outcomes that these meta-stressors push toward. meta-purposes are generally pretty cookie-cutter: practice residuality theory in a way that helps the individual and the organization. Finally, structure-defense-pitches hold practiced artifacts that can be used in team communication to move residual concerns forward.
+
+Save the new lexicon additions and add to the component list these I've detailed here.
+
+We'll discuss the TUI/GUI next. The human-centric surfaces for LLM-apostatic situations.
+
+Feel free to ask follow up questions.
+
+---
+
+Remove the erroneous tests in that file. Really, the only useful tests are the format ones... And those are better served someplace like the storage module (actually, that's 100% the only place any sort of check like that should exist)... Detail the other tests of this nature to me. It's possible this project has been too lax with what sort of tests have been added.
+
+---
+
+The tests in a06 and a07 should be relocated. Test colocation with functionality is the desired pattern. These details these test for: "skills describe x" are desired. But again, colocation prevents breakage. Use the tagging system to make it clear why those tests exist. Launch a subagent to tag tests with stressor names. The tagging system should accept only shortnames, not IDs. Verification should throw warnings when the tagging system finds tag-shaped comments that don't actually point to any forces, residues or components.
+
+---
+
+The tagging system, does it handle all forces, residues and components? Can I tag all details in the codebase (except for attractors, since that doesn't really make sense)?
+
+The other tagging system changes you made are robust. Good judgement calls there. How are we handling what gets counted as a comment? This varies per language, ideally we don't have to manually maintain a list or support specific languages... That said, perhaps there's a list someone else maintains we can leverage? Before we search for that, what's the mechanism in place now?
+
+---
+
+Yes, @residue is misleading. That's an easy fix though. No @residue tagging, yes @component tagging. Add @purpose in addition to @stressor. That way it's clear which is which at a glance, @force would be harder to quickly identify. Ah, you labeled this choice as (a). Go for it.
+
+Pull in tokei and use it. Verify it's FOSS. We can change licenses since I'm currently the sole contributor (if needed, but I'm doubtful it will be).
+
+---
+
+<task-notification>
+<task-id>b8uc2ksb6</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/7b983b93-ae13-4193-8b04-89d66550bdb5/tasks/b8uc2ksb6.output</output-file>
+<status>completed</status>
+<summary>Background command "Build with tokei now properly locked" completed (exit code 0)</summary>
+</task-notification>

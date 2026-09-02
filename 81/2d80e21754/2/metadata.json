@@ -1,0 +1,116 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "812d80e21754",
+  "session_id": "7b983b93-ae13-4193-8b04-89d66550bdb5",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-02T07:04:42.995297118Z",
+  "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
+  "checkpoints_count": 6,
+  "save_step_count": 6,
+  "files_touched": [
+    ".gitignore",
+    "Cargo.lock",
+    "Cargo.toml",
+    "README.md",
+    "residual/.storage-hashes",
+    "residual/components.csv",
+    "residual/lexicon.csv",
+    "residual/residues.csv",
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/skills/context.rs",
+    "src/skills/mod.rs",
+    "src/skills/research.rs",
+    "src/storage/mod.rs",
+    "src/structure/definition/components.rs",
+    "src/tags.rs",
+    "src/verify.rs",
+    "tests/a06_fluent_capture.rs",
+    "tests/a07_software_only_tunnel_vision.rs",
+    "tests/architecture_iter4_v3.rs",
+    "tests/integration.rs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "f45c728b5e62",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 258,
+    "cache_creation_tokens": 296155,
+    "cache_read_tokens": 24562433,
+    "output_tokens": 152901,
+    "api_call_count": 129,
+    "subagent_tokens": {
+      "input_tokens": 16,
+      "cache_creation_tokens": 39986,
+      "cache_read_tokens": 244693,
+      "output_tokens": 6027,
+      "api_call_count": 8
+    }
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-02T07:04:42.736533015Z",
+    "agent_lines": 1804,
+    "agent_removed": 624,
+    "human_added": 2,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 1807,
+    "total_lines_changed": 2432,
+    "agent_percentage": 99.83552631578947,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 27,
+      "agent_lines_removed": 22
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 84,
+      "agent_lines_removed": 307
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 689,
+      "agent_lines_removed": 467
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 689,
+      "agent_lines_removed": 467
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 1,
+      "user_lines_removed": 1,
+      "agent_lines_added": 1716,
+      "agent_lines_removed": 536,
+      "user_added_per_file": {
+        ".claude/CLAUDE.md": 1
+      },
+      "user_removed_per_file": {
+        ".claude/CLAUDE.md": 1
+      }
+    }
+  ]
+}

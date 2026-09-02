@@ -41,6 +41,17 @@ pub fn metadata_dir(cfg: &Config) -> Result<PathBuf> {
     metadata_dir_from_parts(&cfg.repo_root, &cfg.config_path, &cfg.config_host_dir)
 }
 
+/// Resolve metadata directory for a mutation. Strict in branch mode: bails with a
+/// `residual branch init` hint rather than silently falling back to trunk.
+pub fn metadata_dir_for_mutation(cfg: &Config) -> Result<PathBuf> {
+    let sidecar = git_sidecar::SidecarConfig::from_config_file(&cfg.config_path)?;
+    if sidecar.enabled {
+        git_sidecar::write_sidecar_metadata(&cfg.repo_root, &sidecar)
+    } else {
+        Ok(cfg.config_host_dir.clone())
+    }
+}
+
 /// Resolve metadata directory for reads/mutations, honoring git sidecar when enabled.
 pub fn effective_metadata_dir(repo_root: &Path, config_path: &Path) -> Result<PathBuf> {
     let discovery = git_sidecar::discover_config(repo_root)?;
@@ -98,7 +109,7 @@ fn init_dirs_and_files(dir: &Path) -> Result<()> {
 }
 
 pub fn add(cfg: &Config, target: AddTarget, force: bool) -> Result<()> {
-    let dir = metadata_dir(cfg)?;
+    let dir = metadata_dir_for_mutation(cfg)?;
     let session = integrity::sessions::begin_mutation(&dir, force)?;
     add_entry(&dir, target)?;
     session.commit()?;
@@ -107,7 +118,7 @@ pub fn add(cfg: &Config, target: AddTarget, force: bool) -> Result<()> {
 }
 
 pub fn remove(cfg: &Config, target: RemoveTarget, force: bool) -> Result<()> {
-    let dir = metadata_dir(cfg)?;
+    let dir = metadata_dir_for_mutation(cfg)?;
     let session = integrity::sessions::begin_mutation(&dir, force)?;
     remove_entry(&dir, target)?;
     session.commit()?;
@@ -387,7 +398,7 @@ fn truncate_state(s: &str) -> String {
 
 /// Run naive → v3 migration for the project's residual/ directory.
 pub fn migrate(cfg: &Config, force: bool) -> Result<()> {
-    let dir = metadata_dir(cfg)?;
+    let dir = metadata_dir_for_mutation(cfg)?;
     let report = integrity::migration::migrate_residual_dir(&dir, force)?;
     git_sidecar::persist_if_sidecar(cfg, &dir)?;
     println!(

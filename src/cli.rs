@@ -105,7 +105,42 @@ pub enum Command {
         #[command(subcommand)]
         op: WalkOp,
     },
+    /// Manage per-code-branch metadata branches (git sidecar branch mode).
+    ///
+    /// `init` is the only subcommand that creates a metadata branch — every other
+    /// mutating command requires it to already exist and points here if it doesn't.
+    Branch {
+        #[command(subcommand)]
+        op: BranchOp,
+    },
     Config,
+}
+
+#[derive(Subcommand)]
+pub enum BranchOp {
+    /// Fork a metadata branch for the current (or given) code branch from trunk.
+    Init { branch: Option<String> },
+    /// Copy the resolved metadata branch's tree into the config-host residual/ dir for manual editing.
+    Edit,
+    /// Save hand-edited metadata back to the resolved metadata branch.
+    Save {
+        #[arg(long, default_value = "")]
+        commit_msg: String,
+        #[arg(long)]
+        push: bool,
+    },
+    /// Merge one metadata branch into another (resolved from code branch names).
+    Merge {
+        from: String,
+        to: String,
+        #[arg(long)]
+        commit_msg: Option<String>,
+        #[arg(long)]
+        push: bool,
+    },
+    /// Mirror the latest commit into the resolved metadata branch (post-commit hook).
+    #[command(name = "sync-commit")]
+    SyncCommit,
 }
 
 #[derive(Subcommand)]
@@ -471,7 +506,66 @@ pub fn run() -> Result<()> {
                 Ok(())
             }
         }
+        Command::Branch { op } => run_branch(&cfg, op),
         Command::Config => crate::config::print(&cfg),
+    }
+}
+
+fn run_branch(cfg: &crate::config::Config, op: BranchOp) -> Result<()> {
+    use crate::storage::git_sidecar;
+
+    let sidecar = git_sidecar::SidecarConfig::from_config_file(&cfg.config_path)?;
+    match op {
+        BranchOp::Init { branch } => {
+            let resolved = git_sidecar::branch_init(&cfg.repo_root, &sidecar, branch.as_deref())?;
+            println!("Initialized metadata branch '{resolved}'");
+            Ok(())
+        }
+        BranchOp::Edit => {
+            let branch = git_sidecar::branch_edit(&cfg.repo_root, &sidecar, &cfg.config_host_dir)?;
+            println!(
+                "Materialized '{branch}' into {} for manual editing",
+                cfg.config_host_dir.display()
+            );
+            Ok(())
+        }
+        BranchOp::Save { commit_msg, push } => {
+            let branch = git_sidecar::branch_save(
+                &cfg.repo_root,
+                &sidecar,
+                &cfg.config_host_dir,
+                &commit_msg,
+                push,
+            )?;
+            println!("Saved edits to '{branch}'{}", if push { " and pushed" } else { "" });
+            Ok(())
+        }
+        BranchOp::Merge {
+            from,
+            to,
+            commit_msg,
+            push,
+        } => {
+            let (from_branch, to_branch) = git_sidecar::branch_merge(
+                &cfg.repo_root,
+                &sidecar,
+                &from,
+                &to,
+                commit_msg.as_deref(),
+                push,
+            )?;
+            println!("Merged '{from_branch}' into '{to_branch}'{}", if push { " and pushed" } else { "" });
+            Ok(())
+        }
+        BranchOp::SyncCommit => {
+            // Called from the post-commit hook — must never fail the commit.
+            match git_sidecar::branch_sync_commit(&cfg.repo_root, &sidecar, &cfg.config_host_dir) {
+                Ok(Some(branch)) => println!("Synced commit to '{branch}'"),
+                Ok(None) => {}
+                Err(e) => eprintln!("residual branch sync-commit: {e}"),
+            }
+            Ok(())
+        }
     }
 }
 
@@ -565,6 +659,36 @@ mod tests {
                 assert_eq!(naive_change, "aliased text");
             }
             _ => panic!("expected Command::Add(AddTarget::Purpose)"),
+        }
+    }
+
+    #[test]
+    fn branch_merge_parses_from_to_and_flags() {
+        let cli = Cli::try_parse_from([
+            "residual", "branch", "merge", "feature/x", "main",
+            "--commit-msg", "fold it in", "--push",
+        ]).unwrap();
+        match cli.command {
+            Command::Branch {
+                op: BranchOp::Merge { from, to, commit_msg, push },
+            } => {
+                assert_eq!(from, "feature/x");
+                assert_eq!(to, "main");
+                assert_eq!(commit_msg.as_deref(), Some("fold it in"));
+                assert!(push);
+            }
+            _ => panic!("expected Command::Branch(BranchOp::Merge)"),
+        }
+    }
+
+    #[test]
+    fn branch_init_branch_flag_defaults_to_none() {
+        let cli = Cli::try_parse_from(["residual", "branch", "init"]).unwrap();
+        match cli.command {
+            Command::Branch { op: BranchOp::Init { branch } } => {
+                assert_eq!(branch, None);
+            }
+            _ => panic!("expected Command::Branch(BranchOp::Init)"),
         }
     }
 

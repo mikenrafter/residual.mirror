@@ -71,6 +71,9 @@ fn default_config_host() -> String {
 fn default_working_tree_policy() -> String {
     "warn".to_string()
 }
+fn default_branch_pattern() -> String {
+    "residual/branch-{prefix}{suffix}".to_string()
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct StorageSection {
@@ -86,6 +89,11 @@ struct StorageSection {
     config_host: String,
     #[serde(default)]
     git_sidecar: GitSidecarNested,
+    /// Route reads/writes through a per-code-branch metadata branch instead of the trunk alone.
+    #[serde(default)]
+    branch_mode: bool,
+    #[serde(default = "default_branch_pattern")]
+    branch_pattern: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -141,6 +149,8 @@ pub struct SidecarStorageConfig {
     pub git_sidecar_remote: String,
     pub config_host: String,
     pub working_tree_policy: String,
+    pub branch_mode: bool,
+    pub branch_pattern: String,
 }
 
 /// Parse [storage] sidecar keys from config TOML.
@@ -152,6 +162,8 @@ pub fn parse_sidecar_section(toml_str: &str) -> Result<SidecarStorageConfig> {
         git_sidecar_remote: doc.storage.git_sidecar_remote,
         config_host: doc.storage.config_host,
         working_tree_policy: doc.storage.git_sidecar.working_tree_policy,
+        branch_mode: doc.storage.branch_mode,
+        branch_pattern: doc.storage.branch_pattern,
     })
 }
 
@@ -235,5 +247,37 @@ token_warn = 1000
 "#;
         let sidecar = parse_sidecar_section(raw).unwrap();
         assert!(!sidecar.git_sidecar_enabled);
+    }
+
+    #[test]
+    fn parse_sidecar_section_branch_mode_defaults_off_with_default_pattern() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+git_sidecar_enabled = true
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(!sidecar.branch_mode, "branch_mode must default to false");
+        assert_eq!(sidecar.branch_pattern, "residual/branch-{prefix}{suffix}");
+    }
+
+    #[test]
+    fn parse_sidecar_section_reads_branch_mode_and_custom_pattern() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+git_sidecar_enabled = true
+branch_mode = true
+branch_pattern = "meta/{suffix}"
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(sidecar.branch_mode);
+        assert_eq!(sidecar.branch_pattern, "meta/{suffix}");
     }
 }

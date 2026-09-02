@@ -3,7 +3,7 @@
   "checkpoint_id": "812d80e21754",
   "strategy": "manual-commit",
   "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     ".gitignore",
     "Cargo.lock",
@@ -34,13 +34,20 @@
       "compact_transcript": "/81/2d80e21754/0/transcript.jsonl",
       "content_hash": "/81/2d80e21754/0/content_hash.txt",
       "prompt": "/81/2d80e21754/0/prompt.txt"
+    },
+    {
+      "metadata": "/81/2d80e21754/1/metadata.json",
+      "transcript": "/81/2d80e21754/1/full.jsonl",
+      "compact_transcript": "/81/2d80e21754/1/transcript.jsonl",
+      "content_hash": "/81/2d80e21754/1/content_hash.txt",
+      "prompt": "/81/2d80e21754/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 2,
-    "cache_creation_tokens": 9157,
-    "cache_read_tokens": 16779,
-    "output_tokens": 126,
-    "api_call_count": 1
+    "input_tokens": 4,
+    "cache_creation_tokens": 16249,
+    "cache_read_tokens": 35676,
+    "output_tokens": 189,
+    "api_call_count": 2
   }
 }

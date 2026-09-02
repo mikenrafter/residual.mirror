@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "812d80e21754",
+  "strategy": "manual-commit",
+  "branch": "stressor-walk/llm-degradation-bubble-org-perspective-fluency",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "Cargo.lock",
+    "Cargo.toml",
+    "README.md",
+    "residual/.storage-hashes",
+    "residual/components.csv",
+    "residual/lexicon.csv",
+    "residual/residues.csv",
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/skills/context.rs",
+    "src/skills/mod.rs",
+    "src/skills/research.rs",
+    "src/storage/mod.rs",
+    "src/structure/definition/components.rs",
+    "src/tags.rs",
+    "src/verify.rs",
+    "tests/a06_fluent_capture.rs",
+    "tests/a07_software_only_tunnel_vision.rs",
+    "tests/architecture_iter4_v3.rs",
+    "tests/integration.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/81/2d80e21754/0/metadata.json",
+      "transcript": "/81/2d80e21754/0/full.jsonl",
+      "compact_transcript": "/81/2d80e21754/0/transcript.jsonl",
+      "content_hash": "/81/2d80e21754/0/content_hash.txt",
+      "prompt": "/81/2d80e21754/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 9157,
+    "cache_read_tokens": 16779,
+    "output_tokens": 126,
+    "api_call_count": 1
+  }
+}

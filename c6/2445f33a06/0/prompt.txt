@@ -1,0 +1,32 @@
+In order to more easily edit the residual metadata manually (when repairs are needed) ... Let's make it so `residual branch edit` copies all residual metadata into the same folder as the config file (also overriding the config file, it should be kept in the sidecar branch as it is now)... This might be ../residual/ or this might be ./residual/ . Depends on the org safety. An accompanying `residual branch save --commit-msg ""` will save the files to the branch. Optionally it can have the --push flag added to git push the sidecar branch. Now, every commit in the main branch should also commit in the residual metadata branch. That way, things stay in sync. The commit messages in the metadata branch should include the title of the main branch commits and the commit hashes. Purpose: residual data needs to be able to be kept in sync with specific branches. A "branch mode" setting will be added. This setting will make the CLI save data to a local branch that is named by an operator specified pattern. e.g. a branch named "super-cool-feature/poc" with the pattern "residual/branch-{prefix}{suffix}" would come out as "residual/branch-super-cool-feature/poc". If the operator does not set this setting, then this pattern will be chosen.
+
+`residual branch merge <from> <to>` (also with optional --commit-msg and --push flags) will merge the two metadata branches... that is, the main one.
+
+This will become a new storage-management component. The git hook will also be effected by this change since it will need to transfer over other branch data. The main git hook should prevent any residual metadata from making it into the primary branch. Of course gitignores don't work, given the stealth-mode requirement... So the hook will have to enforce it. This is something that should not have a --force option.
+
+I'll need to you acquaint yourself with the project... agentgrep, rtk, nix develop -c residual skill-list, etc.
+This isn't a formal purpose walk since it's just the one... But maybe a new attractor and stressor are needed? I'm not sure, what do you think?
+
+---
+
+Add the forces, and let's talk through the design. One key piece here: don't prevent committing residual/config.toml
+
+---
+
+Looks good except the auto sync. The auto sync should not create a new branch. If the caller tries to make any modifications but a branch isn't found, tell them to call "residual branch init" which will init the metadata branch for that code branch. Not every branch will be modifying residual data.
+
+---
+
+Yes, with one addition: the non-mutating operations (skills, data, matrix, etc) should try to resolve the branch, but default back to the main metadata branch. It's only the mutation commands that are super strict about having the correct branch setup. Of course, if branching is disabled, mutation should be allowed on any branch, pointing to the one metadata branch.
+
+---
+
+Yes, implement.
+
+---
+
+agentgrep, rtk, get your bearings and continue the implementation. Recant the plan first.
+
+---
+
+agentgrep, rtk, get your bearings and continue the implementation. Recant the plan first.

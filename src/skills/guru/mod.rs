@@ -105,11 +105,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     #[test]

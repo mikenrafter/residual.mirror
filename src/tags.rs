@@ -94,21 +94,22 @@ pub struct ScanReport {
 /// not taggable — they describe system states, not code-adjacent detail.
 /// Anything else is a dangling tag-shaped comment.
 pub fn scan_report(cfg: &Config, tags: &[Tag]) -> Result<ScanReport> {
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir).unwrap_or_default();
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let stressors = crate::storage::stressors::load(&dir).unwrap_or_default();
     let stressor_shortnames: HashSet<String> = stressors
         .iter()
         .map(|s| s.shortname.clone())
         .filter(|s| !s.is_empty())
         .collect();
 
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir).unwrap_or_default();
+    let purposes = crate::storage::purposes::load(&dir).unwrap_or_default();
     let purpose_shortnames: HashSet<String> = purposes
         .iter()
         .map(|p| p.shortname.clone())
         .filter(|s| !s.is_empty())
         .collect();
 
-    let components = crate::structure::definition::components::load(&cfg.residual_dir).unwrap_or_default();
+    let components = crate::structure::definition::components::load(&dir).unwrap_or_default();
     let component_names: HashSet<String> = components.iter().map(|c| c.name.clone()).collect();
 
     let mut dangling = Vec::new();
@@ -323,11 +324,7 @@ mod tests {
     const RUST_COMMENTS: &[&str] = &["//", "/*"];
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     #[test]

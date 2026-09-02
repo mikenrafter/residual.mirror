@@ -1,5 +1,4 @@
 use anyhow::{bail, Result};
-use std::path::Path;
 use std::time::{Duration, Instant};
 use crate::config::Config;
 use crate::cli::VerifyCheck;
@@ -83,7 +82,7 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
 /// that don't resolve to a known force shortname or component — dangling tags
 /// are suggestions gone stale, not a reason to block a commit (S-06).
 fn print_tag_warnings(cfg: &Config) {
-    let root = cfg.residual_dir.parent().unwrap_or_else(|| Path::new("."));
+    let root = &cfg.repo_root;
     let Ok(tags) = crate::tags::scan_dir(&root.to_string_lossy()) else { return };
     let Ok(report) = crate::tags::scan_report(cfg, &tags) else { return };
     for d in &report.dangling {
@@ -95,9 +94,10 @@ fn print_tag_warnings(cfg: &Config) {
 }
 
 pub fn check_outcomes(cfg: &Config) -> Result<Vec<OutcomeViolation>> {
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir)?;
-    let term_index = crate::storage::terminology::term_index(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let stressors = crate::storage::stressors::load(&dir)?;
+    let purposes = crate::storage::purposes::load(&dir)?;
+    let term_index = crate::storage::terminology::term_index(&dir)?;
 
     let mut violations = Vec::new();
 
@@ -163,9 +163,10 @@ pub fn check_outcomes(cfg: &Config) -> Result<Vec<OutcomeViolation>> {
 }
 
 pub fn check_links(cfg: &Config) -> Result<Vec<LinkViolation>> {
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir)?;
-    let attractors = crate::storage::attractors::load(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let stressors = crate::storage::stressors::load(&dir)?;
+    let purposes = crate::storage::purposes::load(&dir)?;
+    let attractors = crate::storage::attractors::load(&dir)?;
     let attractor_ids: std::collections::HashSet<String> =
         attractors.iter().map(|a| a.id.clone()).collect();
 
@@ -205,8 +206,8 @@ pub fn check_links(cfg: &Config) -> Result<Vec<LinkViolation>> {
         }
     }
 
-    let residues = crate::storage::format::read_residues(&cfg.residual_dir)?;
-    let registry = crate::structure::definition::components::load(&cfg.residual_dir)?;
+    let residues = crate::storage::format::read_residues(&dir)?;
+    let registry = crate::structure::definition::components::load(&dir)?;
     let mut force_ids = std::collections::HashSet::new();
     for s in &stressors {
         force_ids.insert(s.id.clone());
@@ -319,11 +320,7 @@ mod tests {
     use crate::structure::definition::lexicon::Term as LexTerm;
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     // @stressor: ceremony-lockout

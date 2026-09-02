@@ -50,15 +50,16 @@ fn build_matrix(
 }
 
 pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
+    let dir = crate::storage::metadata_dir(cfg)?;
     match op {
         MatrixOp::Show {
             csv,
             filter,
             sort_by,
         } => {
-            let shortnames = force_shortnames(&cfg.residual_dir)?;
-            let attractor_names = attractor_names(&cfg.residual_dir)?;
-            let m = build_matrix(&cfg.residual_dir, &filter, sort_by)?;
+            let shortnames = force_shortnames(&dir)?;
+            let attractor_names = attractor_names(&dir)?;
+            let m = build_matrix(&dir, &filter, sort_by)?;
             if csv {
                 m.print_csv(&shortnames, &attractor_names, sort_by)?;
             } else {
@@ -66,7 +67,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             }
         }
         MatrixOp::Calc => {
-            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
+            let m = matrix::NkpMatrix::build_from_dir(&dir)?;
             println!("N (nodes) = {}", m.n());
             println!("K (connections) = {}", m.k());
             println!(
@@ -79,7 +80,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             );
         }
         MatrixOp::Criticality => {
-            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
+            let m = matrix::NkpMatrix::build_from_dir(&dir)?;
             let report = criticality::assess(&m);
             println!(
                 "N = {}, K = {}, K/N = {:.4}",
@@ -98,7 +99,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             println!("{}", interpretation);
         }
         MatrixOp::Fusion => {
-            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
+            let m = matrix::NkpMatrix::build_from_dir(&dir)?;
             let candidates = m.fusion_candidates();
             if candidates.is_empty() {
                 println!("No fusion candidates found.");
@@ -110,7 +111,7 @@ pub fn run(cfg: &Config, op: MatrixOp) -> Result<()> {
             }
         }
         MatrixOp::Fission => {
-            let m = matrix::NkpMatrix::build_from_dir(&cfg.residual_dir)?;
+            let m = matrix::NkpMatrix::build_from_dir(&dir)?;
             let threshold = (m.force_ids.len() / 2).max(1);
             let candidates = m.fission_candidates(threshold);
             if candidates.is_empty() {

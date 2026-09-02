@@ -23,9 +23,28 @@ pub mod terminology;
 const WHOLE_SYSTEM_REMINDER: &str = "reminder: examine whole-system-residue (hardware, process, organization, policy) before defaulting to a software-only patch; use --whole-system --notes when the zig survives outside software";
 
 /// Resolve metadata directory for reads/mutations, honoring git sidecar when enabled.
-pub fn effective_metadata_dir(repo_root: &Path, config_path: &Path) -> Result<PathBuf> {
+pub fn metadata_dir_from_parts(
+    repo_root: &Path,
+    config_path: &Path,
+    inline_residual_dir: &Path,
+) -> Result<PathBuf> {
     let sidecar = git_sidecar::SidecarConfig::from_config_file(config_path)?;
-    git_sidecar::effective_residual_dir(repo_root, &sidecar)
+    if sidecar.enabled {
+        git_sidecar::read_sidecar_metadata(repo_root, &sidecar)
+    } else {
+        Ok(inline_residual_dir.to_path_buf())
+    }
+}
+
+/// Resolve metadata directory for a loaded config.
+pub fn metadata_dir(cfg: &Config) -> Result<PathBuf> {
+    metadata_dir_from_parts(&cfg.repo_root, &cfg.config_path, &cfg.config_host_dir)
+}
+
+/// Resolve metadata directory for reads/mutations, honoring git sidecar when enabled.
+pub fn effective_metadata_dir(repo_root: &Path, config_path: &Path) -> Result<PathBuf> {
+    let discovery = git_sidecar::discover_config(repo_root)?;
+    metadata_dir_from_parts(repo_root, config_path, &discovery.residual_dir)
 }
 
 /// Print resolved storage banner (S-58) to stdout.
@@ -38,15 +57,15 @@ pub fn print_storage_banner() -> Result<()> {
 }
 
 pub fn init(cfg: &Config, force: bool) -> Result<()> {
-    let session = integrity::sessions::begin_mutation(&cfg.residual_dir, force)?;
-    init_dirs_and_files(cfg)?;
+    let host = &cfg.config_host_dir;
+    let session = integrity::sessions::begin_mutation(host, force)?;
+    init_dirs_and_files(host)?;
     session.commit()?;
-    println!("Initialized residual/ at {}", cfg.residual_dir.display());
+    println!("Initialized residual/ at {}", host.display());
     Ok(())
 }
 
-fn init_dirs_and_files(cfg: &Config) -> Result<()> {
-    let dir = &cfg.residual_dir;
+fn init_dirs_and_files(dir: &Path) -> Result<()> {
     fs::create_dir_all(dir.join("iterations"))?;
     fs::create_dir_all(dir.join("personas"))?;
     fs::create_dir_all(dir.join("research"))?;
@@ -79,21 +98,24 @@ fn init_dirs_and_files(cfg: &Config) -> Result<()> {
 }
 
 pub fn add(cfg: &Config, target: AddTarget, force: bool) -> Result<()> {
-    let session = integrity::sessions::begin_mutation(&cfg.residual_dir, force)?;
-    add_entry(cfg, target)?;
+    let dir = metadata_dir(cfg)?;
+    let session = integrity::sessions::begin_mutation(&dir, force)?;
+    add_entry(&dir, target)?;
     session.commit()?;
+    git_sidecar::persist_if_sidecar(cfg, &dir)?;
     Ok(())
 }
 
 pub fn remove(cfg: &Config, target: RemoveTarget, force: bool) -> Result<()> {
-    let session = integrity::sessions::begin_mutation(&cfg.residual_dir, force)?;
-    remove_entry(cfg, target)?;
+    let dir = metadata_dir(cfg)?;
+    let session = integrity::sessions::begin_mutation(&dir, force)?;
+    remove_entry(&dir, target)?;
     session.commit()?;
+    git_sidecar::persist_if_sidecar(cfg, &dir)?;
     Ok(())
 }
 
-fn remove_entry(cfg: &Config, target: RemoveTarget) -> Result<()> {
-    let dir = &cfg.residual_dir;
+fn remove_entry(dir: &Path, target: RemoveTarget) -> Result<()> {
     match target {
         RemoveTarget::Residue {
             force_id,
@@ -109,8 +131,7 @@ fn remove_entry(cfg: &Config, target: RemoveTarget) -> Result<()> {
     Ok(())
 }
 
-fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
-    let dir = &cfg.residual_dir;
+fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
     match target {
         AddTarget::Stressor {
             description,
@@ -277,10 +298,10 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
 }
 
 pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
-    let dir = &cfg.residual_dir;
+    let dir = metadata_dir(cfg)?;
     match target {
         ListTarget::Stressors => {
-            let items = stressors::load(dir)?;
+            let items = stressors::load(&dir)?;
             if items.is_empty() {
                 println!("No stressors.");
             } else {
@@ -290,7 +311,7 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
             }
         }
         ListTarget::Purposes => {
-            let items = purposes::load(dir)?;
+            let items = purposes::load(&dir)?;
             if items.is_empty() {
                 println!("No purposes.");
             } else {
@@ -301,7 +322,7 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
             }
         }
         ListTarget::Attractors => {
-            let items = attractors::load(dir)?;
+            let items = attractors::load(&dir)?;
             if items.is_empty() {
                 println!("No attractors.");
             } else {
@@ -317,7 +338,7 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
             }
         }
         ListTarget::Terminology => {
-            let items = format::read_lexicon(dir)?;
+            let items = format::read_lexicon(&dir)?;
             if items.is_empty() {
                 println!("No terminology.");
             } else {
@@ -327,7 +348,7 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
             }
         }
         ListTarget::Personas => {
-            let names = personas::list_names(dir)?;
+            let names = personas::list_names(&dir)?;
             if names.is_empty() {
                 println!("No personas.");
             } else {
@@ -336,9 +357,9 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
                 }
             }
         }
-        ListTarget::Residues => { let matrix = format::format_residues_matrix(dir)?; if matrix.lines().count()<=1 { println!("No residues."); } else { print!("{matrix}"); } }
+        ListTarget::Residues => { let matrix = format::format_residues_matrix(&dir)?; if matrix.lines().count()<=1 { println!("No residues."); } else { print!("{matrix}"); } }
         ListTarget::Iterations => {
-            let items = iterations::list(dir)?;
+            let items = iterations::list(&dir)?;
             if items.is_empty() {
                 println!("No iterations.");
             } else {
@@ -366,7 +387,9 @@ fn truncate_state(s: &str) -> String {
 
 /// Run naive → v3 migration for the project's residual/ directory.
 pub fn migrate(cfg: &Config, force: bool) -> Result<()> {
-    let report = integrity::migration::migrate_residual_dir(&cfg.residual_dir, force)?;
+    let dir = metadata_dir(cfg)?;
+    let report = integrity::migration::migrate_residual_dir(&dir, force)?;
+    git_sidecar::persist_if_sidecar(cfg, &dir)?;
     println!(
         "Migrated {} (config={}, attractors={}, lexicon={}, v4_couplings={}, v4_decoupled={})",
         cfg.residual_dir.display(),
@@ -385,11 +408,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     // @stressor: software-only-zag
@@ -410,7 +429,7 @@ mod tests {
         .unwrap();
 
         add_entry(
-            &cfg,
+            &cfg.residual_dir,
             AddTarget::Stressor {
                 description: "queue overload".into(),
                 attractor_id: "A-01".into(),
@@ -457,7 +476,7 @@ mod tests {
         // whole_system_reminder_mentions_whole_system above. Here we assert the
         // call still succeeds and records the stressor without --whole-system.
         let result = add_entry(
-            &cfg,
+            &cfg.residual_dir,
             AddTarget::Stressor {
                 description: "load".into(),
                 attractor_id: "A-01".into(),

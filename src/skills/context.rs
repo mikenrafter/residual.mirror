@@ -2,16 +2,16 @@ use anyhow::Result;
 use crate::config::Config;
 
 pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
-    let dir = &cfg.residual_dir;
+    let dir = crate::storage::metadata_dir(cfg)?;
 
-    let attractors = crate::storage::attractors::load(dir).unwrap_or_default();
-    let stressors  = crate::storage::stressors::load(dir).unwrap_or_default();
-    let purposes   = crate::storage::purposes::load(dir).unwrap_or_default();
-    let terms      = crate::storage::format::read_lexicon(dir).unwrap_or_default();
-    let personas   = crate::storage::personas::load_all(dir).unwrap_or_default();
+    let attractors = crate::storage::attractors::load(&dir).unwrap_or_default();
+    let stressors  = crate::storage::stressors::load(&dir).unwrap_or_default();
+    let purposes   = crate::storage::purposes::load(&dir).unwrap_or_default();
+    let terms      = crate::storage::format::read_lexicon(&dir).unwrap_or_default();
+    let personas   = crate::storage::personas::load_all(&dir).unwrap_or_default();
 
     // NKP summary from residues.csv (v4 canonical coupling source).
-    let nkp = crate::nkp::matrix::NkpMatrix::build_from_dir(dir).unwrap_or_else(|_| {
+    let nkp = crate::nkp::matrix::NkpMatrix::build_from_dir(&dir).unwrap_or_else(|_| {
         crate::nkp::matrix::NkpMatrix {
             force_ids: vec![],
             attractor_ids: vec![],
@@ -192,7 +192,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
     }
 
     if want_defense {
-        out.push_str(&defense_summary_section(dir)?);
+        out.push_str(&defense_summary_section(&dir)?);
     }
 
     crate::skills::guru::inject_for_skill(skill_name, &out)
@@ -329,11 +329,7 @@ mod tests {
     use crate::storage::{format, stressors};
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     #[test]

@@ -204,11 +204,12 @@ pub fn suggest_subjects(
     cfg: &Config,
     staged_paths: &[String],
 ) -> Result<Vec<String>> {
-    let vocab = load_vocabulary(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let vocab = load_vocabulary(&dir)?;
     let hints = staged_component_hints(staged_paths, &vocab);
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir)?;
-    let residues = format::read_residues(&cfg.residual_dir)?;
+    let stressors = crate::storage::stressors::load(&dir)?;
+    let purposes = crate::storage::purposes::load(&dir)?;
+    let residues = format::read_residues(&dir)?;
 
     let mut suggestions = Vec::new();
 
@@ -252,8 +253,9 @@ pub fn suggest_subjects(
 
 pub fn template_for_force(cfg: &Config, force_id: &str) -> Result<String> {
     let force_id = force_id.to_uppercase();
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let stressors = crate::storage::stressors::load(&dir)?;
+    let purposes = crate::storage::purposes::load(&dir)?;
 
     let (canonical_id, shortname) = if let Some(s) = stressors.iter().find(|s| s.id.eq_ignore_ascii_case(&force_id)) {
         (s.id.clone(), s.shortname.clone())
@@ -263,7 +265,7 @@ pub fn template_for_force(cfg: &Config, force_id: &str) -> Result<String> {
         anyhow::bail!("force '{force_id}' not found in stressors or purposes");
     };
 
-    let residues = format::read_residues(&cfg.residual_dir)?;
+    let residues = format::read_residues(&dir)?;
     let component = residues
         .iter()
         .find(|r| r.force_id.eq_ignore_ascii_case(&canonical_id))
@@ -284,7 +286,8 @@ pub fn verify_message(
     staged_paths: &[String],
 ) -> Result<CommitMsgVerdict> {
     let subject = subject_line(message);
-    let vocab = load_vocabulary(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let vocab = load_vocabulary(&dir)?;
     let mut verdict = check_subject(subject, &vocab, policy.super_strict);
 
     if !staged_paths.is_empty() {
@@ -331,7 +334,7 @@ pub fn run_verify(
     staged_paths: &[String],
     enforce_override: Option<bool>,
 ) -> Result<()> {
-    let policy = crate::verification::policy_from_storage_config(&cfg.residual_dir)?;
+    let policy = crate::verification::policy_from_config(cfg)?;
     let enforce = enforce_override.unwrap_or(policy.commit_msg_enforce);
     let verdict = verify_message(cfg, &policy, message, staged_paths)?;
 
@@ -382,11 +385,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn cfg_for(dir: &Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     fn seed_vocab(dir: &Path) {

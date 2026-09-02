@@ -18,7 +18,7 @@ complete -c residual -n '__fish_use_subcommand' -a 'generate' -d 'Generate artif
 complete -c residual -n '__fish_use_subcommand' -a 'migrate' -d 'Migrate legacy residual/ layout'
 complete -c residual -n '__fish_use_subcommand' -a 'config' -d 'Show configuration'
 complete -c residual -n '__fish_seen_subcommand_from skill' -a 'show data list install check-install'
-complete -c residual -n '__fish_seen_subcommand_from skill' -a 'purpose-walk naive-draft stressor-walk integrate fmea atam defense-walk'
+complete -c residual -n '__fish_seen_subcommand_from skill' -a 'purpose-walk naive-draft stressor-walk integrate fmea atam tdd-implement defense-walk'
 complete -c residual -n '__fish_seen_subcommand_from skill' -l agent -a 'claude cursor copilot agnostic'
 complete -c residual -n '__fish_seen_subcommand_from skill' -l global -d 'Install user-wide'
 complete -c residual -n '__fish_seen_subcommand_from add' -a 'stressor residue purpose attractor term persona iteration component'

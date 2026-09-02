@@ -8,8 +8,19 @@ pub struct Config {
     pub validation: ValidationConfig,
     #[serde(default)]
     pub skills: SkillsConfig,
+    /// In-repo residual/ hosting config.toml (config pointer when sidecar is enabled).
+    /// Use [`crate::storage::metadata_dir`] for ledger reads when sidecar may be enabled.
     #[serde(skip)]
     pub residual_dir: PathBuf,
+    /// In-repo residual/ hosting config.toml (config pointer when sidecar is enabled).
+    #[serde(skip)]
+    pub config_host_dir: PathBuf,
+    /// Resolved config.toml path used for policy and sidecar settings.
+    #[serde(skip)]
+    pub config_path: PathBuf,
+    /// Repository root for code scans and git sidecar operations.
+    #[serde(skip)]
+    pub repo_root: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,17 +48,40 @@ impl Default for SkillsConfig {
 
 impl Default for Config {
     fn default() -> Self {
+        let residual_dir = PathBuf::from("residual");
         Self {
             validation: ValidationConfig::default(),
             skills: SkillsConfig::default(),
-            residual_dir: PathBuf::from("residual"),
+            config_path: residual_dir.join("config.toml"),
+            config_host_dir: residual_dir.clone(),
+            repo_root: PathBuf::from("."),
+            residual_dir,
+        }
+    }
+}
+
+impl Config {
+    /// Test helper: inline metadata (no git sidecar resolution).
+    pub fn for_test_residual_dir(dir: impl AsRef<Path>) -> Self {
+        let dir = dir.as_ref().to_path_buf();
+        Self {
+            validation: ValidationConfig::default(),
+            skills: SkillsConfig::default(),
+            residual_dir: dir.clone(),
+            config_host_dir: dir.clone(),
+            config_path: dir.join("config.toml"),
+            repo_root: dir
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from(".")),
         }
     }
 }
 
 pub fn load() -> Result<Config> {
-    let residual_dir = find_residual_dir()?;
-    let config_path = residual_dir.join("config.toml");
+    let repo_root = std::env::current_dir().context("get current dir")?;
+    let discovery = crate::storage::git_sidecar::discover_config(&repo_root)?;
+    let config_path = discovery.config_path.clone();
 
     let mut cfg = if config_path.exists() {
         let raw = std::fs::read_to_string(&config_path)
@@ -57,21 +91,23 @@ pub fn load() -> Result<Config> {
         Config::default()
     };
 
-    cfg.residual_dir = residual_dir;
+    cfg.repo_root = repo_root.clone();
+    cfg.config_path = config_path;
+    cfg.config_host_dir = discovery.residual_dir.clone();
+    // Keep residual_dir as the config-host path; sidecar materialization is lazy via storage::metadata_dir.
+    cfg.residual_dir = cfg.config_host_dir.clone();
     Ok(cfg)
 }
 
 pub fn print(cfg: &Config) -> Result<()> {
-    println!("residual_dir = {}", cfg.residual_dir.display());
+    println!("config_host_dir = {}", cfg.config_host_dir.display());
+    match crate::storage::metadata_dir(cfg) {
+        Ok(dir) => println!("metadata_dir = {}", dir.display()),
+        Err(err) => println!("metadata_dir = <unresolved: {err}>"),
+    }
     println!("validation.strict = {}", cfg.validation.strict);
     println!("skills.token_warn = {}", cfg.skills.token_warn);
     Ok(())
-}
-
-fn find_residual_dir() -> Result<PathBuf> {
-    let cwd = std::env::current_dir().context("get current dir")?;
-    let discovery = crate::storage::git_sidecar::discover_config(&cwd)?;
-    Ok(discovery.residual_dir)
 }
 
 pub fn residual_dir(cfg: &Config) -> &Path {
@@ -113,7 +149,7 @@ fn parse_any(raw: &str) -> Result<Config> {
         return Ok(Config {
             validation: ValidationConfig { strict },
             skills: SkillsConfig { token_warn },
-            residual_dir: PathBuf::new(),
+            ..Config::default()
         });
     }
     Ok(toml::from_str::<Config>(raw)?)
@@ -126,8 +162,23 @@ mod tests {
 
     /// Helper: parse a config.toml string with a given residual_dir.
     fn parse_with_dir(toml_str: &str, dir: &Path) -> Config {
-        let mut cfg: Config = toml::from_str(toml_str).expect("failed to parse config toml");
+        let mut cfg = if toml_str.trim().is_empty() {
+            Config::for_test_residual_dir(dir)
+        } else if toml_str.contains("format_version")
+            || toml_str.contains("[verification]")
+            || toml_str.contains("[storage]")
+        {
+            parse_any(toml_str).expect("failed to parse config toml")
+        } else {
+            toml::from_str(toml_str).expect("failed to parse config toml")
+        };
         cfg.residual_dir = dir.to_path_buf();
+        cfg.config_host_dir = dir.to_path_buf();
+        cfg.config_path = dir.join("config.toml");
+        cfg.repo_root = dir
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
         cfg
     }
 
@@ -166,6 +217,29 @@ mod tests {
         let toml_str = "[skills]\ntoken_warn = 500\n";
         let cfg = parse_with_dir(toml_str, dir.path());
         assert_eq!(cfg.skills.token_warn, 500);
+    }
+
+    #[test]
+    fn load_succeeds_without_git_repo_when_sidecar_config_present() {
+        let dir = tempdir().unwrap();
+        let project = dir.path().join("proj");
+        std::fs::create_dir_all(project.join("residual")).unwrap();
+        std::fs::write(
+            project.join("residual/config.toml"),
+            r#"
+format_version = "v4"
+[storage]
+git_sidecar_enabled = true
+git_sidecar_branch = "residual/metadata"
+config_host = "repo"
+"#,
+        )
+        .unwrap();
+        let prev = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&project).unwrap();
+        let cfg = super::load().expect("load must not touch git during config discovery");
+        assert_eq!(cfg.config_host_dir, project.join("residual"));
+        std::env::set_current_dir(prev).unwrap();
     }
 
     #[test]

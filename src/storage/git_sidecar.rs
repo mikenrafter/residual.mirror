@@ -254,6 +254,97 @@ fn materialize_branch_tree(repo_root: &Path, branch: &str) -> Result<PathBuf> {
     Ok(checkout)
 }
 
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest = dst.join(entry.file_name());
+        if path.is_dir() {
+            copy_dir_all(&path, &dest)?;
+        } else {
+            std::fs::copy(&path, &dest)
+                .with_context(|| format!("copy {} -> {}", path.display(), dest.display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Write materialized metadata back to the sidecar branch when enabled.
+pub fn persist_metadata_to_branch(
+    repo_root: &Path,
+    branch: &str,
+    metadata_root: &Path,
+) -> Result<()> {
+    if !branch_exists(repo_root, branch)? {
+        bail!("sidecar branch {branch} does not exist");
+    }
+    let prev = current_branch(repo_root)?;
+    let checkout = git(repo_root)
+        .args(["checkout", branch])
+        .output()
+        .context("git checkout sidecar for persist")?;
+    if !checkout.status.success() {
+        bail!(
+            "git checkout {branch} failed: {}",
+            String::from_utf8_lossy(&checkout.stderr)
+        );
+    }
+
+    let dest = repo_root.join("residual");
+    if dest.exists() {
+        std::fs::remove_dir_all(&dest)
+            .with_context(|| format!("clear {}", dest.display()))?;
+    }
+    copy_dir_all(metadata_root, &dest)?;
+
+    git(repo_root)
+        .args(["add", "-f", "residual/"])
+        .output()
+        .context("git add sidecar metadata")?;
+    let diff = git(repo_root)
+        .args(["diff", "--cached", "--quiet"])
+        .output()
+        .context("git diff --cached --quiet")?;
+    if !diff.status.success() {
+        let commit = git(repo_root)
+            .args([
+                "commit",
+                "-m",
+                "general - sidecar: update metadata from working branch",
+            ])
+            .output()
+            .context("git commit sidecar metadata")?;
+        if !commit.status.success() {
+            bail!(
+                "git commit sidecar metadata failed: {}",
+                String::from_utf8_lossy(&commit.stderr)
+            );
+        }
+    }
+
+    let restore = git(repo_root)
+        .args(["checkout", "-f", &prev])
+        .output()
+        .context("git checkout previous branch")?;
+    if !restore.status.success() {
+        bail!(
+            "git checkout {prev} failed: {}",
+            String::from_utf8_lossy(&restore.stderr)
+        );
+    }
+    Ok(())
+}
+
+/// Persist metadata mutations when git sidecar is enabled.
+pub fn persist_if_sidecar(cfg: &crate::config::Config, metadata_root: &Path) -> Result<()> {
+    let sidecar = SidecarConfig::from_config_file(&cfg.config_path)?;
+    if sidecar.enabled {
+        persist_metadata_to_branch(&cfg.repo_root, &sidecar.branch, metadata_root)?;
+    }
+    Ok(())
+}
+
 /// Resolve effective metadata directory (sidecar branch tip when enabled).
 pub fn effective_residual_dir(repo_root: &Path, sidecar: &SidecarConfig) -> Result<PathBuf> {
     if sidecar.enabled {

@@ -605,11 +605,7 @@ mod tests {
         fn init_storage(dir: &tempfile::TempDir) {
             let residual = dir.path().join("residual");
             std::fs::create_dir_all(&residual).unwrap();
-            let cfg = Config {
-                validation: crate::config::ValidationConfig { strict: true },
-                skills: crate::config::SkillsConfig { token_warn: 1000 },
-                residual_dir: residual,
-            };
+            let cfg = Config::for_test_residual_dir(&residual);
             storage::init(&cfg, true).expect("storage init in tempdir");
         }
 

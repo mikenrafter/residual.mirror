@@ -39,14 +39,7 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
 
 /// Residual metadata directory for verify reads — sidecar branch tip when enabled.
 pub fn metadata_dir_for_verify(cfg: &Config) -> Result<PathBuf> {
-    let cwd = std::env::current_dir()?;
-    let discovery = git_sidecar::discover_config(&cwd)?;
-    let sidecar = SidecarConfig::from_config_file(&discovery.config_path)?;
-    if sidecar.enabled {
-        git_sidecar::read_sidecar_metadata(&cwd, &sidecar)
-    } else {
-        Ok(cfg.residual_dir.clone())
-    }
+    crate::storage::metadata_dir(cfg)
 }
 
 fn sidecar_working_tree_warning() -> Result<Option<git_sidecar::WorkingTreeWarning>> {
@@ -70,11 +63,19 @@ pub fn run_walk_reminder(cfg: &Config, _staged: bool) -> Result<()> {
 
 /// Load verification policy from storage-config (config.toml on disk, or defaults).
 pub fn policy_from_storage_config(residual_dir: &Path) -> Result<StorageConfig> {
-    let path = residual_dir.join("config.toml");
+    policy_from_config_path(&residual_dir.join("config.toml"))
+}
+
+pub fn policy_from_config(cfg: &Config) -> Result<StorageConfig> {
+    policy_from_config_path(&cfg.config_path)
+}
+
+pub fn policy_from_config_path(config_path: &Path) -> Result<StorageConfig> {
+    let path = config_path;
     if !path.exists() {
         return Ok(StorageConfig::default());
     }
-    let raw = std::fs::read_to_string(&path)?;
+    let raw = std::fs::read_to_string(path)?;
     if raw.contains("format_version") || raw.contains("[verification]") || raw.contains("[storage]")
     {
         storage_config::parse_v3(&raw)

@@ -388,8 +388,118 @@ pub struct MigrateSidecarReport {
 
 /// Lift inline working-tree residual/ to sidecar branch (migrate --sidecar).
 pub fn migrate_inline_to_sidecar(repo_root: &Path, force: bool) -> Result<MigrateSidecarReport> {
-    let _ = (repo_root, force);
-    todo!("lift inline residual/ to sidecar branch and enable git_sidecar")
+    let _ = force;
+    let residual_dir = repo_root.join("residual");
+    if !residual_dir.is_dir() {
+        bail!("no residual/ directory at {}", residual_dir.display());
+    }
+
+    let branch = "residual/metadata".to_string();
+    let config_path = residual_dir.join("config.toml");
+    let prev = git_current_branch(repo_root)?;
+
+    if !git_branch_exists(repo_root, &branch)? {
+        let out = git_cmd(repo_root)
+            .args(["branch", &branch])
+            .output()
+            .context("git branch sidecar")?;
+        if !out.status.success() {
+            bail!(
+                "git branch {branch} failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+    }
+
+    let checkout = git_cmd(repo_root)
+        .args(["checkout", &branch])
+        .output()
+        .context("git checkout sidecar")?;
+    if !checkout.status.success() {
+        bail!(
+            "git checkout {branch} failed: {}",
+            String::from_utf8_lossy(&checkout.stderr)
+        );
+    }
+
+    let sidecar_toml = enable_sidecar_in_toml(&fs::read_to_string(&config_path).unwrap_or_default());
+    fs::write(&config_path, &sidecar_toml)?;
+
+    git_cmd(repo_root)
+        .args(["add", "residual/"])
+        .output()
+        .context("git add residual on sidecar")?;
+    git_cmd(repo_root)
+        .args(["commit", "-m", "migrate inline residual to sidecar branch"])
+        .output()
+        .context("git commit sidecar migration")?;
+
+    let list_out = git_cmd(repo_root)
+        .args(["ls-tree", "-r", "--name-only", "HEAD", "--", "residual/"])
+        .output()
+        .context("git ls-tree lifted files")?;
+    let lifted_files = String::from_utf8_lossy(&list_out.stdout)
+        .lines()
+        .filter(|l| !l.is_empty() && !l.ends_with('/'))
+        .count();
+
+    git_cmd(repo_root)
+        .args(["checkout", &prev])
+        .output()
+        .context("git checkout previous branch")?;
+
+    Ok(MigrateSidecarReport {
+        sidecar_branch: branch,
+        config_path,
+        lifted_files,
+    })
+}
+
+fn git_cmd(repo_root: &Path) -> std::process::Command {
+    let mut cmd = std::process::Command::new("git");
+    cmd.current_dir(repo_root);
+    cmd
+}
+
+fn git_branch_exists(repo_root: &Path, branch: &str) -> Result<bool> {
+    let out = git_cmd(repo_root)
+        .args(["rev-parse", "--verify", &format!("refs/heads/{branch}")])
+        .output()
+        .context("git rev-parse branch")?;
+    Ok(out.status.success())
+}
+
+fn git_current_branch(repo_root: &Path) -> Result<String> {
+    let out = git_cmd(repo_root)
+        .args(["symbolic-ref", "--short", "HEAD"])
+        .output()
+        .context("git symbolic-ref")?;
+    if out.status.success() {
+        return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
+    }
+    Ok("main".to_string())
+}
+
+fn enable_sidecar_in_toml(raw: &str) -> String {
+    if raw.contains("git_sidecar_enabled") {
+        return raw.to_string();
+    }
+    let mut cfg = if raw.trim().is_empty() {
+        StorageConfig::default()
+    } else if let Ok(c) = crate::storage::config::parse_v3(raw) {
+        c
+    } else {
+        StorageConfig::default()
+    };
+    cfg.format_version = "v4".to_string();
+    format!(
+        "# residual v4 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\ngit_sidecar_enabled = true\ngit_sidecar_branch = \"residual/metadata\"\ngit_sidecar_remote = \"origin\"\n\n[storage.git_sidecar]\nworking_tree_policy = \"warn\"\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\n",
+        cfg.format_version,
+        cfg.change_detection,
+        cfg.super_strict,
+        cfg.token_warn,
+        cfg.commit_msg_enforce
+    )
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::fs;
+use std::path::{Path, PathBuf};
 use crate::config::Config;
 use crate::cli::{AddTarget, ListTarget, RemoveTarget};
 use crate::structure::analysis::residues::{tag_naive_change_whole_system, Residue};
@@ -20,6 +21,21 @@ pub mod stressors;
 pub mod terminology;
 
 const WHOLE_SYSTEM_REMINDER: &str = "reminder: examine whole-system-residue (hardware, process, organization, policy) before defaulting to a software-only patch; use --whole-system --notes when the zig survives outside software";
+
+/// Resolve metadata directory for reads/mutations, honoring git sidecar when enabled.
+pub fn effective_metadata_dir(repo_root: &Path, config_path: &Path) -> Result<PathBuf> {
+    let sidecar = git_sidecar::SidecarConfig::from_config_file(config_path)?;
+    git_sidecar::effective_residual_dir(repo_root, &sidecar)
+}
+
+/// Print resolved storage banner (S-58) to stdout.
+pub fn print_storage_banner() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let discovery = git_sidecar::discover_config(&cwd)?;
+    let sidecar = git_sidecar::SidecarConfig::from_config_file(&discovery.config_path)?;
+    println!("{}", git_sidecar::format_storage_banner(&discovery, &sidecar));
+    Ok(())
+}
 
 pub fn init(cfg: &Config, force: bool) -> Result<()> {
     let session = integrity::sessions::begin_mutation(&cfg.residual_dir, force)?;

@@ -6,11 +6,12 @@
 
 use anyhow::{bail, Result};
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::cli::VerifyCheck;
 use crate::config::Config;
 use crate::storage::config::{self as storage_config, StorageConfig};
+use crate::storage::git_sidecar::{self, SidecarConfig};
 
 pub mod commit_msg;
 pub mod git_hook;
@@ -23,7 +24,33 @@ pub use crate::verify::{
 };
 
 pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
+    if let Some(warning) = sidecar_working_tree_warning()? {
+        eprintln!(
+            "warning: staged residual/ paths on working branch ({}) — policy={:?}",
+            warning.staged_paths.join(", "),
+            warning.policy
+        );
+    }
     crate::verify::run(cfg, check)
+}
+
+/// Residual metadata directory for verify reads — sidecar branch tip when enabled.
+pub fn metadata_dir_for_verify(cfg: &Config) -> Result<PathBuf> {
+    let cwd = std::env::current_dir()?;
+    let discovery = git_sidecar::discover_config(&cwd)?;
+    let sidecar = SidecarConfig::from_config_file(&discovery.config_path)?;
+    if sidecar.enabled {
+        git_sidecar::read_sidecar_metadata(&cwd, &sidecar)
+    } else {
+        Ok(cfg.residual_dir.clone())
+    }
+}
+
+fn sidecar_working_tree_warning() -> Result<Option<git_sidecar::WorkingTreeWarning>> {
+    let cwd = std::env::current_dir()?;
+    let discovery = git_sidecar::discover_config(&cwd)?;
+    let sidecar = SidecarConfig::from_config_file(&discovery.config_path)?;
+    git_sidecar::check_working_tree_policy(&cwd, &sidecar)
 }
 
 /// Load verification policy from storage-config (config.toml on disk, or defaults).

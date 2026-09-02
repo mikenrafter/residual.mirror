@@ -69,16 +69,9 @@ pub fn print(cfg: &Config) -> Result<()> {
 }
 
 fn find_residual_dir() -> Result<PathBuf> {
-    let mut dir = std::env::current_dir().context("get current dir")?;
-    loop {
-        let candidate = dir.join("residual");
-        if candidate.is_dir() {
-            return Ok(candidate);
-        }
-        if !dir.pop() {
-            return Ok(PathBuf::from("residual"));
-        }
-    }
+    let cwd = std::env::current_dir().context("get current dir")?;
+    let discovery = crate::storage::git_sidecar::discover_config(&cwd)?;
+    Ok(discovery.residual_dir)
 }
 
 pub fn residual_dir(cfg: &Config) -> &Path {

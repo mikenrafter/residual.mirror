@@ -59,10 +59,39 @@ struct V3Document {
     verification: VerificationSection,
 }
 
+fn default_git_sidecar_branch() -> String {
+    "residual/metadata".to_string()
+}
+fn default_git_sidecar_remote() -> String {
+    "origin".to_string()
+}
+fn default_config_host() -> String {
+    "repo".to_string()
+}
+fn default_working_tree_policy() -> String {
+    "warn".to_string()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct StorageSection {
     #[serde(default = "default_change_detection")]
     change_detection: bool,
+    #[serde(default)]
+    git_sidecar_enabled: bool,
+    #[serde(default = "default_git_sidecar_branch")]
+    git_sidecar_branch: String,
+    #[serde(default = "default_git_sidecar_remote")]
+    git_sidecar_remote: String,
+    #[serde(default = "default_config_host")]
+    config_host: String,
+    #[serde(default)]
+    git_sidecar: GitSidecarNested,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct GitSidecarNested {
+    #[serde(default = "default_working_tree_policy")]
+    working_tree_policy: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,8 +145,14 @@ pub struct SidecarStorageConfig {
 
 /// Parse [storage] sidecar keys from config TOML.
 pub fn parse_sidecar_section(toml_str: &str) -> Result<SidecarStorageConfig> {
-    let _ = toml_str;
-    todo!("parse git_sidecar_enabled, git_sidecar_branch, config_host, working_tree_policy")
+    let doc: V3Document = toml::from_str(toml_str).with_context(|| "parse sidecar TOML")?;
+    Ok(SidecarStorageConfig {
+        git_sidecar_enabled: doc.storage.git_sidecar_enabled,
+        git_sidecar_branch: doc.storage.git_sidecar_branch,
+        git_sidecar_remote: doc.storage.git_sidecar_remote,
+        config_host: doc.storage.config_host,
+        working_tree_policy: doc.storage.git_sidecar.working_tree_policy,
+    })
 }
 
 #[cfg(test)]

@@ -1,7 +1,10 @@
 //! Git sidecar branch storage — metadata on orphan branch, code on working branch.
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use crate::storage::config::parse_sidecar_section;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidecarConfig {
@@ -19,10 +22,29 @@ pub enum WorkingTreePolicy {
     Ignore,
 }
 
+impl WorkingTreePolicy {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "block" => Self::Block,
+            "ignore" => Self::Ignore,
+            _ => Self::Warn,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigHost {
     Parent,
     Repo,
+}
+
+impl ConfigHost {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "parent" => Self::Parent,
+            _ => Self::Repo,
+        }
+    }
 }
 
 impl Default for SidecarConfig {
@@ -34,6 +56,29 @@ impl Default for SidecarConfig {
             working_tree_policy: WorkingTreePolicy::Warn,
             config_host: ConfigHost::Repo,
         }
+    }
+}
+
+impl SidecarConfig {
+    /// Load sidecar settings from a config.toml file.
+    pub fn from_config_file(config_path: &Path) -> Result<Self> {
+        if !config_path.is_file() {
+            return Ok(Self::default());
+        }
+        let raw = std::fs::read_to_string(config_path)
+            .with_context(|| format!("read {}", config_path.display()))?;
+        Self::from_toml(&raw)
+    }
+
+    pub fn from_toml(raw: &str) -> Result<Self> {
+        let parsed = parse_sidecar_section(raw)?;
+        Ok(Self {
+            enabled: parsed.git_sidecar_enabled,
+            branch: parsed.git_sidecar_branch,
+            remote: parsed.git_sidecar_remote,
+            working_tree_policy: WorkingTreePolicy::from_str(&parsed.working_tree_policy),
+            config_host: ConfigHost::from_str(&parsed.config_host),
+        })
     }
 }
 
@@ -53,26 +98,188 @@ pub enum ConfigSource {
 
 /// Discover config following search order: parent-dir stealth → in-repo → walk up (bounded at /).
 pub fn discover_config(start: &Path) -> Result<ConfigDiscovery> {
-    let _ = start;
-    todo!("discover config with parent-dir stealth mode before in-repo")
+    let mut base = start.to_path_buf();
+    if base.is_file() {
+        base.pop();
+    }
+
+    // 1. Parent-dir stealth: ../residual/config.toml relative to start directory.
+    if let Some(parent) = base.parent() {
+        let parent_config = parent.join("residual/config.toml");
+        if parent_config.is_file() {
+            return Ok(ConfigDiscovery {
+                config_path: parent_config.clone(),
+                residual_dir: parent.join("residual"),
+                source: ConfigSource::ParentStealth,
+            });
+        }
+    }
+
+    // 2. In-repo: <start>/residual/config.toml
+    let in_repo_config = base.join("residual/config.toml");
+    if in_repo_config.is_file() {
+        return Ok(ConfigDiscovery {
+            config_path: in_repo_config,
+            residual_dir: base.join("residual"),
+            source: ConfigSource::InRepo,
+        });
+    }
+
+    // 3. Walk up from start for residual/ directory (bounded at filesystem root).
+    let mut dir = base;
+    loop {
+        let candidate = dir.join("residual");
+        if candidate.is_dir() {
+            return Ok(ConfigDiscovery {
+                config_path: candidate.join("config.toml"),
+                residual_dir: candidate,
+                source: ConfigSource::WalkUp,
+            });
+        }
+        if !dir.pop() {
+            return Ok(ConfigDiscovery {
+                config_path: PathBuf::from("residual/config.toml"),
+                residual_dir: PathBuf::from("residual"),
+                source: ConfigSource::WalkUp,
+            });
+        }
+    }
+}
+
+fn git(repo_root: &Path) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(repo_root);
+    cmd
+}
+
+fn branch_exists(repo_root: &Path, branch: &str) -> Result<bool> {
+    let out = git(repo_root)
+        .args(["rev-parse", "--verify", &format!("refs/heads/{branch}")])
+        .output()
+        .context("git rev-parse branch")?;
+    Ok(out.status.success())
+}
+
+fn current_branch(repo_root: &Path) -> Result<String> {
+    let out = git(repo_root)
+        .args(["symbolic-ref", "--short", "HEAD"])
+        .output()
+        .context("git symbolic-ref")?;
+    if out.status.success() {
+        return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
+    }
+    Ok("main".to_string())
+}
+
+fn bootstrap_sidecar_branch(repo_root: &Path, branch: &str) -> Result<()> {
+    let prev = current_branch(repo_root)?;
+    let orphan_out = git(repo_root)
+        .args(["checkout", "--orphan", branch])
+        .output()
+        .context("git checkout --orphan")?;
+    if !orphan_out.status.success() {
+        bail!(
+            "git checkout --orphan failed: {}",
+            String::from_utf8_lossy(&orphan_out.stderr)
+        );
+    }
+
+    // Orphan checkout retains working-tree files; write canonical empty metadata only.
+    let residual = repo_root.join("residual");
+    std::fs::create_dir_all(&residual)?;
+    let header = "id,shortname,description,naive_change,outcomes,attractor_id\n";
+    std::fs::write(residual.join("stressors.csv"), header)?;
+
+    git(repo_root)
+        .args(["rm", "-rf", "--cached", "."])
+        .output()
+        .ok();
+    git(repo_root)
+        .args(["add", "residual/"])
+        .output()
+        .context("git add residual")?;
+    git(repo_root)
+        .args(["commit", "-m", "bootstrap sidecar metadata"])
+        .output()
+        .context("git commit sidecar bootstrap")?;
+
+    git(repo_root)
+        .args(["checkout", &prev])
+        .output()
+        .context("git checkout previous branch")?;
+    Ok(())
+}
+
+fn materialize_branch_tree(repo_root: &Path, branch: &str) -> Result<PathBuf> {
+    if !branch_exists(repo_root, branch)? {
+        bootstrap_sidecar_branch(repo_root, branch)?;
+    }
+
+    let checkout = repo_root
+        .join(".git")
+        .join("residual-sidecar-checkout");
+    if checkout.exists() {
+        std::fs::remove_dir_all(&checkout)
+            .with_context(|| format!("clear {}", checkout.display()))?;
+    }
+    std::fs::create_dir_all(&checkout)?;
+
+    let list_out = git(repo_root)
+        .args(["ls-tree", "-r", "--name-only", branch, "--", "residual/"])
+        .output()
+        .context("git ls-tree sidecar")?;
+    if !list_out.status.success() {
+        bail!(
+            "git ls-tree failed: {}",
+            String::from_utf8_lossy(&list_out.stderr)
+        );
+    }
+
+    let paths = String::from_utf8_lossy(&list_out.stdout);
+    for rel in paths.lines().filter(|l| !l.is_empty()) {
+        let show_out = git(repo_root)
+            .args(["show", &format!("{branch}:{rel}")])
+            .output()
+            .with_context(|| format!("git show {branch}:{rel}"))?;
+        if !show_out.status.success() {
+            continue;
+        }
+        let dest = checkout.join(rel.strip_prefix("residual/").unwrap_or(rel));
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&dest, &show_out.stdout)?;
+    }
+
+    Ok(checkout)
 }
 
 /// Resolve effective metadata directory (sidecar branch tip when enabled).
 pub fn effective_residual_dir(repo_root: &Path, sidecar: &SidecarConfig) -> Result<PathBuf> {
-    let _ = (repo_root, sidecar);
-    todo!("resolve sidecar branch tip for metadata reads")
+    if sidecar.enabled {
+        read_sidecar_metadata(repo_root, sidecar)
+    } else {
+        Ok(repo_root.join("residual"))
+    }
 }
 
 /// Read metadata from sidecar branch tip, not working tree.
 pub fn read_sidecar_metadata(repo_root: &Path, sidecar: &SidecarConfig) -> Result<PathBuf> {
-    let _ = (repo_root, sidecar);
-    todo!("read metadata from sidecar branch tip")
+    if !sidecar.enabled {
+        return Ok(repo_root.join("residual"));
+    }
+    materialize_branch_tree(repo_root, &sidecar.branch)
 }
 
 /// Tag scan: code from cwd working tree, force/component IDs from sidecar metadata.
 pub fn tag_scan_sources(repo_root: &Path, sidecar: &SidecarConfig) -> Result<(PathBuf, PathBuf)> {
-    let _ = (repo_root, sidecar);
-    todo!("dual-source tag scan: code cwd, metadata sidecar")
+    let code_root = repo_root.to_path_buf();
+    let meta_root = if sidecar.enabled {
+        read_sidecar_metadata(repo_root, sidecar)?
+    } else {
+        repo_root.join("residual")
+    };
+    Ok((code_root, meta_root))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,14 +293,41 @@ pub fn check_working_tree_policy(
     repo_root: &Path,
     sidecar: &SidecarConfig,
 ) -> Result<Option<WorkingTreeWarning>> {
-    let _ = (repo_root, sidecar);
-    todo!("warn/block on staged residual/ per working_tree_policy")
+    if !sidecar.enabled || sidecar.working_tree_policy == WorkingTreePolicy::Ignore {
+        return Ok(None);
+    }
+
+    let out = git(repo_root)
+        .args(["diff", "--cached", "--name-only"])
+        .output()
+        .context("git diff --cached")?;
+    if !out.status.success() {
+        return Ok(None);
+    }
+
+    let staged: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|p| p.starts_with("residual/") || p.starts_with("residual\\"))
+        .map(str::to_string)
+        .collect();
+
+    if staged.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(WorkingTreeWarning {
+        staged_paths: staged,
+        policy: sidecar.working_tree_policy,
+    }))
 }
 
 /// Surface resolved config path + sidecar branch on command output (S-58).
 pub fn format_storage_banner(discovery: &ConfigDiscovery, sidecar: &SidecarConfig) -> String {
-    let _ = (discovery, sidecar);
-    todo!("format resolved config path and sidecar branch banner")
+    format!(
+        "config: {} | sidecar branch: {}",
+        discovery.config_path.display(),
+        sidecar.branch
+    )
 }
 
 #[cfg(test)]

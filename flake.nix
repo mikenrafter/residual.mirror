@@ -41,6 +41,7 @@
           pname = "residual";
           version = "0.1.0";
           cargoExtraArgs = "--locked";
+          nativeBuildInputs = [ pkgs.git ];
 
           postInstall = ''
             # fish completions
@@ -70,6 +71,7 @@
           residual-fmt = craneLib.cargoFmt { inherit src; };
           residual-test = craneLib.cargoTest (commonArgs // {
             inherit cargoArtifacts;
+            nativeBuildInputs = [ pkgs.git ];
           });
         };
 
@@ -93,6 +95,7 @@
           inputsFrom = [ residual ];
           packages = with pkgs; [
             residual
+            git
             cargo-watch
             cargo-audit
             cargo-edit

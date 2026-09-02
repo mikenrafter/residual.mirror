@@ -83,8 +83,9 @@ pub fn managed_rel_paths(residual_dir: &Path) -> Result<Vec<String>> {
         "residues.csv".to_string(),
         "components.csv".to_string(),
         "config.toml".to_string(),
+        ".walk-review.toml".to_string(),
     ];
-    for sub in &["personas", "iterations", "research"] {
+    for sub in &["personas", "iterations", "research", "defense", "defense-personas"] {
         let dir = residual_dir.join(sub);
         if !dir.is_dir() {
             continue;

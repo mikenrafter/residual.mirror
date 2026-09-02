@@ -72,6 +72,9 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
         VerifyCheck::CommitMsg { .. } => {
             anyhow::bail!("verify commit-msg is handled by the CLI dispatcher; call residual verify commit-msg directly");
         }
+        VerifyCheck::WalkReminder { .. } => {
+            anyhow::bail!("verify walk-reminder is handled by verification::run_walk_reminder");
+        }
     }
     Ok(())
 }

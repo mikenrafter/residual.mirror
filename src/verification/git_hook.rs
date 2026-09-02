@@ -16,6 +16,7 @@ if [ -z "$STAGED" ]; then
 fi
 
 residual verify all || exit 1
+residual verify walk-reminder --staged || exit 1
 "#;
 
     let commit_msg = git_hooks_dir.join("commit-msg");

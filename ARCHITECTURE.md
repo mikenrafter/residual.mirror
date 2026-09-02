@@ -17,6 +17,13 @@ On-disk ledger shape (`format_version = "v4"` in `config.toml`):
 | `lexicon.csv` | Domain vocabulary (legacy `terminology.csv` migrated by `residual migrate`) |
 | `personas/<name>.md` | Stakeholder voices |
 | `attractors.csv` | Attractors with positive and negative states |
+| `defense/*.csv` | Meta forces (MS-/MA-/MP-) — isolated from main ledger |
+| `.walk-review.toml` | Walk cadence state (on git-sidecar branch when enabled) |
+
+**Git sidecar:** when `git_sidecar_enabled = true`, the full tree above lives on an orphan branch
+(e.g. `residual/metadata`). Config may live in `../residual/config.toml` (stealth-mode) one
+directory above the repo. Verify resolves metadata from the sidecar tip; tag scan uses working-tree
+code + sidecar metadata.
 
 **Workflow:** `residual add stressor|purpose`, then `residual add residue --force-id … --component-id …` per coupling. `residual matrix show` reads `residues.csv` only — not inline force columns.
 
@@ -58,9 +65,19 @@ structure                      ← EXTERNAL filter/sort/group API (default group
 
 storage                        ← read / write / mutate
 ├─ storage-config              ← THE config (v4 TOML): format_version + app + verify policy keys
+├─ storage-git-sidecar         ← orphan branch metadata; parent-dir stealth config
 ├─ storage-sessions
-├─ storage-migration           ← naive → v3; v3 → v4 (inline force components → residues.csv)
+├─ storage-migration           ← naive → v3; v3 → v4; inline → git-sidecar branch lift
 └─ storage-format
+
+skills-guru                    ← topic-keyed guidance snippets for skill-data
+skills-defense-walk            ← skill lens for defense ledger / outsider rehearsal
+
+structure-defense-*            ← meta ledger (MS-/MA-/MP- only; never main stressors.csv)
+├─ structure-defense-analysis
+├─ structure-defense-strategy / progress / pitches
+skills-defense-personas
+structure-analysis-outsiders   ← audience framing + artifact routing
 ```
 
 ## research-study standalone
@@ -89,7 +106,10 @@ shared preamble module. Whole-system-residue reminder sits next to add force/res
 | `skill-install` / `skill check-install` | `skills-installer` |
 | `verify *` | `verification` (via storage-config policy) |
 | `matrix *` | `structure-analysis` (NKP) |
-| `init` / `add` | `storage` via `storage-sessions` |
+| `init` / `add` / `remove` | `storage` via `storage-sessions` |
+| `add component` | `structure-definition-components` |
+| `walk record` / `verify walk-reminder` | `verification-git-hook` + `.walk-review.toml` |
+| `migrate --sidecar` | `storage-migration` + `storage-git-sidecar` |
 | `tag scan` | `structure-analysis-tag-scan` |
 | `generate completions/man` | `cli-help` |
 | `generate hook` | `verification-git-hook` |

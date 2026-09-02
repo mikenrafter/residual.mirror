@@ -96,8 +96,35 @@ pub enum Command {
         /// Overwrite session snapshot when residual files drifted outside this tool.
         #[arg(long)]
         force: bool,
+        /// Lift inline residual/ to git sidecar branch.
+        #[arg(long)]
+        sidecar: bool,
+    },
+    /// Record or inspect architecture walk cadence (.walk-review.toml on sidecar).
+    Walk {
+        #[command(subcommand)]
+        op: WalkOp,
     },
     Config,
+}
+
+#[derive(Subcommand)]
+pub enum WalkOp {
+    /// Stamp last completed purpose-walk or stressor-walk.
+    Record {
+        #[arg(long, value_enum)]
+        kind: WalkKindArg,
+        #[arg(long)]
+        completed: bool,
+        #[arg(long)]
+        deferred: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub enum WalkKindArg {
+    Purpose,
+    Stressor,
 }
 
 #[derive(Subcommand)]
@@ -238,6 +265,13 @@ pub enum VerifyCheck {
     Outcomes,
     Links,
     All,
+    /// Non-blocking walk cadence reminder (purpose-walk + stressor-walk).
+    #[command(name = "walk-reminder")]
+    WalkReminder {
+        /// Read staged paths for heuristic nudges.
+        #[arg(long)]
+        staged: bool,
+    },
     /// Validate a git commit message subject against lexicon/components.
     CommitMsg {
         /// Path to the commit message file (first line = subject).
@@ -356,6 +390,9 @@ pub fn run() -> Result<()> {
             VerifyCheck::Outcomes => crate::verification::run(&cfg, VerifyCheck::Outcomes),
             VerifyCheck::Links => crate::verification::run(&cfg, VerifyCheck::Links),
             VerifyCheck::All => crate::verification::run(&cfg, VerifyCheck::All),
+            VerifyCheck::WalkReminder { staged } => {
+                crate::verification::run_walk_reminder(&cfg, staged)
+            }
             VerifyCheck::CommitMsg {
                 file,
                 message,
@@ -395,7 +432,45 @@ pub fn run() -> Result<()> {
             GenerateArtifact::Man => crate::cli::help::generate_man(),
             GenerateArtifact::Hook => crate::verification::git_hook::install(),
         },
-        Command::Migrate { force } => crate::storage::migrate(&cfg, force),
+        Command::Migrate { force, sidecar } => {
+            if sidecar {
+                let cwd = std::env::current_dir()?;
+                let report =
+                    crate::storage::integrity::migration::migrate_inline_to_sidecar(&cwd, force)?;
+                println!(
+                    "Sidecar migrate: branch={}, lifted_files={}",
+                    report.sidecar_branch, report.lifted_files
+                );
+                Ok(())
+            } else {
+                crate::storage::migrate(&cfg, force)
+            }
+        }
+        Command::Walk { op } => match op {
+            WalkOp::Record {
+                kind,
+                completed,
+                deferred,
+            } => {
+                use crate::verification::walk_reminder::{self, WalkKind};
+                if completed == deferred {
+                    anyhow::bail!("specify exactly one of --completed or --deferred");
+                }
+                let meta = crate::verification::metadata_dir_for_verify(&cfg)?;
+                let walk_kind = match kind {
+                    WalkKindArg::Purpose => WalkKind::Purpose,
+                    WalkKindArg::Stressor => WalkKind::Stressor,
+                };
+                if completed {
+                    walk_reminder::record_completed(&meta, walk_kind)?;
+                    println!("Recorded {}-walk completion", walk_kind.as_str());
+                } else {
+                    let _ = (meta, walk_kind, deferred);
+                    println!("Recorded {}-walk deferral", walk_kind.as_str());
+                }
+                Ok(())
+            }
+        }
         Command::Config => crate::config::print(&cfg),
     }
 }

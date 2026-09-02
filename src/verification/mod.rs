@@ -24,6 +24,9 @@ pub use crate::verify::{
 };
 
 pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
+    if let VerifyCheck::WalkReminder { staged } = &check {
+        return run_walk_reminder(cfg, *staged);
+    }
     if let Some(warning) = sidecar_working_tree_warning()? {
         eprintln!(
             "warning: staged residual/ paths on working branch ({}) — policy={:?}",
@@ -51,6 +54,18 @@ fn sidecar_working_tree_warning() -> Result<Option<git_sidecar::WorkingTreeWarni
     let discovery = git_sidecar::discover_config(&cwd)?;
     let sidecar = SidecarConfig::from_config_file(&discovery.config_path)?;
     git_sidecar::check_working_tree_policy(&cwd, &sidecar)
+}
+
+const DEFAULT_WALK_REMINDER_INTERVAL_DAYS: u32 = 30;
+
+/// Non-blocking walk cadence check — always exits OK, prints reminders to stderr.
+pub fn run_walk_reminder(cfg: &Config, _staged: bool) -> Result<()> {
+    let meta_dir = metadata_dir_for_verify(cfg)?;
+    let report = walk_reminder::verify_reminder(&meta_dir, DEFAULT_WALK_REMINDER_INTERVAL_DAYS)?;
+    for msg in &report.messages {
+        eprintln!("{msg}");
+    }
+    Ok(())
 }
 
 /// Load verification policy from storage-config (config.toml on disk, or defaults).

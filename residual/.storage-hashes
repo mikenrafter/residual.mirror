@@ -1,14 +1,15 @@
 # storage integrity change-detection snapshot
 attractors.csv=dae83254a5768e06
-components.csv=b24e91b59060fcec
+components.csv=39f1286371e71d87
 config.toml=0779f6a040b10866
 iterations/1.md=dcf32757637f4854
 iterations/2.md=df62931d5da549bc
 iterations/4.md=a270ea805600ee45
 iterations/5.md=ae5c5adb0679b0fb
-lexicon.csv=e4d0872611c8ffb4
+iterations/tdd-implement-defense-ledger-plan.md=f9ce4e41d8ea8d91
+lexicon.csv=2425a71d9d5b7e2c
 personas/agent.md=8b0135fe35258d31
 personas/architect.md=c43ffc1c5fda1a2a
-purposes.csv=ba2a9063fee085e3
-residues.csv=9061b1bc67322ce7
-stressors.csv=c14b56d9b97910e0
+purposes.csv=08ec09b76b40d819
+residues.csv=4824afb7d8eb6eca
+stressors.csv=11c8b55a190baaf9

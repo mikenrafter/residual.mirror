@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use std::path::Path;
 use std::time::{Duration, Instant};
 use crate::config::Config;
 use crate::cli::VerifyCheck;
@@ -61,6 +62,7 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
             for v in &link_violations {
                 println!("LINK VIOLATION [{}] {}: {}", v.source, v.id, v.message);
             }
+            print_tag_warnings(cfg);
             if total == 0 {
                 println!("OK: all checks passed.");
             } else {
@@ -72,6 +74,21 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Non-fatal: warn on tag-shaped comments (`@stressor:`/`@purpose:`/`@component:`)
+/// that don't resolve to a known force shortname or component — dangling tags
+/// are suggestions gone stale, not a reason to block a commit (S-06).
+fn print_tag_warnings(cfg: &Config) {
+    let root = cfg.residual_dir.parent().unwrap_or_else(|| Path::new("."));
+    let Ok(tags) = crate::tags::scan_dir(&root.to_string_lossy()) else { return };
+    let Ok(report) = crate::tags::scan_report(cfg, &tags) else { return };
+    for d in &report.dangling {
+        println!(
+            "WARNING: {}:{} {} '{}' does not match any known stressor, purpose, or component",
+            d.file, d.line, d.kind.marker(), d.id
+        );
+    }
 }
 
 pub fn check_outcomes(cfg: &Config) -> Result<Vec<OutcomeViolation>> {
@@ -304,6 +321,36 @@ mod tests {
             skills: crate::config::SkillsConfig { token_warn: 1000 },
             residual_dir: dir.to_path_buf(),
         }
+    }
+
+    // @stressor: ceremony-lockout
+    #[test]
+    fn verify_all_passes_after_direct_ledger_writes_without_running_any_skill() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        attractors::append(
+            &cfg.residual_dir,
+            crate::structure::analysis::attractors::Attractor::new("A-01", "X", "ok", "bad"),
+        )
+        .unwrap();
+        format::append_lexicon(
+            &cfg.residual_dir,
+            LexTerm { term: "operator".into(), definition: "human".into(), domain: "".into(), aliases: "".into() },
+        )
+        .unwrap();
+        stressors::append(
+            &cfg.residual_dir,
+            stressors::Stressor {
+                id: "S-01".into(),
+                shortname: "mid-session-capture".into(),
+                description: "p".into(),
+                attractor_id: "A-01".into(),
+                naive_change: "none".into(),
+                outcomes: "operator records stressor mid-session".into(),
+            },
+        )
+        .unwrap();
+        assert!(run(&cfg, VerifyCheck::All).is_ok());
     }
 
     #[test]

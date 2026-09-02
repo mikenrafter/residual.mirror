@@ -472,6 +472,42 @@ mod tests {
     }
 
     #[test]
+    fn build_stressor_walk_succeeds_without_personas() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        assert!(
+            build(&cfg, "stressor-walk").is_ok(),
+            "stressor-walk context should build even with zero personas recorded"
+        );
+    }
+
+    // @stressor: phase-rigidity-assumption
+    #[test]
+    fn build_includes_fluent_capture_preamble() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        let out = build(&cfg, "integrate").unwrap();
+        assert!(
+            out.contains("Fluent capture") || out.to_lowercase().contains("any phase"),
+            "expected Fluent capture preamble in skill data context"
+        );
+    }
+
+    // @stressor: software-only-zag
+    #[test]
+    fn build_includes_whole_system_reminder_for_relevant_skills() {
+        for name in ["stressor-walk", "fmea", "integrate"] {
+            let dir = tempdir().unwrap();
+            let cfg = cfg_for(dir.path());
+            let out = build(&cfg, name).unwrap();
+            assert!(
+                out.to_lowercase().contains("whole-system"),
+                "{name} skill-data context should remind whole-system-residue"
+            );
+        }
+    }
+
+    #[test]
     fn build_includes_verify_status_advisory_when_not_strict() {
         let dir = tempdir().unwrap();
         let mut cfg = cfg_for(dir.path());

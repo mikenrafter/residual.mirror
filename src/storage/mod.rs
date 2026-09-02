@@ -298,3 +298,96 @@ pub fn migrate(cfg: &Config, force: bool) -> Result<()> {
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn cfg_for(dir: &std::path::Path) -> Config {
+        Config {
+            validation: crate::config::ValidationConfig { strict: true },
+            skills: crate::config::SkillsConfig { token_warn: 1000 },
+            residual_dir: dir.to_path_buf(),
+        }
+    }
+
+    // @stressor: software-only-zag
+    #[test]
+    fn whole_system_reminder_mentions_whole_system() {
+        assert!(WHOLE_SYSTEM_REMINDER.contains("whole-system"));
+    }
+
+    // @stressor: software-only-zag
+    #[test]
+    fn add_entry_whole_system_stressor_records_residue() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        attractors::append(
+            &cfg.residual_dir,
+            attractors::Attractor::new("A-01", "X", "ok", "bad"),
+        )
+        .unwrap();
+
+        add_entry(
+            &cfg,
+            AddTarget::Stressor {
+                description: "queue overload".into(),
+                attractor_id: "A-01".into(),
+                naive_change: "add retry".into(),
+                shortname: "".into(),
+                outcomes: "".into(),
+                whole_system: true,
+                notes: "policy zig: cap tickets".into(),
+            },
+        )
+        .unwrap();
+
+        let residues_csv = std::fs::read_to_string(cfg.residual_dir.join("residues.csv")).unwrap();
+        assert!(residues_csv.contains("whole-system"), "expected whole-system column");
+        let row = residues_csv
+            .lines()
+            .find(|l| l.starts_with("S-01,"))
+            .expect("S-01 residue row");
+        assert!(
+            row.split(',').next_back() == Some("1"),
+            "expected whole-system coupling mark, row={row}"
+        );
+
+        let stressors_csv = std::fs::read_to_string(cfg.residual_dir.join("stressors.csv")).unwrap();
+        assert!(
+            stressors_csv.contains("whole-system-residue"),
+            "notes should land on stressor naive_change"
+        );
+    }
+
+    // @stressor: software-only-zag
+    #[test]
+    fn add_entry_software_only_stressor_prints_reminder_to_stderr() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        attractors::append(
+            &cfg.residual_dir,
+            attractors::Attractor::new("A-01", "X", "ok", "bad"),
+        )
+        .unwrap();
+
+        // add_entry prints WHOLE_SYSTEM_REMINDER to stderr on the non-whole-system
+        // path; the reminder's own content is covered by
+        // whole_system_reminder_mentions_whole_system above. Here we assert the
+        // call still succeeds and records the stressor without --whole-system.
+        let result = add_entry(
+            &cfg,
+            AddTarget::Stressor {
+                description: "load".into(),
+                attractor_id: "A-01".into(),
+                naive_change: "cache".into(),
+                shortname: "".into(),
+                outcomes: "".into(),
+                whole_system: false,
+                notes: "".into(),
+            },
+        );
+        assert!(result.is_ok());
+    }
+}

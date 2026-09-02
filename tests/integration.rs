@@ -566,3 +566,22 @@ fn list_residues_prints_matrix() {
     assert!(list.status.success());
     assert!(String::from_utf8_lossy(&list.stdout).starts_with("force,"));
 }
+
+#[test]
+fn skill_check_install_subcommand_help_succeeds() {
+    let dir = TempDir::new().unwrap();
+    let out = run(&dir, &["skill", "check-install", "--help"]);
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.status.success(),
+        "residual skill check-install --help should succeed: {text}"
+    );
+    assert!(
+        text.contains("check-install") || text.contains("check_install"),
+        "help should mention check-install, got: {text}"
+    );
+}

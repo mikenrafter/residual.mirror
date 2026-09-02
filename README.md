@@ -158,16 +158,19 @@ The pre-commit hook runs `residual verify all` before commits that touch `residu
 ## Codebase Tagging
 
 ```rust
-// @residue: R-03
-// @stressor: S-07, S-12
+// @component: skills-phases
+// @stressor: skill-stub-burden, lexicon-alias-gap
+// @purpose: fluent-metadata-capture
 ```
 
+Tags are shortname-only (not IDs — `S-07` won't match, `skill-stub-burden` will). Comment syntax is detected per file type via [tokei](https://github.com/XAMPPRocky/tokei)'s language database, not a hand-maintained list — any language tokei recognizes works out of the box. Attractors aren't taggable; they describe system states, not code-adjacent detail.
+
 ```bash
-residual tag scan     # find dangling tags + untagged stressors
+residual tag scan     # find dangling tags + untagged forces
 residual tag report   # map each tag to its file:line
 ```
 
-Metadata-only tags are fine. Tags in code must exist in metadata; verification enforces that one-way rule.
+Metadata-only tags are fine; tags in code without matching metadata are the case verification cares about. `residual verify all` warns (non-fatally) on any tag-shaped comment that doesn't resolve to a real stressor, purpose, or component.
 
 ## Nix / NixOS
 
@@ -224,7 +227,7 @@ Programmatic and process pieces integrated so the method sticks in a real repo:
 
 - **Lexicon** — shared vocabulary with alias-aware validation of outcomes
 - **Git integration** — verify hooks and commit-message checks in [Scoped Commits](https://scopedcommits.com/) form: scope-first subjects tied to lexicon and components, with Conventional Commit type prefixes rejected
-- **Code tagging** — `@residue` / `@stressor` markers linked to metadata
+- **Code tagging** — `@stressor` / `@purpose` / `@component` markers linked to metadata, shortname-only, comment syntax detected per language via tokei
 - **Naïve-draft phase** — agent skill that drafts a naïve architecture using **deep modules** ([APOSD](#sources-of-inspiration)) and **vertical slices**, then TDD-first scaffolding
 
 ## Sources of inspiration

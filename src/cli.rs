@@ -428,3 +428,40 @@ fn run_commit_suggest(cfg: &crate::config::Config, staged: bool) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_purpose_accepts_naive_change_flag() {
+        let cli = Cli::try_parse_from([
+            "residual", "add", "purpose",
+            "--description", "d",
+            "--attractor-id", "A-01",
+            "--naive-change", "naive change text",
+        ]).unwrap();
+        match cli.command {
+            Command::Add { target: AddTarget::Purpose { naive_change, .. }, .. } => {
+                assert_eq!(naive_change, "naive change text");
+            }
+            _ => panic!("expected Command::Add(AddTarget::Purpose)"),
+        }
+    }
+
+    #[test]
+    fn add_purpose_feature_alias_maps_to_naive_change() {
+        let cli = Cli::try_parse_from([
+            "residual", "add", "purpose",
+            "--description", "d",
+            "--attractor-id", "A-01",
+            "--feature", "aliased text",
+        ]).unwrap();
+        match cli.command {
+            Command::Add { target: AddTarget::Purpose { naive_change, .. }, .. } => {
+                assert_eq!(naive_change, "aliased text");
+            }
+            _ => panic!("expected Command::Add(AddTarget::Purpose)"),
+        }
+    }
+}

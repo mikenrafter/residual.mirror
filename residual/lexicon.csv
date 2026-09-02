@@ -25,3 +25,10 @@ ergodic boundary,"The boundary, defined per architecture iteration, between the 
 component dynamic,Behavior explained within an ergodic boundary by the operation and interaction of known components rather than by a force originating primarily beyond that boundary.,,
 architecture iteration,"A time-bounded candidate arrangement of components and boundaries against which forces, attractors, and residues are interpreted.",,
 actor,A human operator or non-human agent whose behavior matters to a force narrative; used when the distinction between them is irrelevant.,,
+meta-stressor,"a stressor whose target is the practice of residuality within an organization rather than the project under architecture — concerning management decisions, teammate bias, or other organizational friction against practicing residuality itself",,stressor
+meta-attractor,"a recurring state that meta-stressors push the residuality practice toward or away from, scoped to sustaining the practice itself rather than the project being architected",,attractor
+meta-purpose,"a behavioral contract for a meta-attractor; canonically, practicing residuality theory in a way that helps both the individual operator and the organization",,purpose
+walk-persona,"a persona voice used during stressor-walk to surface project-state concerns from a specific role's perspective, as distinguished from a defense-persona",,persona
+defense-persona,"a simulated outsider persona voice used to rehearse how residuality artifacts and pitches will land with a specific external audience, as distinguished from a walk-persona",,"persona,outsider"
+outsider,"an actor outside the residuality practice — audience, gatekeeper, evaluator, or adversary — whose reception of residuality artifacts is simulated or tracked separately from the operator and prospect",,"prospect,persona"
+defense-pitch,"a practiced communication artifact, refined through defense-strategy brainstorming and defense-progress history, used to advance residuality concerns in team or organizational communication",,outsider

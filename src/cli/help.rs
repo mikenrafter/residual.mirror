@@ -33,7 +33,11 @@ complete -c residual -n '__fish_seen_subcommand_from generate' -a 'completions m
 }
 
 pub fn generate_man() -> Result<()> {
-    print!(r#".TH RESIDUAL 1 "2026" "residual 0.1.0" "NKP Residuality CLI"
+    print!("{MAN_TEXT}");
+    Ok(())
+}
+
+const MAN_TEXT: &str = r#".TH RESIDUAL 1 "2026" "residual 0.1.0" "NKP Residuality CLI"
 .SH NAME
 residual \- NKP Residuality architecture CLI
 .SH SYNOPSIS
@@ -71,7 +75,7 @@ Phase skills (skills-phases). Includes ATAM/FMEA prose.
 Installer (skills-installer). \fIskill-check\fR remains an alias.
 .TP
 .B tag scan [\fIPATH\fR]
-Scan source files for @residue: and @stressor: tags (suggestions).
+Scan source files for @stressor:/@purpose:/@component: tags (suggestions).
 .TP
 .B generate completions / man
 Owned by cli-help.
@@ -92,6 +96,21 @@ Show the current configuration.
 The project's residual data directory.
 .SH AUTHOR
 Mike Nrafter
-"#);
-    Ok(())
+"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @stressor: phase-rigidity-assumption
+    #[test]
+    fn man_text_leads_with_fluent_entry_model() {
+        let lower = MAN_TEXT.to_lowercase();
+        let description_pos = lower.find(".sh description").unwrap_or(0);
+        let fluent_pos = lower.find("fluent").or_else(|| lower.find("a-la-carte"));
+        assert!(
+            fluent_pos.is_some_and(|p| p <= description_pos + 800),
+            "expected fluent/a-la-carte mention near the top of the man page"
+        );
+    }
 }

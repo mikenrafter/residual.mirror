@@ -7,3 +7,6 @@ target/
 .niri-workspace.yaml
 residual/.verify-stamp
 result
+
+# tea — transparent pipeline logs
+logs.csv

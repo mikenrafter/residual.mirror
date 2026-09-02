@@ -28,7 +28,7 @@ residual matrix ri --stressors N --naive-survived X --residual-survived Y
 
 residual verify all        # validate outcomes + links (run before committing)
 
-residual tag scan          # find @residue:/@stressor: annotations; report dangling
+residual tag scan          # find @stressor:/@purpose:/@component: annotations; report dangling
 ```
 
 ## Skills

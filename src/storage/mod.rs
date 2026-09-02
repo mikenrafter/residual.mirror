@@ -73,6 +73,8 @@ fn init_dirs_and_files(cfg: &Config) -> Result<()> {
             fs::write(&path, format!("{}\n", header))?;
         }
     }
+
+    defense::init_tree(dir)?;
     Ok(())
 }
 

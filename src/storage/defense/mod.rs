@@ -2,19 +2,48 @@
 
 pub mod meta_stressors;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
+use std::fs;
 use std::path::Path;
+
+use crate::structure::defense::scan_main_ledger_contamination;
+
+const META_STRESSORS_HEADER: &str = "id,shortname,description";
+const META_ATTRACTORS_HEADER: &str = "id,name,description,positive_state,negative_state";
+const META_PURPOSES_HEADER: &str = "id,shortname,description,naive_change,outcomes,attractor_id";
 
 /// Initialize defense/ tree on effective (sidecar) residual directory.
 pub fn init_tree(residual_dir: &Path) -> Result<()> {
-    let _ = residual_dir;
-    todo!("create defense/ tree with meta-stressors.csv header")
+    let defense = residual_dir.join("defense");
+    fs::create_dir_all(defense.join("strategy"))?;
+    fs::create_dir_all(defense.join("progress"))?;
+    fs::create_dir_all(defense.join("pitches"))?;
+    fs::create_dir_all(residual_dir.join("defense-personas"))?;
+
+    let csvs: &[(&str, &str)] = &[
+        ("defense/meta-stressors.csv", META_STRESSORS_HEADER),
+        ("defense/meta-attractors.csv", META_ATTRACTORS_HEADER),
+        ("defense/meta-purposes.csv", META_PURPOSES_HEADER),
+    ];
+    for (rel, header) in csvs {
+        let path = residual_dir.join(rel);
+        if !path.exists() {
+            fs::write(&path, format!("{header}\n"))?;
+        }
+    }
+    Ok(())
 }
 
 /// Verify MS-/MA-/MP- ids never appear in main ledger CSVs.
 pub fn verify_meta_isolation(residual_dir: &Path) -> Result<()> {
-    let _ = residual_dir;
-    todo!("fail verify when meta force id bleeds into main stressors.csv")
+    let hits = scan_main_ledger_contamination(residual_dir)?;
+    if hits.is_empty() {
+        return Ok(());
+    }
+    bail!(
+        "meta force id contamination in main ledger: {}",
+        hits.join("; ")
+    );
 }
 
 #[cfg(test)]

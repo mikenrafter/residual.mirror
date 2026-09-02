@@ -8,5 +8,17 @@ target/
 residual/.verify-stamp
 result
 
+# sidecar metadata — canonical copy on residual/metadata branch; in-repo config.toml only
+residual/*.csv
+residual/.storage-hashes
+residual/.walk-review.toml
+residual/.session.lock
+residual/personas/
+residual/iterations/
+residual/research/
+residual/defense/
+residual/defense-personas/
+!residual/config.toml
+
 # tea — transparent pipeline logs
 logs.csv

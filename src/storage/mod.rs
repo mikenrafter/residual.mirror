@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::fs;
 use crate::config::Config;
-use crate::cli::{AddTarget, ListTarget};
+use crate::cli::{AddTarget, ListTarget, RemoveTarget};
 use crate::structure::analysis::residues::{tag_naive_change_whole_system, Residue};
 
 pub mod attractors;
@@ -67,6 +67,30 @@ pub fn add(cfg: &Config, target: AddTarget, force: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn remove(cfg: &Config, target: RemoveTarget, force: bool) -> Result<()> {
+    let session = integrity::sessions::begin_mutation(&cfg.residual_dir, force)?;
+    remove_entry(cfg, target)?;
+    session.commit()?;
+    Ok(())
+}
+
+fn remove_entry(cfg: &Config, target: RemoveTarget) -> Result<()> {
+    let dir = &cfg.residual_dir;
+    match target {
+        RemoveTarget::Residue {
+            force_id,
+            component_id,
+        } => {
+            residues::remove_coupling(dir, &force_id, &component_id)?;
+            println!(
+                "Removed residue coupling {} × {}",
+                force_id, component_id
+            );
+        }
+    }
+    Ok(())
+}
+
 fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
     let dir = &cfg.residual_dir;
     match target {
@@ -109,8 +133,24 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
             component_id,
             whole_system,
             notes,
+            move_to,
         } => {
-            if whole_system {
+            if !move_to.is_empty() {
+                if component_id.is_empty() {
+                    anyhow::bail!("--move-to requires --component-id (source component)");
+                }
+                if !residues::force_exists(dir, &force_id)? {
+                    anyhow::bail!(
+                        "force id '{}' not found in stressors or purposes",
+                        force_id
+                    );
+                }
+                residues::move_coupling(dir, &force_id, &component_id, &move_to)?;
+                println!(
+                    "Moved residue coupling {} from {} to {}",
+                    force_id, component_id, move_to
+                );
+            } else if whole_system {
                 let id = residues::append_whole_system(dir, &force_id, &notes)?;
                 println!("Added whole-system-residue {}", id);
             } else {
@@ -127,6 +167,25 @@ fn add_entry(cfg: &Config, target: AddTarget) -> Result<()> {
                     Residue::coupling(id.clone(), force_id, component_id),
                 )?;
                 println!("Added residue coupling {}", id);
+            }
+        }
+        AddTarget::Component {
+            name,
+            description,
+            status,
+            architecture_set,
+        } => {
+            let added = components::append_idempotent_inner(
+                dir,
+                &name,
+                &description,
+                &status,
+                &architecture_set,
+            )?;
+            if added {
+                println!("Added component '{}'", name);
+            } else {
+                println!("Component '{}' already exists (idempotent no-op)", name);
             }
         }
         AddTarget::Purpose { description, attractor_id, naive_change, shortname, outcomes } => {

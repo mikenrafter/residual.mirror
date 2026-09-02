@@ -113,8 +113,11 @@ pub fn remove_coupling(
     force_id: &str,
     component_id: &str,
 ) -> Result<()> {
-    let _ = (residual_dir, force_id, component_id);
-    todo!("clear matrix cell for force_id × component_id")
+    let mut all = load(residual_dir)?;
+    all.retain(|r| {
+        !(r.force_id == force_id && r.component_id == component_id && r.is_coupled())
+    });
+    crate::storage::format::write_residues(residual_dir, &all)
 }
 
 /// Repoint coupling from one component column to another atomically.
@@ -124,8 +127,19 @@ pub fn move_coupling(
     from_component: &str,
     to_component: &str,
 ) -> Result<()> {
-    let _ = (residual_dir, force_id, from_component, to_component);
-    todo!("repoint residue coupling via --move-to")
+    let mut all = load(residual_dir)?;
+    all.retain(|r| !(r.force_id == force_id && r.component_id == from_component));
+    if let Some(existing) = all
+        .iter_mut()
+        .find(|r| r.force_id == force_id && r.component_id == to_component)
+    {
+        existing.status = "1".into();
+        existing.notes.clear();
+    } else {
+        let id = next_id(&all);
+        all.push(Residue::coupling(id, force_id, to_component));
+    }
+    crate::storage::format::write_residues(residual_dir, &all)
 }
 
 #[cfg(test)]

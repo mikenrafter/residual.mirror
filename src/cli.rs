@@ -33,6 +33,14 @@ pub enum Command {
         #[command(subcommand)]
         target: AddTarget,
     },
+    /// Remove a residual record.
+    Remove {
+        /// Overwrite session snapshot when residual files drifted outside this tool.
+        #[arg(long)]
+        force: bool,
+        #[command(subcommand)]
+        target: RemoveTarget,
+    },
     /// List residual records (filter/group by attractor; not creation order).
     List {
         #[command(subcommand)]
@@ -157,6 +165,16 @@ pub enum AddTarget {
         notes: String,
         #[arg(long)]
         whole_system: bool,
+        /// Repoint an existing coupling from --component-id to this component.
+        #[arg(long, default_value = "")]
+        move_to: String,
+    },
+    /// Append a component to components.csv and extend residues.csv header.
+    Component {
+        #[arg(long)] name: String,
+        #[arg(long)] description: String,
+        #[arg(long)] status: String,
+        #[arg(long)] architecture_set: String,
     },
     /// Add a purpose force. Process: whole-system-residue first — record outcomes.
     /// Map components via `residual add residue --force-id … --component-id …`.
@@ -190,6 +208,15 @@ pub enum AddTarget {
     Iteration {
         #[arg(long, default_value = "")] notes: String,
         #[arg(long, default_value = "")] ri_score: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum RemoveTarget {
+    /// Clear force×component coupling from residues.csv.
+    Residue {
+        #[arg(long)] force_id: String,
+        #[arg(long)] component_id: String,
     },
 }
 
@@ -323,6 +350,7 @@ pub fn run() -> Result<()> {
     match cli.command {
         Command::Init { force } => crate::storage::init(&cfg, force),
         Command::Add { force, target } => crate::storage::add(&cfg, target, force),
+        Command::Remove { force, target } => crate::storage::remove(&cfg, target, force),
         Command::List { target } => crate::storage::list(&cfg, target),
         Command::Verify { check } => match check {
             VerifyCheck::Outcomes => crate::verification::run(&cfg, VerifyCheck::Outcomes),
@@ -478,10 +506,17 @@ mod tests {
         }
 
         fn bin() -> std::path::PathBuf {
-            std::env::var("CARGO_BIN_EXE_residual")
-                .map(std::path::PathBuf::from)
-                .or_else(|_| std::env::current_exe())
-                .expect("resolve residual CLI binary for subprocess tests")
+            if let Ok(path) = std::env::var("CARGO_BIN_EXE_residual") {
+                return path.into();
+            }
+            let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            for profile in ["debug", "release"] {
+                let candidate = manifest.join("target").join(profile).join("residual");
+                if candidate.is_file() {
+                    return candidate;
+                }
+            }
+            manifest.join("target/debug/residual")
         }
 
         fn run(dir: &tempfile::TempDir, args: &[&str]) -> std::process::Output {
@@ -501,6 +536,29 @@ mod tests {
                 residual_dir: residual,
             };
             storage::init(&cfg, true).expect("storage init in tempdir");
+        }
+
+        fn add_component(dir: &tempfile::TempDir, name: &str, description: &str) {
+            let status = run(
+                dir,
+                &[
+                    "add",
+                    "component",
+                    "--name",
+                    name,
+                    "--description",
+                    description,
+                    "--status",
+                    "actual",
+                    "--architecture-set",
+                    "set",
+                ],
+            );
+            assert!(
+                status.status.success(),
+                "add component {name}: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
         }
 
         #[test]
@@ -576,11 +634,7 @@ mod tests {
         fn remove_residue_clears_matrix_cell() {
             let dir = isolated_tempdir();
             init_storage(&dir);
-            std::fs::write(
-                dir.path().join("residual/components.csv"),
-                "name,description,status,architecture_set\nauth,Auth,actual,set\n",
-            )
-            .unwrap();
+            add_component(&dir, "auth", "Auth");
             run(
                 &dir,
                 &[
@@ -649,13 +703,8 @@ mod tests {
         fn add_residue_move_to_repoints_coupling() {
             let dir = isolated_tempdir();
             init_storage(&dir);
-            std::fs::write(
-                dir.path().join("residual/components.csv"),
-                "name,description,status,architecture_set\n\
-auth,Auth,actual,set\n\
-db,DB,actual,set\n",
-            )
-            .unwrap();
+            add_component(&dir, "auth", "Auth");
+            add_component(&dir, "db", "DB");
             run(
                 &dir,
                 &[
@@ -716,13 +765,24 @@ db,DB,actual,set\n",
             );
 
             let residues = std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            let header = residues.lines().next().expect("header");
+            let cols: Vec<&str> = header.split(',').map(str::trim).collect();
             let row = residues
                 .lines()
                 .find(|l| l.starts_with("S-01,"))
                 .expect("S-01 row");
-            assert!(
-                row.contains("db") && !row.split(',').nth(1).is_some_and(|c| c == "1" && !row.contains("db,1")),
-                "coupling must repoint to db, row={row}"
+            let cells: Vec<&str> = row.split(',').map(str::trim).collect();
+            let auth_idx = cols.iter().position(|c| *c == "auth").expect("auth column");
+            let db_idx = cols.iter().position(|c| *c == "db").expect("db column");
+            assert_ne!(
+                cells.get(auth_idx).copied().unwrap_or(""),
+                "1",
+                "auth coupling must be cleared, row={row}"
+            );
+            assert_eq!(
+                cells.get(db_idx).copied().unwrap_or(""),
+                "1",
+                "db coupling must be set, row={row}"
             );
         }
     }

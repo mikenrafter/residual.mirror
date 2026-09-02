@@ -108,8 +108,37 @@ fn residues_to_rows(
     (components.into_iter().collect(), cells)
 }
 
-fn render_residues_matrix(residues: &[Residue]) -> String {
-    let (components, cells) = residues_to_rows(residues);
+fn registry_component_columns(residual_dir: &Path) -> Result<Vec<String>> {
+    let mut cols = BTreeSet::new();
+    for c in crate::structure::definition::components::load(residual_dir)? {
+        cols.insert(c.name);
+    }
+    let path = residual_dir.join("residues.csv");
+    if path.exists() {
+        let text = std::fs::read_to_string(&path)?;
+        if let Some(header) = text.lines().next() {
+            if residues_is_matrix_header(header) {
+                for c in header.split(',').skip(1) {
+                    let c = c.trim();
+                    if !c.is_empty() {
+                        cols.insert(c.to_string());
+                    }
+                }
+            }
+        }
+    }
+    Ok(cols.into_iter().collect())
+}
+
+fn render_residues_matrix(residues: &[Residue], extra_columns: &[String]) -> String {
+    let (_, cells) = residues_to_rows(residues);
+    let mut components: BTreeSet<String> = extra_columns.iter().cloned().collect();
+    for r in residues {
+        if r.is_coupled() && !r.component_id.is_empty() {
+            components.insert(r.component_id.clone());
+        }
+    }
+    let components: Vec<String> = components.into_iter().collect();
     let mut buf = RESIDUES_MATRIX_FORCE_COL.to_string();
     for c in &components {
         buf.push(',');
@@ -150,13 +179,15 @@ fn render_residues_matrix(residues: &[Residue]) -> String {
 }
 
 pub fn format_residues_matrix(residual_dir: &Path) -> Result<String> {
-    Ok(render_residues_matrix(&read_residues(residual_dir)?))
+    let extras = registry_component_columns(residual_dir)?;
+    Ok(render_residues_matrix(&read_residues(residual_dir)?, &extras))
 }
 
 pub fn write_residues(residual_dir: &Path, residues: &[Residue]) -> Result<()> {
+    let extras = registry_component_columns(residual_dir)?;
     std::fs::write(
         residual_dir.join("residues.csv"),
-        render_residues_matrix(residues),
+        render_residues_matrix(residues, &extras),
     )?;
     Ok(())
 }

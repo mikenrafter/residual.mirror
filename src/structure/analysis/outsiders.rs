@@ -1,6 +1,6 @@
 //! Outsider / audience analysis — artifact routing and channel safety (S-52).
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudienceChannel {
@@ -10,15 +10,35 @@ pub enum AudienceChannel {
     Translated,
 }
 
-/// Route an artifact path for the given audience channel.
-pub fn route_artifact(path: &str, channel: AudienceChannel) -> Result<()> {
-    let _ = (path, channel);
-    todo!("audience registry: block raw ledger paths on raw_unsafe channel")
-}
-
 /// Returns true when path points at defense ledger internals.
 pub fn is_defense_artifact_path(path: &str) -> bool {
     path.contains("defense/") || path.contains("defense-personas/")
+}
+
+/// Returns true when path is a vetted translated pitch artifact.
+pub fn is_translated_pitch_path(path: &str) -> bool {
+    path.contains("defense/pitches/")
+}
+
+/// Route an artifact path for the given audience channel.
+pub fn route_artifact(path: &str, channel: AudienceChannel) -> Result<()> {
+    if !is_defense_artifact_path(path) {
+        return Ok(());
+    }
+
+    match channel {
+        AudienceChannel::RawUnsafe => {
+            bail!(
+                "reject: defense artifact path blocked on raw_unsafe channel: {path}"
+            );
+        }
+        AudienceChannel::Translated if is_translated_pitch_path(path) => Ok(()),
+        AudienceChannel::Translated => {
+            bail!(
+                "block: only defense/pitches/ paths allowed on translated channel: {path}"
+            );
+        }
+    }
 }
 
 #[cfg(test)]

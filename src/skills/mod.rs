@@ -18,6 +18,7 @@ pub const SKILLS: &[(&str, &str, u32)] = &[
     ("fmea",            include_str!("definitions/fmea.md"),            0),
     ("atam",            include_str!("definitions/atam.md"),            0),
     ("tdd-implement",   include_str!("definitions/tdd_implement.md"),   0),
+    ("defense-walk",    include_str!("definitions/defense_walk.md"),    0),
 ];
 
 pub fn find(name: &str) -> Option<(&'static str, u32)> {
@@ -89,16 +90,27 @@ pub fn list_all() -> Result<()> {
     Ok(())
 }
 
-fn list_all_text() -> String {
+pub(crate) fn list_all_text() -> String {
     let mut out = String::new();
     out.push_str(
         "Skills are selectable analytical lenses (a-la-carte) — invoke only the steps your workflow needs.\n\n"
     );
-    out.push_str(&format!("{:<20} {:>7}  {:>12}\n", "SKILL", "VERSION", "TOKENS (~)"));
-    out.push_str(&format!("{}\n", "-".repeat(44)));
+    out.push_str(&format!(
+        "{:<20} {:>7}  {:>12}  {:>10}\n",
+        "SKILL", "VERSION", "TOKENS (~)", "GURU (~)"
+    ));
+    out.push_str(&format!("{}\n", "-".repeat(58)));
     for (name, content, version) in SKILLS {
         let tokens = estimate_tokens(content);
-        out.push_str(&format!("{:<20} {:>7}  {:>12}\n", name, version, tokens));
+        let guru = guru::token_estimate_for_skill(name);
+        if guru > 0 {
+            out.push_str(&format!(
+                "{:<20} {:>7}  {:>12}  +guru {:>4}\n",
+                name, version, tokens, guru
+            ));
+        } else {
+            out.push_str(&format!("{:<20} {:>7}  {:>12}  {:>10}\n", name, version, tokens, guru));
+        }
     }
     out
 }
@@ -199,10 +211,10 @@ mod tests {
     #[test]
     fn all_skills_present() {
         let names: Vec<&str> = SKILLS.iter().map(|(n, _, _)| *n).collect();
-        for expected in &["framework", "purpose-walk", "naive-draft", "stressor-walk", "integrate", "fmea", "atam", "tdd-implement"] {
+        for expected in &["framework", "purpose-walk", "naive-draft", "stressor-walk", "integrate", "fmea", "atam", "tdd-implement", "defense-walk"] {
             assert!(names.contains(expected), "missing skill: {}", expected);
         }
-        assert_eq!(SKILLS.len(), 8, "expected exactly 8 skills");
+        assert_eq!(SKILLS.len(), 9, "expected exactly 9 skills");
     }
 
     // @stressor: ceremony-lockout

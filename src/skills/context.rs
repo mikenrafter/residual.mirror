@@ -29,6 +29,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
     let want_terminology;
     let want_personas;
     let want_nkp;
+    let want_defense;
 
     match skill_name {
         "purpose-walk" => {
@@ -38,6 +39,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = false;
             want_nkp         = false;
+            want_defense     = false;
         }
         "stressor-walk" => {
             want_attractors  = true;
@@ -46,6 +48,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = true;
             want_nkp         = false;
+            want_defense     = false;
         }
         "integrate" => {
             want_attractors  = true;
@@ -54,6 +57,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = false;
             want_nkp         = true;
+            want_defense     = false;
         }
         "fmea" | "atam" => {
             want_attractors  = true;
@@ -62,6 +66,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = true;
             want_nkp         = true;
+            want_defense     = false;
         }
         "naive-draft" => {
             want_attractors  = false;
@@ -70,6 +75,16 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = false;
             want_nkp         = false;
+            want_defense     = false;
+        }
+        "defense-walk" => {
+            want_attractors  = false;
+            want_stressors   = false;
+            want_purposes    = false;
+            want_terminology = false;
+            want_personas    = false;
+            want_nkp         = false;
+            want_defense     = true;
         }
         _ => {
             // default: everything
@@ -79,29 +94,24 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = true;
             want_nkp         = true;
+            want_defense     = false;
         }
     }
 
     let mut out = String::new();
     out.push_str(&format!("# Residual Context — {}\n\n", skill_name));
-    if let Some(bootstrap) = bootstrap_status_section(attractors.len(), stressors.len(), purposes.len()) {
-        out.push_str(&bootstrap);
+    if !want_defense {
+        if let Some(bootstrap) = bootstrap_status_section(attractors.len(), stressors.len(), purposes.len()) {
+            out.push_str(&bootstrap);
+        }
+        out.push_str(&verify_status_section(cfg)?);
     }
-    out.push_str(&verify_status_section(cfg)?);
     out.push_str(
         "## Fluent capture\n\
          Metadata (`residual add stressor|purpose|attractor|term|persona`) works in **any order**, \
          at **any phase**, without invoking a skill. Skills are **selectable analytical lenses** — \
          not mandatory gates. `verify all` enforces structure, not ceremony order.\n\n",
     );
-    if matches!(skill_name, "stressor-walk" | "fmea" | "integrate") {
-        out.push_str("## Whole-system-residue\n");
-        out.push_str(
-            "Examine **whole-system-residue** (hardware, process, organization, policy zig) \
-             before defaulting to a software-only patch. Use `--whole-system --notes` when the \
-             surviving change leaves the software boundary.\n\n",
-        );
-    }
     if want_personas {
         let persona_names: Vec<&str> = personas.iter().map(|p| p.name.as_str()).collect();
         if matches!(skill_name, "stressor-walk" | "fmea" | "atam") {
@@ -181,6 +191,33 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
         out.push('\n');
     }
 
+    if want_defense {
+        out.push_str(&defense_summary_section(dir)?);
+    }
+
+    Ok(out)
+}
+
+fn defense_summary_section(residual_dir: &std::path::Path) -> Result<String> {
+    let meta_stressors =
+        crate::storage::defense::meta_stressors::load(residual_dir).unwrap_or_default();
+
+    let mut out = String::from("## Defense ledger summary\n\n");
+    out.push_str(
+        "Defense-layer meta forces and artifacts — isolated from the main ledger (MS-/MA-/MP-). \
+         Route only vetted `defense/pitches/` artifacts to hostile channels; block raw walk internals.\n\n",
+    );
+    out.push_str("### Meta-stressors\n");
+    if meta_stressors.is_empty() {
+        out.push_str("none\n");
+    } else {
+        out.push_str("| shortname | description |\n");
+        out.push_str("|---|---|\n");
+        for s in &meta_stressors {
+            out.push_str(&format!("| {} | {} |\n", s.shortname, s.description));
+        }
+    }
+    out.push('\n');
     Ok(out)
 }
 

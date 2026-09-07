@@ -62,6 +62,7 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
                 println!("LINK VIOLATION [{}] {}: {}", v.source, v.id, v.message);
             }
             print_tag_warnings(cfg);
+            crate::storage::defense::verify_meta_isolation(&cfg.residual_dir)?;
             if total == 0 {
                 println!("OK: all checks passed.");
             } else {

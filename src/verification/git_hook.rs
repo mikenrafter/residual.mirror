@@ -111,7 +111,15 @@ fn merge_hook_content(existing: Option<String>, name: &str, body: &str) -> Strin
 
 fn write_hook(path: &std::path::Path, name: &str, body: &str) -> Result<()> {
     let existing = std::fs::read_to_string(path).ok();
-    let content = merge_hook_content(existing, name, body);
+    let mut content = merge_hook_content(existing, name, body);
+    // Portable shebang for nix sandboxes (no /usr/bin/env → bash).
+    content = match content.find('\n') {
+        Some(i) if content[..i].contains("/usr/bin/env") || content[..i].starts_with("#!") => {
+            format!("#!/bin/sh\n{}", &content[i + 1..])
+        }
+        _ if !content.starts_with("#!") => format!("#!/bin/sh\n{content}"),
+        _ => content,
+    };
     std::fs::write(path, content)
         .with_context(|| format!("failed to write hook to {}", path.display()))?;
 

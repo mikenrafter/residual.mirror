@@ -111,8 +111,15 @@ pub fn append_idempotent(
 /// Update status for an existing component (e.g. proposed → actual). Errors if name unknown.
 /// Session/change-detection guarded like other mutators.
 pub fn set_status(residual_dir: &Path, name: &str, status: &str) -> Result<()> {
-    let _ = (residual_dir, name, status);
-    anyhow::bail!("TODO: components::set_status — promote/update status for existing name")
+    let session = crate::storage::integrity::sessions::begin_mutation(residual_dir, false)?;
+    let mut components = load(residual_dir)?;
+    let Some(row) = components.iter_mut().find(|c| c.name == name) else {
+        anyhow::bail!("unknown component: {name} not found");
+    };
+    row.status = status.to_string();
+    write_all(residual_dir, &components)?;
+    session.commit()?;
+    Ok(())
 }
 
 pub fn load(residual_dir: &Path) -> Result<Vec<Component>> {

@@ -3,8 +3,11 @@
   "checkpoint_id": "4c1ff0d52c78",
   "strategy": "manual-commit",
   "branch": "vhs-demo",
-  "checkpoints_count": 2,
+  "checkpoints_count": 8,
   "files_touched": [
+    "demo/dummy-project/.cursor/rules/vhs-demo.mdc",
+    "demo/dummy-project/README.md",
+    "demo/dummy-project/opencode.json",
     "flake.lock",
     "flake.nix"
   ],
@@ -22,13 +25,20 @@
       "compact_transcript": "/4c/1ff0d52c78/1/transcript.jsonl",
       "content_hash": "/4c/1ff0d52c78/1/content_hash.txt",
       "prompt": "/4c/1ff0d52c78/1/prompt.txt"
+    },
+    {
+      "metadata": "/4c/1ff0d52c78/2/metadata.json",
+      "transcript": "/4c/1ff0d52c78/2/full.jsonl",
+      "compact_transcript": "/4c/1ff0d52c78/2/transcript.jsonl",
+      "content_hash": "/4c/1ff0d52c78/2/content_hash.txt",
+      "prompt": "/4c/1ff0d52c78/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 4,
-    "cache_creation_tokens": 18814,
-    "cache_read_tokens": 33558,
-    "output_tokens": 2017,
-    "api_call_count": 2
+    "input_tokens": 236,
+    "cache_creation_tokens": 389996,
+    "cache_read_tokens": 16506436,
+    "output_tokens": 104581,
+    "api_call_count": 119
   }
 }

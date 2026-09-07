@@ -1,0 +1,34 @@
+Three GIFs: raw CLI walkthrough, a real `cursor-agent`-driven purpose-walk (steered by `.cursor/rules/vhs-demo.mdc` toward a fixed attractor + 3 purposes, verified byte-identical CSV output across runs), and a pre-commit verify-hook demo with a deliberate failure-then-fix. Fixture is a small Python CLI ("nudge") shipped as a git bundle, currently **left untracked** — flagged as the one thing needing your explicit `git add`. `devShells.default` confirmed still cursor-agent-free.
+
+Please change the way residual handles the skills portion...
+https://github.com/mock-server/mockserver-monorepo
+https://github.com/anomalyco/opencode/
+https://www.mock-server.com/mock_server/llm_response_mocking.html
+
+I want the real TUI. You can record a cursor session that has been steered. I want for you to have the demo better follow real residual principles... The attractors/forces aren't respecting the methodology properly. Also, the gif audience doesn't really know what the demo project is! The demo project should be well introduced by some in-gif comments that hang on screen for a few seconds before tape continues. I want the LLM harness TUI to be snappy. The real one in the demo is far too slow. But it shouldn't be too fast... The demo should let the user read some of the text as it goes by. The demo should scroll up and read some of what the agent has said, then type the socratic response... You have entireio transcripts to work with in the sidecar branch and you have some distilled examples in the plaintext demos folder.
+
+For your tests leading up to your final output, you can shorten some of the typing delays to make the gifs generate faster. Just ensure that you render the final versions and save the final files in a manner that actually follows a natural pacing for a demo gif.
+
+---
+
+Where is the final gif?
+
+---
+
+The stressor framing you have looks fine. Yes, you may continue.
+
+---
+
+The stressor framing you have looks fine. Yes, you may continue.
+
+---
+
+The rsync incident... What specifically was copied where?
+
+---
+
+yeash... sandbox time!
+
+---
+
+Unfortunately, that shape of lesson doesn't translate well to skill files and your weights are locked. This was an invocation error, not something in the current project?

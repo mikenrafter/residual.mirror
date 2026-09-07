@@ -108,6 +108,13 @@ pub fn append_idempotent(
     Ok(added)
 }
 
+/// Update status for an existing component (e.g. proposed → actual). Errors if name unknown.
+/// Session/change-detection guarded like other mutators.
+pub fn set_status(residual_dir: &Path, name: &str, status: &str) -> Result<()> {
+    let _ = (residual_dir, name, status);
+    anyhow::bail!("TODO: components::set_status — promote/update status for existing name")
+}
+
 pub fn load(residual_dir: &Path) -> Result<Vec<Component>> {
     crate::structure::definition::components::load(residual_dir)
 }
@@ -195,6 +202,81 @@ mod tests {
         assert!(
             msg.contains("--force"),
             "drift without --force must mention --force, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn set_status_promotes_proposed_to_actual() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        init_minimal(&residual);
+
+        append(
+            &residual,
+            "skills-defense-walk",
+            "Defense walk skill",
+            "proposed",
+            "iter4-defense",
+        )
+        .unwrap();
+
+        set_status(&residual, "skills-defense-walk", "actual")
+            .expect("set_status must update existing component");
+
+        let components = load(&residual).unwrap();
+        let row = components
+            .iter()
+            .find(|c| c.name == "skills-defense-walk")
+            .expect("component must still exist");
+        assert_eq!(row.status, "actual");
+    }
+
+    #[test]
+    fn set_status_unknown_name_errors() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        init_minimal(&residual);
+
+        let err = set_status(&residual, "does-not-exist", "actual").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("does-not-exist")
+                || msg.contains("unknown")
+                || msg.contains("not found")
+                || msg.contains("no such"),
+            "unknown name must error clearly, got: {msg}"
+        );
+        // TODO stub message is not the final contract — green must replace with real not-found.
+        assert!(
+            !msg.contains("TODO: components::set_status"),
+            "set_status must be implemented (not stub TODO), got: {msg}"
+        );
+    }
+
+    #[test]
+    fn set_status_respects_session_drift() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        init_minimal(&residual);
+
+        append(
+            &residual,
+            "skills-guru",
+            "Guru snippets",
+            "proposed",
+            "iter4-guru",
+        )
+        .unwrap();
+
+        let mut csv = std::fs::read_to_string(residual.join("components.csv")).unwrap();
+        csv.push_str("smuggled,outside-session,actual,set\n");
+        std::fs::write(residual.join("components.csv"), csv).unwrap();
+
+        let err = set_status(&residual, "skills-guru", "actual").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("--force"),
+            "set_status drift without --force must mention --force, got: {msg}"
         );
     }
 }

@@ -630,6 +630,110 @@ fn run_commit_suggest(cfg: &crate::config::Config, staged: bool) -> Result<()> {
 mod tests {
     use super::*;
 
+    /// Phase 2: `residual add meta-stressor` with fields matching defense headers.
+    #[test]
+    fn cli_parses_add_meta_stressor() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "add",
+            "meta-stressor",
+            "--shortname",
+            "meta-force-landscape",
+            "--description",
+            "Defense-layer stressor",
+        ]);
+        assert!(
+            cli.is_ok(),
+            "CLI must accept `add meta-stressor` (id,shortname,description), got err: {}",
+            cli.err().map(|e| e.to_string()).unwrap_or_default()
+        );
+    }
+
+    #[test]
+    fn cli_parses_add_meta_attractor() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "add",
+            "meta-attractor",
+            "--name",
+            "Practitioner Standing",
+            "--description",
+            "Defense attractor",
+            "--positive-state",
+            "safe to discuss",
+            "--negative-state",
+            "reads as heresy",
+        ]);
+        assert!(
+            cli.is_ok(),
+            "CLI must accept `add meta-attractor` matching meta-attractors.csv header, got err: {}",
+            cli.err().map(|e| e.to_string()).unwrap_or_default()
+        );
+    }
+
+    #[test]
+    fn cli_parses_add_meta_purpose() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "add",
+            "meta-purpose",
+            "--shortname",
+            "defense-efficacy",
+            "--description",
+            "Defense purpose",
+            "--naive-change",
+            "capture meta forces",
+            "--outcomes",
+            "operator records defense purpose",
+            "--attractor-id",
+            "MA-01",
+        ]);
+        assert!(
+            cli.is_ok(),
+            "CLI must accept `add meta-purpose` matching meta-purposes.csv header, got err: {}",
+            cli.err().map(|e| e.to_string()).unwrap_or_default()
+        );
+    }
+
+    #[test]
+    fn cli_parses_add_defense_persona_strategy_progress_pitch() {
+        for (sub, name) in [
+            ("defense-persona", "hostile-auditor"),
+            ("defense-strategy", "alpha"),
+            ("defense-progress", "week-1"),
+            ("defense-pitch", "exec-summary"),
+        ] {
+            let cli = Cli::try_parse_from([
+                "residual", "add", sub, "--name", name, "--body", "# md\n",
+            ]);
+            assert!(
+                cli.is_ok(),
+                "CLI must accept `add {sub}`, got err: {}",
+                cli.err().map(|e| e.to_string()).unwrap_or_default()
+            );
+        }
+    }
+
+    #[test]
+    fn cli_parses_list_defense_meta_and_artifacts() {
+        for target in [
+            "meta-stressors",
+            "meta-attractors",
+            "meta-purposes",
+            "defense-personas",
+            "defense-strategies",
+            "defense-progress",
+            "defense-pitches",
+        ] {
+            let cli = Cli::try_parse_from(["residual", "list", target]);
+            assert!(
+                cli.is_ok(),
+                "CLI must accept `list {target}`, got err: {}",
+                cli.err().map(|e| e.to_string()).unwrap_or_default()
+            );
+        }
+    }
+
     #[test]
     fn add_purpose_accepts_naive_change_flag() {
         let cli = Cli::try_parse_from([

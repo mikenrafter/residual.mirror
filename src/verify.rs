@@ -323,6 +323,60 @@ mod tests {
         Config::for_test_residual_dir(dir)
     }
 
+    /// Phase 2: `verify all` must call `storage::defense::verify_meta_isolation`.
+    /// Fixture is otherwise clean so outcomes/links would pass without that check.
+    #[test]
+    fn verify_all_fails_when_ms_id_contaminates_main_stressors() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path();
+        let cfg = cfg_for(residual);
+
+        attractors::append(
+            residual,
+            crate::structure::analysis::attractors::Attractor::new(
+                "A-01",
+                "X",
+                "ok",
+                "bad",
+            ),
+        )
+        .unwrap();
+        format::append_lexicon(
+            residual,
+            LexTerm {
+                term: "operator".into(),
+                definition: "human".into(),
+                domain: "".into(),
+                aliases: "".into(),
+            },
+        )
+        .unwrap();
+        std::fs::write(
+            residual.join("stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n\
+MS-01,contamination,meta bleed into main,none,operator records meta force wrongly,A-01\n",
+        )
+        .unwrap();
+        std::fs::write(
+            residual.join("purposes.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n",
+        )
+        .unwrap();
+
+        // Sanity: isolation helper alone already detects contamination.
+        let iso = crate::storage::defense::verify_meta_isolation(residual);
+        assert!(iso.is_err(), "fixture must trip verify_meta_isolation");
+
+        let err = run(&cfg, VerifyCheck::All).expect_err(
+            "verify all must fail when main stressors.csv contains MS-* (meta isolation)",
+        );
+        let msg = err.to_string();
+        assert!(
+            msg.contains("meta") || msg.contains("MS-") || msg.contains("contamination"),
+            "verify all must surface a meta-contamination message, got: {msg}"
+        );
+    }
+
     // @stressor: ceremony-lockout
     #[test]
     fn verify_all_passes_after_direct_ledger_writes_without_running_any_skill() {

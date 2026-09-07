@@ -166,6 +166,28 @@ mod tests {
         installed.unwrap();
     }
 
+    /// Contract for nix/sandbox: installed hooks must not rely on `env bash`.
+    /// Prefer `#!/bin/sh` (or an explicit interpreter path available in the test env).
+    #[test]
+    fn installed_pre_commit_shebang_is_portable_sh() {
+        let dir = tempdir().unwrap();
+        let repo = dir.path().to_path_buf();
+        init_git_repo(&repo);
+        install_in(&repo);
+
+        let script = std::fs::read_to_string(repo.join(".git/hooks/pre-commit")).unwrap();
+        let first = script.lines().next().unwrap_or("");
+        assert!(
+            first == "#!/bin/sh" || first == "#!/bin/bash",
+            "pre-commit shebang must be portable (/bin/sh or /bin/bash), not env bash; got: {first:?}\n\
+             (nix sandbox often lacks /usr/bin/env → bash, causing No such file or directory)"
+        );
+        assert!(
+            !first.contains("/usr/bin/env"),
+            "pre-commit must not use #!/usr/bin/env … (missing in nix sandbox); got: {first}"
+        );
+    }
+
     #[test]
     fn pre_commit_blocks_staged_residual_csv_with_no_bypass_flag() {
         let dir = tempdir().unwrap();

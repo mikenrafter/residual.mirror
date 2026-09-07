@@ -1,5 +1,8 @@
 //! Defense ledger — meta force namespaces isolated from main ledger.
 
+pub mod artifacts;
+pub mod meta_attractors;
+pub mod meta_purposes;
 pub mod meta_stressors;
 
 use anyhow::{bail, Result};
@@ -132,5 +135,55 @@ MS-01,contamination,bleed,none,,A-01\n",
 
         assert!(residual.join("defense").is_dir());
         assert!(residual.join("defense/meta-stressors.csv").exists());
+    }
+
+    /// Contract: list helpers surface meta forces (MS/MA/MP) for defense list CLI.
+    #[test]
+    fn list_meta_forces_surfaces_ms_ma_mp() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        init_tree(&residual).unwrap();
+
+        meta_stressors::append(
+            &residual,
+            MetaStressor {
+                id: "MS-01".into(),
+                shortname: "ms".into(),
+                description: "d".into(),
+            },
+        )
+        .unwrap();
+
+        crate::storage::defense::meta_attractors::append(
+            &residual,
+            crate::storage::defense::meta_attractors::MetaAttractor {
+                id: "MA-01".into(),
+                name: "ma".into(),
+                description: "d".into(),
+                positive_state: "p".into(),
+                negative_state: "n".into(),
+            },
+        )
+        .expect("meta_attractors append required for list contract");
+
+        crate::storage::defense::meta_purposes::append(
+            &residual,
+            crate::storage::defense::meta_purposes::MetaPurpose {
+                id: "MP-01".into(),
+                shortname: "mp".into(),
+                description: "d".into(),
+                naive_change: "n".into(),
+                outcomes: "".into(),
+                attractor_id: "MA-01".into(),
+            },
+        )
+        .expect("meta_purposes append required for list contract");
+
+        let ms = meta_stressors::list(&residual).unwrap();
+        let ma = crate::storage::defense::meta_attractors::list(&residual).unwrap();
+        let mp = crate::storage::defense::meta_purposes::list(&residual).unwrap();
+        assert_eq!(ms[0].id, "MS-01");
+        assert_eq!(ma[0].id, "MA-01");
+        assert_eq!(mp[0].id, "MP-01");
     }
 }

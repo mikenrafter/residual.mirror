@@ -271,6 +271,46 @@ pub enum AddTarget {
         #[arg(long, default_value = "")] notes: String,
         #[arg(long, default_value = "")] ri_score: String,
     },
+    /// Add a meta-stressor (MS-*) to defense/meta-stressors.csv only.
+    MetaStressor {
+        #[arg(long)] description: String,
+        #[arg(long, default_value = "")] shortname: String,
+    },
+    /// Add a meta-attractor (MA-*) to defense/meta-attractors.csv only.
+    MetaAttractor {
+        #[arg(long)] name: String,
+        #[arg(long)] description: String,
+        #[arg(long)] positive_state: String,
+        #[arg(long)] negative_state: String,
+    },
+    /// Add a meta-purpose (MP-*) to defense/meta-purposes.csv only.
+    MetaPurpose {
+        #[arg(long)] description: String,
+        #[arg(long)] attractor_id: String,
+        #[arg(long)] naive_change: String,
+        #[arg(long, default_value = "")] shortname: String,
+        #[arg(long, default_value = "")] outcomes: String,
+    },
+    /// Write a defense persona markdown under defense-personas/.
+    DefensePersona {
+        #[arg(long)] name: String,
+        #[arg(long)] body: String,
+    },
+    /// Write a defense strategy markdown under defense/strategy/.
+    DefenseStrategy {
+        #[arg(long)] name: String,
+        #[arg(long)] body: String,
+    },
+    /// Write a defense progress markdown under defense/progress/.
+    DefenseProgress {
+        #[arg(long)] name: String,
+        #[arg(long)] body: String,
+    },
+    /// Write a defense pitch markdown under defense/pitches/.
+    DefensePitch {
+        #[arg(long)] name: String,
+        #[arg(long)] body: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -291,6 +331,13 @@ pub enum ListTarget {
     Personas,
     Iterations,
     Residues,
+    MetaStressors,
+    MetaAttractors,
+    MetaPurposes,
+    DefensePersonas,
+    DefenseStrategies,
+    DefenseProgress,
+    DefensePitches,
 }
 
 #[derive(Subcommand)]

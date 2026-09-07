@@ -1,8 +1,6 @@
 //! Defense markdown artifacts — personas, strategy, progress, pitches.
-//!
-//! Stub for red TDD: green fills writers + list helpers.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 
 pub fn persona_path(residual_dir: &Path, name: &str) -> PathBuf {
@@ -27,44 +25,63 @@ pub fn pitch_path(residual_dir: &Path, name: &str) -> PathBuf {
         .join(format!("{name}.md"))
 }
 
+fn write_md(path: PathBuf, body: &str) -> Result<PathBuf> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, body)?;
+    Ok(path)
+}
+
 pub fn write_persona(residual_dir: &Path, name: &str, body: &str) -> Result<PathBuf> {
-    let _ = (residual_dir, name, body);
-    bail!("TODO: write_persona → residual/defense-personas/<name>.md")
+    write_md(persona_path(residual_dir, name), body)
 }
 
 pub fn write_strategy(residual_dir: &Path, name: &str, body: &str) -> Result<PathBuf> {
-    let _ = (residual_dir, name, body);
-    bail!("TODO: write_strategy → residual/defense/strategy/<name>.md")
+    write_md(strategy_path(residual_dir, name), body)
 }
 
 pub fn write_progress(residual_dir: &Path, name: &str, body: &str) -> Result<PathBuf> {
-    let _ = (residual_dir, name, body);
-    bail!("TODO: write_progress → residual/defense/progress/<name>.md")
+    write_md(progress_path(residual_dir, name), body)
 }
 
 pub fn write_pitch(residual_dir: &Path, name: &str, body: &str) -> Result<PathBuf> {
-    let _ = (residual_dir, name, body);
-    bail!("TODO: write_pitch → residual/defense/pitches/<name>.md")
+    write_md(pitch_path(residual_dir, name), body)
+}
+
+fn list_md_stems(dir: &Path) -> Result<Vec<String>> {
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            names.push(stem.to_string());
+        }
+    }
+    names.sort();
+    Ok(names)
 }
 
 pub fn list_personas(residual_dir: &Path) -> Result<Vec<String>> {
-    let _ = residual_dir;
-    bail!("TODO: list_personas — surface defense-personas/*.md")
+    list_md_stems(&residual_dir.join("defense-personas"))
 }
 
 pub fn list_strategies(residual_dir: &Path) -> Result<Vec<String>> {
-    let _ = residual_dir;
-    bail!("TODO: list_strategies — surface defense/strategy/*.md")
+    list_md_stems(&residual_dir.join("defense/strategy"))
 }
 
 pub fn list_progress(residual_dir: &Path) -> Result<Vec<String>> {
-    let _ = residual_dir;
-    bail!("TODO: list_progress — surface defense/progress/*.md")
+    list_md_stems(&residual_dir.join("defense/progress"))
 }
 
 pub fn list_pitches(residual_dir: &Path) -> Result<Vec<String>> {
-    let _ = residual_dir;
-    bail!("TODO: list_pitches — surface defense/pitches/*.md")
+    list_md_stems(&residual_dir.join("defense/pitches"))
 }
 
 #[cfg(test)]

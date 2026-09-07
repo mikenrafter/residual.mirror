@@ -304,6 +304,80 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
             })?;
             println!("Added iteration {}", n);
         }
+        AddTarget::MetaStressor {
+            description,
+            shortname,
+        } => {
+            let existing = defense::meta_stressors::load(dir)?;
+            let id = defense::meta_stressors::next_id(&existing);
+            defense::meta_stressors::append(
+                dir,
+                defense::meta_stressors::MetaStressor {
+                    id: id.clone(),
+                    shortname,
+                    description,
+                },
+            )?;
+            println!("Added meta-stressor {}", id);
+        }
+        AddTarget::MetaAttractor {
+            name,
+            description,
+            positive_state,
+            negative_state,
+        } => {
+            let existing = defense::meta_attractors::load(dir)?;
+            let id = defense::meta_attractors::next_id(&existing);
+            defense::meta_attractors::append(
+                dir,
+                defense::meta_attractors::MetaAttractor {
+                    id: id.clone(),
+                    name,
+                    description,
+                    positive_state,
+                    negative_state,
+                },
+            )?;
+            println!("Added meta-attractor {}", id);
+        }
+        AddTarget::MetaPurpose {
+            description,
+            attractor_id,
+            naive_change,
+            shortname,
+            outcomes,
+        } => {
+            let existing = defense::meta_purposes::load(dir)?;
+            let id = defense::meta_purposes::next_id(&existing);
+            defense::meta_purposes::append(
+                dir,
+                defense::meta_purposes::MetaPurpose {
+                    id: id.clone(),
+                    shortname,
+                    description,
+                    naive_change,
+                    outcomes,
+                    attractor_id,
+                },
+            )?;
+            println!("Added meta-purpose {}", id);
+        }
+        AddTarget::DefensePersona { name, body } => {
+            let path = defense::artifacts::write_persona(dir, &name, &body)?;
+            println!("Added defense-persona '{}' → {}", name, path.display());
+        }
+        AddTarget::DefenseStrategy { name, body } => {
+            let path = defense::artifacts::write_strategy(dir, &name, &body)?;
+            println!("Added defense-strategy '{}' → {}", name, path.display());
+        }
+        AddTarget::DefenseProgress { name, body } => {
+            let path = defense::artifacts::write_progress(dir, &name, &body)?;
+            println!("Added defense-progress '{}' → {}", name, path.display());
+        }
+        AddTarget::DefensePitch { name, body } => {
+            let path = defense::artifacts::write_pitch(dir, &name, &body)?;
+            println!("Added defense-pitch '{}' → {}", name, path.display());
+        }
     }
     Ok(())
 }
@@ -378,6 +452,79 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
                 sorted.sort_by_key(|i| i.n);
                 for meta in &sorted {
                     println!("Iteration {}: {} (Ri: {})", meta.n, meta.date, meta.ri_score);
+                }
+            }
+        }
+        ListTarget::MetaStressors => {
+            let items = defense::meta_stressors::list(&dir)?;
+            if items.is_empty() {
+                println!("No meta-stressors.");
+            } else {
+                for s in &items {
+                    println!("[{}] {} {}", s.id, s.shortname, s.description);
+                }
+            }
+        }
+        ListTarget::MetaAttractors => {
+            let items = defense::meta_attractors::list(&dir)?;
+            if items.is_empty() {
+                println!("No meta-attractors.");
+            } else {
+                for a in &items {
+                    println!("[{}] {} {}", a.id, a.name, a.description);
+                }
+            }
+        }
+        ListTarget::MetaPurposes => {
+            let items = defense::meta_purposes::list(&dir)?;
+            if items.is_empty() {
+                println!("No meta-purposes.");
+            } else {
+                for p in &items {
+                    println!(
+                        "[{}] {} {} (attractor: {})",
+                        p.id, p.shortname, p.description, p.attractor_id
+                    );
+                }
+            }
+        }
+        ListTarget::DefensePersonas => {
+            let names = defense::artifacts::list_personas(&dir)?;
+            if names.is_empty() {
+                println!("No defense-personas.");
+            } else {
+                for name in &names {
+                    println!("{}", name);
+                }
+            }
+        }
+        ListTarget::DefenseStrategies => {
+            let names = defense::artifacts::list_strategies(&dir)?;
+            if names.is_empty() {
+                println!("No defense-strategies.");
+            } else {
+                for name in &names {
+                    println!("{}", name);
+                }
+            }
+        }
+        ListTarget::DefenseProgress => {
+            let names = defense::artifacts::list_progress(&dir)?;
+            if names.is_empty() {
+                println!("No defense-progress.");
+            } else {
+                for name in &names {
+                    println!("{}", name);
+                }
+            }
+        }
+        ListTarget::DefensePitches => {
+            let names = defense::artifacts::list_pitches(&dir)?;
+            if names.is_empty() {
+                println!("No defense-pitches.");
+            } else {
+                for name in &names {
+                    println!("{}", name);
                 }
             }
         }

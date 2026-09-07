@@ -1,8 +1,6 @@
 //! Meta-attractors — MA-* namespace in defense/meta-attractors.csv only.
-//!
-//! Stub for red TDD: green fills round-trip write/load.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -38,12 +36,38 @@ pub fn load(residual_dir: &Path) -> Result<Vec<MetaAttractor>> {
 }
 
 pub fn append(residual_dir: &Path, item: MetaAttractor) -> Result<()> {
-    let _ = (residual_dir, item, HEADER);
-    bail!("TODO: meta_attractors::append — write MA-* to defense/meta-attractors.csv only")
+    let mut all = load(residual_dir)?;
+    if all.iter().any(|s| s.id == item.id) {
+        anyhow::bail!("meta-attractor id '{}' already exists", item.id);
+    }
+    all.push(item);
+    write_all(residual_dir, &all)
 }
 
 pub fn list(residual_dir: &Path) -> Result<Vec<MetaAttractor>> {
     load(residual_dir)
+}
+
+fn write_all(residual_dir: &Path, rows: &[MetaAttractor]) -> Result<()> {
+    std::fs::create_dir_all(residual_dir.join("defense"))?;
+    let mut buf = format!("{HEADER}\n");
+    for a in rows {
+        let mut row = Vec::new();
+        {
+            let mut wtr = csv::WriterBuilder::new().has_headers(false).from_writer(&mut row);
+            wtr.write_record(&[
+                &a.id,
+                &a.name,
+                &a.description,
+                &a.positive_state,
+                &a.negative_state,
+            ])?;
+            wtr.flush()?;
+        }
+        buf.push_str(std::str::from_utf8(&row)?);
+    }
+    std::fs::write(csv_path(residual_dir), buf)?;
+    Ok(())
 }
 
 pub fn next_id(items: &[MetaAttractor]) -> String {

@@ -19,16 +19,29 @@ pub struct AudiencePrior {
     pub locked: bool,
 }
 
-/// Built-in audience registry — locked priors + channel safety.
-/// Stub for red TDD: green fills the locked prior set.
+/// Built-in audience registry — locked priors + channel safety (S-52).
 pub fn audience_registry() -> Vec<AudiencePrior> {
-    Vec::new()
+    vec![
+        AudiencePrior {
+            name: "hostile-auditor",
+            channel: AudienceChannel::RawUnsafe,
+            locked: true,
+        },
+        AudiencePrior {
+            name: "translated-pitch",
+            channel: AudienceChannel::Translated,
+            locked: true,
+        },
+    ]
 }
 
 /// Resolve channel for a named audience; errors if unknown.
 pub fn channel_for_audience(name: &str) -> Result<AudienceChannel> {
-    let _ = name;
-    bail!("TODO: channel_for_audience — look up locked audience registry")
+    audience_registry()
+        .into_iter()
+        .find(|a| a.name == name)
+        .map(|a| a.channel)
+        .ok_or_else(|| anyhow::anyhow!("unknown audience prior: {name}"))
 }
 
 /// Returns true when path points at defense ledger internals.

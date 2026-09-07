@@ -1,0 +1,35 @@
+Generate a title that will help the user recognize this T3 Code thread weeks later.
+Return JSON with exactly one key: title.
+
+Before answering, silently reduce the request to:
+- Subject: What system, feature, or problem is this really about?
+- Outcome: What does the user ultimately want to understand or change?
+- Incidental instructions: What only describes how the agent should do the work?
+
+Title the subject and outcome. Discard incidental instructions.
+
+Editorial rules:
+- 3-8 words, fewer than 40 characters.
+- Use a compact noun phrase or clear action phrase.
+- Capture the umbrella goal when the request lists several symptoms or steps.
+- Name the product change, not the mock, plan, report, branch, or PR used to produce it.
+- Models, subagents, tools, output formats, and monitoring instructions do not belong in the title unless they are themselves the topic.
+- For reviews, name what is being reviewed and the relevant concern. Avoid generic titles such as "Review PR 123" when linked or attached context reveals the subject.
+- For research, name the question domain rather than the requested research process.
+- Do not claim the work is complete.
+- Do not copy and truncate the user's message.
+- Avoid project names already visible in the UI, quotes, labels, filler, and trailing punctuation.
+- Use attached images as primary context for UI issues.
+- When a URL or attachment is the only source of the subject, use available tools to inspect it. If it cannot be resolved, remain accurate rather than guessing.
+
+User message:
+Three GIFs: raw CLI walkthrough, a real `cursor-agent`-driven purpose-walk (steered by `.cursor/rules/vhs-demo.mdc` toward a fixed attractor + 3 purposes, verified byte-identical CSV output across runs), and a pre-commit verify-hook demo with a deliberate failure-then-fix. Fixture is a small Python CLI ("nudge") shipped as a git bundle, currently **left untracked** — flagged as the one thing needing your explicit `git add`. `devShells.default` confirmed still cursor-agent-free.
+
+Please change the way residual handles the skills portion...
+https://github.com/mock-server/mockserver-monorepo
+https://github.com/anomalyco/opencode/
+https://www.mock-server.com/mock_server/llm_response_mocking.html
+
+I want the real TUI. You can record a cursor session that has been steered. I want for you to have the demo better follow real residual principles... The attractors/forces aren't respecting the methodology properly. Also, the gif audience doesn't really know what the demo project is! The demo project should be well introduced by some in-gif comments that hang on screen for a few seconds before tape continues. I want the LLM harness TUI to be snappy. The real one in the demo is far too slow. But it shouldn't be too fast... The demo should let the user read some of the text as it goes by. The demo should scroll up and read some of what the agent has said, then type the socratic response... You have entireio transcripts to work with in the sidecar branch and you have some distilled examples in the plaintext demos folder.
+
+For your tests leading up to your final output, you can shorten some of the typing delays to make the gifs generate faster. Just ensure that you render the final versions and save the final files in a manner that actually follows a natural pacing for a demo gif.

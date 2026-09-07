@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "4c1ff0d52c78",
+  "strategy": "manual-commit",
+  "branch": "vhs-demo",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "flake.lock",
+    "flake.nix"
+  ],
+  "sessions": [
+    {
+      "metadata": "/4c/1ff0d52c78/0/metadata.json",
+      "transcript": "/4c/1ff0d52c78/0/full.jsonl",
+      "compact_transcript": "/4c/1ff0d52c78/0/transcript.jsonl",
+      "content_hash": "/4c/1ff0d52c78/0/content_hash.txt",
+      "prompt": "/4c/1ff0d52c78/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 9483,
+    "cache_read_tokens": 16779,
+    "output_tokens": 1834,
+    "api_call_count": 1
+  }
+}

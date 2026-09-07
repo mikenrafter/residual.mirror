@@ -21,6 +21,12 @@ fn default_token_warn() -> usize {
 fn default_commit_msg_enforce() -> bool {
     false
 }
+fn default_walk_reminder_enabled() -> bool {
+    true
+}
+fn default_walk_reminder_interval_days() -> u32 {
+    30
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StorageConfig {
@@ -35,6 +41,10 @@ pub struct StorageConfig {
     /// When false, commit-msg hook prints violations but exits 0 (warn-only).
     #[serde(default = "default_commit_msg_enforce")]
     pub commit_msg_enforce: bool,
+    #[serde(default = "default_walk_reminder_enabled")]
+    pub walk_reminder_enabled: bool,
+    #[serde(default = "default_walk_reminder_interval_days")]
+    pub walk_reminder_interval_days: u32,
 }
 
 impl Default for StorageConfig {
@@ -45,6 +55,8 @@ impl Default for StorageConfig {
             super_strict: default_super_strict(),
             token_warn: default_token_warn(),
             commit_msg_enforce: default_commit_msg_enforce(),
+            walk_reminder_enabled: default_walk_reminder_enabled(),
+            walk_reminder_interval_days: default_walk_reminder_interval_days(),
         }
     }
 }
@@ -110,6 +122,10 @@ struct VerificationSection {
     token_warn: usize,
     #[serde(default = "default_commit_msg_enforce")]
     commit_msg_enforce: bool,
+    #[serde(default = "default_walk_reminder_enabled")]
+    walk_reminder_enabled: bool,
+    #[serde(default = "default_walk_reminder_interval_days")]
+    walk_reminder_interval_days: u32,
 }
 
 impl Default for VerificationSection {
@@ -118,6 +134,8 @@ impl Default for VerificationSection {
             super_strict: default_super_strict(),
             token_warn: default_token_warn(),
             commit_msg_enforce: default_commit_msg_enforce(),
+            walk_reminder_enabled: default_walk_reminder_enabled(),
+            walk_reminder_interval_days: default_walk_reminder_interval_days(),
         }
     }
 }
@@ -131,14 +149,22 @@ pub fn parse_v3(toml_str: &str) -> Result<StorageConfig> {
         super_strict: doc.verification.super_strict,
         token_warn: doc.verification.token_warn,
         commit_msg_enforce: doc.verification.commit_msg_enforce,
+        walk_reminder_enabled: doc.verification.walk_reminder_enabled,
+        walk_reminder_interval_days: doc.verification.walk_reminder_interval_days,
     })
 }
 
 /// Render the full v3 document (storage + verify policy sections).
 pub fn render_v3(cfg: &StorageConfig) -> String {
     format!(
-        "# residual v4 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\n",
-        cfg.format_version, cfg.change_detection, cfg.super_strict, cfg.token_warn, cfg.commit_msg_enforce
+        "# residual v4 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\nwalk_reminder_enabled = {}\nwalk_reminder_interval_days = {}\n",
+        cfg.format_version,
+        cfg.change_detection,
+        cfg.super_strict,
+        cfg.token_warn,
+        cfg.commit_msg_enforce,
+        cfg.walk_reminder_enabled,
+        cfg.walk_reminder_interval_days
     )
 }
 
@@ -279,5 +305,25 @@ token_warn = 1000
         let sidecar = parse_sidecar_section(raw).unwrap();
         assert!(sidecar.branch_mode);
         assert_eq!(sidecar.branch_pattern, "meta/{suffix}");
+    }
+
+    #[test]
+    fn parse_v3_reads_walk_reminder_policy() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+change_detection = true
+[verification]
+super_strict = true
+token_warn = 1000
+walk_reminder_enabled = false
+walk_reminder_interval_days = 14
+"#;
+        let cfg = parse_v3(raw).unwrap();
+        assert!(!cfg.walk_reminder_enabled);
+        assert_eq!(cfg.walk_reminder_interval_days, 14);
+        let rendered = render_v3(&cfg);
+        assert!(rendered.contains("walk_reminder_enabled = false"));
+        assert!(rendered.contains("walk_reminder_interval_days = 14"));
     }
 }

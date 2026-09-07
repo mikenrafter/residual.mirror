@@ -72,6 +72,8 @@ pub fn migrate_naive_to_v3(naive_toml: &str) -> Result<MigratedV3> {
         super_strict: naive.validation.strict,
         token_warn: naive.skills.token_warn,
         commit_msg_enforce: false,
+        walk_reminder_enabled: true,
+        walk_reminder_interval_days: 30,
     };
     let toml_out = crate::storage::config::render_v3(&storage);
     Ok(MigratedV3 {

@@ -91,16 +91,32 @@ fn write_state(residual_dir: &Path, file: &WalkReviewFile) -> Result<()> {
     std::fs::write(&path, body).with_context(|| format!("write {}", path.display()))
 }
 
-pub fn record_completed(residual_dir: &Path, kind: WalkKind) -> Result<()> {
-    let mut file = if walk_review_path(residual_dir).exists() {
-        parse_file(&std::fs::read_to_string(walk_review_path(residual_dir))?)? 
+fn load_or_default(residual_dir: &Path) -> Result<WalkReviewFile> {
+    if walk_review_path(residual_dir).exists() {
+        parse_file(&std::fs::read_to_string(walk_review_path(residual_dir))?)
     } else {
-        WalkReviewFile::default()
-    };
+        Ok(WalkReviewFile::default())
+    }
+}
+
+pub fn record_completed(residual_dir: &Path, kind: WalkKind) -> Result<()> {
+    let mut file = load_or_default(residual_dir)?;
     let today = Local::now().format("%Y-%m-%d").to_string();
     match kind {
         WalkKind::Purpose => file.last_completed.purpose_walk = Some(today),
         WalkKind::Stressor => file.last_completed.stressor_walk = Some(today),
+    }
+    write_state(residual_dir, &file)
+}
+
+/// Acknowledge an overdue reminder without claiming the walk was completed (P-23).
+/// Stamps `last_prompted` so the same-day nag silences until tomorrow.
+pub fn record_deferred(residual_dir: &Path, kind: WalkKind) -> Result<()> {
+    let mut file = load_or_default(residual_dir)?;
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    match kind {
+        WalkKind::Purpose => file.last_prompted.purpose_walk = Some(today),
+        WalkKind::Stressor => file.last_prompted.stressor_walk = Some(today),
     }
     write_state(residual_dir, &file)
 }
@@ -122,7 +138,13 @@ fn reminder_message(kind: WalkKind, days: i64, interval_days: u32) -> String {
     )
 }
 
+fn prompted_today(last_prompted: Option<&str>) -> bool {
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    last_prompted == Some(today.as_str())
+}
+
 /// Non-blocking verify — always succeeds but may print reminder copy.
+/// Same-day `--deferred` acknowledgement suppresses re-nag until tomorrow.
 pub fn verify_reminder(
     residual_dir: &Path,
     interval_days: u32,
@@ -138,16 +160,22 @@ pub fn verify_reminder(
             WalkKind::Purpose => state.last_completed_purpose.as_deref(),
             WalkKind::Stressor => state.last_completed_stressor.as_deref(),
         };
+        let last_prompted = match kind {
+            WalkKind::Purpose => state.last_prompted_purpose.as_deref(),
+            WalkKind::Stressor => state.last_prompted_stressor.as_deref(),
+        };
         let overdue = match last {
             None => true,
             Some(date) => days_since(date).is_none_or(|d| d >= i64::from(interval_days)),
         };
         if overdue {
-            let days = last
-                .and_then(days_since)
-                .unwrap_or(i64::from(interval_days) + 1);
             report.overdue.push(kind.field_key().to_string());
-            report.messages.push(reminder_message(kind, days, interval_days));
+            if !prompted_today(last_prompted) {
+                let days = last
+                    .and_then(days_since)
+                    .unwrap_or(i64::from(interval_days) + 1);
+                report.messages.push(reminder_message(kind, days, interval_days));
+            }
         }
     }
 
@@ -224,6 +252,43 @@ mod tests {
             report.messages.iter().any(|m| m.to_lowercase().contains("purpose"))
                 && report.messages.iter().any(|m| m.to_lowercase().contains("stressor")),
             "separate prompts required for purpose-walk AND stressor-walk, got: {:?}",
+            report.messages
+        );
+    }
+
+    #[test]
+    fn record_deferred_stamps_last_prompted_and_silences_same_day_nag() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        std::fs::create_dir_all(&residual).unwrap();
+
+        let stale = (Local::now() - Duration::days(60))
+            .format("%Y-%m-%d")
+            .to_string();
+        std::fs::write(
+            walk_review_path(&residual),
+            format!(
+                "[last_completed]\npurpose-walk = \"{stale}\"\nstressor-walk = \"{stale}\"\n"
+            ),
+        )
+        .unwrap();
+
+        record_deferred(&residual, WalkKind::Purpose).unwrap();
+        record_deferred(&residual, WalkKind::Stressor).unwrap();
+
+        let state = load_state(&residual).unwrap();
+        assert!(state.last_prompted_purpose.is_some());
+        assert!(state.last_prompted_stressor.is_some());
+        assert!(
+            state.last_completed_purpose.as_deref() == Some(stale.as_str()),
+            "deferral must not claim completion"
+        );
+
+        let report = verify_reminder(&residual, 30).unwrap();
+        assert_eq!(report.overdue.len(), 2, "still overdue after deferral");
+        assert!(
+            report.messages.is_empty(),
+            "same-day deferral must silence nag messages, got: {:?}",
             report.messages
         );
     }

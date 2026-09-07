@@ -545,9 +545,11 @@ pub fn run() -> Result<()> {
                 };
                 if completed {
                     walk_reminder::record_completed(&meta, walk_kind)?;
+                    crate::storage::git_sidecar::persist_if_sidecar(&cfg, &meta)?;
                     println!("Recorded {}-walk completion", walk_kind.as_str());
                 } else {
-                    let _ = (meta, walk_kind, deferred);
+                    walk_reminder::record_deferred(&meta, walk_kind)?;
+                    crate::storage::git_sidecar::persist_if_sidecar(&cfg, &meta)?;
                     println!("Recorded {}-walk deferral", walk_kind.as_str());
                 }
                 Ok(())

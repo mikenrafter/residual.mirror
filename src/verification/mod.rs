@@ -53,8 +53,17 @@ const DEFAULT_WALK_REMINDER_INTERVAL_DAYS: u32 = 30;
 
 /// Non-blocking walk cadence check — always exits OK, prints reminders to stderr.
 pub fn run_walk_reminder(cfg: &Config, _staged: bool) -> Result<()> {
+    let policy = policy_from_config(cfg).unwrap_or_default();
+    if !policy.walk_reminder_enabled {
+        return Ok(());
+    }
+    let interval = if policy.walk_reminder_interval_days == 0 {
+        DEFAULT_WALK_REMINDER_INTERVAL_DAYS
+    } else {
+        policy.walk_reminder_interval_days
+    };
     let meta_dir = metadata_dir_for_verify(cfg)?;
-    let report = walk_reminder::verify_reminder(&meta_dir, DEFAULT_WALK_REMINDER_INTERVAL_DAYS)?;
+    let report = walk_reminder::verify_reminder(&meta_dir, interval)?;
     for msg in &report.messages {
         eprintln!("{msg}");
     }

@@ -113,6 +113,26 @@ pub enum Command {
         #[command(subcommand)]
         op: BranchOp,
     },
+    /// Render the force landscape as a self-contained HTML page and print its path.
+    ///
+    /// Process: read-only and ephemeral — the page stages `residual add …`
+    /// commands for the operator to copy, it never mutates the ledger.
+    View {
+        /// Include the defense ledger (meta forces + defense artifacts).
+        #[arg(long)]
+        defense: bool,
+        /// Write the page here instead of a temp dir.
+        #[arg(long, value_name = "DIR")]
+        out: Option<std::path::PathBuf>,
+    },
+    /// Serve the force landscape on loopback and print the URL.
+    Serve {
+        /// Include the defense ledger (meta forces + defense artifacts).
+        #[arg(long)]
+        defense: bool,
+        #[arg(long, default_value_t = crate::view::DEFAULT_PORT)]
+        port: u16,
+    },
     Config,
 }
 
@@ -556,6 +576,8 @@ pub fn run() -> Result<()> {
             }
         }
         Command::Branch { op } => run_branch(&cfg, op),
+        Command::View { defense, out } => crate::view::run_view(&cfg, defense, out),
+        Command::Serve { defense, port } => crate::view::run_serve(&cfg, defense, port),
         Command::Config => crate::config::print(&cfg),
     }
 }
@@ -831,6 +853,68 @@ mod tests {
                 assert!(push);
             }
             _ => panic!("expected Command::Branch(BranchOp::Merge)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_view_with_defense_flag() {
+        let cli = Cli::try_parse_from(["residual", "view", "--defense"])
+            .expect("CLI must accept `view --defense`");
+        match cli.command {
+            Command::View { defense, out } => {
+                assert!(defense, "--defense must set the defense flag");
+                assert_eq!(out, None, "--out defaults to a temp dir");
+            }
+            _ => panic!("expected Command::View"),
+        }
+    }
+
+    #[test]
+    fn cli_view_defaults_defense_off() {
+        let cli = Cli::try_parse_from(["residual", "view"]).expect("CLI must accept bare `view`");
+        match cli.command {
+            Command::View { defense, .. } => {
+                assert!(!defense, "defense must default to OFF");
+            }
+            _ => panic!("expected Command::View"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_view_out_dir() {
+        let cli = Cli::try_parse_from(["residual", "view", "--out", "/tmp/landscape"])
+            .expect("CLI must accept `view --out <dir>`");
+        match cli.command {
+            Command::View { out, .. } => {
+                assert_eq!(out.as_deref(), Some(std::path::Path::new("/tmp/landscape")));
+            }
+            _ => panic!("expected Command::View"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_serve_with_port() {
+        let cli = Cli::try_parse_from(["residual", "serve", "--port", "8765"])
+            .expect("CLI must accept `serve --port <u16>`");
+        match cli.command {
+            Command::Serve { defense, port } => {
+                assert_eq!(port, 8765);
+                assert!(!defense, "defense must default to OFF");
+            }
+            _ => panic!("expected Command::Serve"),
+        }
+    }
+
+    #[test]
+    fn cli_serve_defaults_to_view_default_port() {
+        let cli = Cli::try_parse_from(["residual", "serve", "--defense"])
+            .expect("CLI must accept `serve --defense`");
+        match cli.command {
+            Command::Serve { defense, port } => {
+                assert!(defense);
+                assert_eq!(port, crate::view::DEFAULT_PORT);
+            }
+            _ => panic!("expected Command::Serve"),
         }
     }
 

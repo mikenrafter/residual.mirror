@@ -10,6 +10,7 @@ mod structure;
 mod tags;
 mod verification;
 mod verify;
+mod view;
 
 fn main() -> Result<()> {
     cli::run()

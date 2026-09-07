@@ -91,7 +91,7 @@ fn merge_hook_content(existing: Option<String>, name: &str, body: &str) -> Strin
     let block = format!("{begin}\n{body}{end}\n");
 
     match existing {
-        None => format!("#!/usr/bin/env bash\n{block}"),
+        None => format!("#!/bin/sh\n{block}"),
         Some(mut content) => match (content.find(&begin), content.find(&end)) {
             (Some(b), Some(e)) => {
                 let e_end = e + end.len();

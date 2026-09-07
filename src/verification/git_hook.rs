@@ -158,11 +158,18 @@ mod tests {
             .unwrap_or_else(|e| panic!("run {name} hook: {e}"))
     }
 
+    /// Serialize CWD-mutating installs — other tests also call `set_current_dir`,
+    /// and restoring a deleted temp cwd races under `--test-threads > 1`.
+    static INSTALL_CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn install_in(repo: &std::path::Path) {
+        let _guard = INSTALL_CWD_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let prev = std::env::current_dir().unwrap();
         std::env::set_current_dir(repo).unwrap();
         let installed = install();
-        std::env::set_current_dir(prev).unwrap();
+        let _ = std::env::set_current_dir(&prev);
         installed.unwrap();
     }
 

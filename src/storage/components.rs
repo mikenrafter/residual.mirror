@@ -109,15 +109,22 @@ pub fn append_idempotent(
 }
 
 /// Update status for an existing component (e.g. proposed → actual). Errors if name unknown.
-/// Session/change-detection guarded like other mutators.
-pub fn set_status(residual_dir: &Path, name: &str, status: &str) -> Result<()> {
-    let session = crate::storage::integrity::sessions::begin_mutation(residual_dir, false)?;
+/// No session guard — caller holds the mutation session.
+pub(crate) fn set_status_inner(residual_dir: &Path, name: &str, status: &str) -> Result<()> {
     let mut components = load(residual_dir)?;
     let Some(row) = components.iter_mut().find(|c| c.name == name) else {
         anyhow::bail!("unknown component: {name} not found");
     };
     row.status = status.to_string();
     write_all(residual_dir, &components)?;
+    Ok(())
+}
+
+/// Update status for an existing component (e.g. proposed → actual). Errors if name unknown.
+/// Session/change-detection guarded like other mutators.
+pub fn set_status(residual_dir: &Path, name: &str, status: &str) -> Result<()> {
+    let session = crate::storage::integrity::sessions::begin_mutation(residual_dir, false)?;
+    set_status_inner(residual_dir, name, status)?;
     session.commit()?;
     Ok(())
 }

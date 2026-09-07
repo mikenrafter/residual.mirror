@@ -235,7 +235,9 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
             if added {
                 println!("Added component '{}'", name);
             } else {
-                println!("Component '{}' already exists (idempotent no-op)", name);
+                // Promote / update status when the registry row already exists (P-30 hygiene).
+                components::set_status_inner(dir, &name, &status)?;
+                println!("Updated component '{}' status to '{}'", name, status);
             }
         }
         AddTarget::Purpose { description, attractor_id, naive_change, shortname, outcomes } => {

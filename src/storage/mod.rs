@@ -1,9 +1,9 @@
+use crate::cli::{AddTarget, ListTarget, RemoveTarget};
+use crate::config::Config;
+use crate::structure::analysis::residues::{tag_naive_change_whole_system, Residue};
 use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::config::Config;
-use crate::cli::{AddTarget, ListTarget, RemoveTarget};
-use crate::structure::analysis::residues::{tag_naive_change_whole_system, Residue};
 
 pub mod attractors;
 pub mod components;
@@ -15,10 +15,11 @@ pub mod integrity;
 pub mod iterations;
 pub mod personas;
 pub mod purposes;
-pub mod residues;
 pub mod research;
+pub mod residues;
 pub mod stressors;
 pub mod terminology;
+pub mod write_authorization;
 
 const WHOLE_SYSTEM_REMINDER: &str = "reminder: examine whole-system-residue (hardware, process, organization, policy) before defaulting to a software-only patch; use --whole-system --notes when the zig survives outside software";
 
@@ -63,11 +64,15 @@ pub fn print_storage_banner() -> Result<()> {
     let cwd = std::env::current_dir()?;
     let discovery = git_sidecar::discover_config(&cwd)?;
     let sidecar = git_sidecar::SidecarConfig::from_config_file(&discovery.config_path)?;
-    println!("{}", git_sidecar::format_storage_banner(&discovery, &sidecar));
+    println!(
+        "{}",
+        git_sidecar::format_storage_banner(&discovery, &sidecar)
+    );
     Ok(())
 }
 
 pub fn init(cfg: &Config, force: bool) -> Result<()> {
+    write_authorization::require(cfg)?;
     let host = &cfg.config_host_dir;
     let session = integrity::sessions::begin_mutation(host, force)?;
     init_dirs_and_files(host)?;
@@ -84,15 +89,25 @@ fn init_dirs_and_files(dir: &Path) -> Result<()> {
     // Write config.toml if not present (storage-config; format_version v4 by default).
     let config_path = dir.join("config.toml");
     if !config_path.exists() {
-        let toml = crate::storage::config::render_v3(&crate::storage::config::StorageConfig::default());
+        let toml =
+            crate::storage::config::render_v3(&crate::storage::config::StorageConfig::default());
         fs::write(&config_path, toml)?;
     }
 
     // Write empty CSVs with headers if not present
     let csvs: &[(&str, &str)] = &[
-        ("stressors.csv", "id,shortname,description,naive_change,outcomes,attractor_id"),
-        ("purposes.csv", "id,shortname,description,naive_change,outcomes,attractor_id"),
-        ("attractors.csv", "id,name,description,positive_state,negative_state"),
+        (
+            "stressors.csv",
+            "id,shortname,description,naive_change,outcomes,attractor_id",
+        ),
+        (
+            "purposes.csv",
+            "id,shortname,description,naive_change,outcomes,attractor_id",
+        ),
+        (
+            "attractors.csv",
+            "id,name,description,positive_state,negative_state",
+        ),
         ("lexicon.csv", "term,definition,domain,aliases"),
         ("residues.csv", "force"),
         ("components.csv", "name,description,status,architecture_set"),
@@ -109,6 +124,7 @@ fn init_dirs_and_files(dir: &Path) -> Result<()> {
 }
 
 pub fn add(cfg: &Config, target: AddTarget, force: bool) -> Result<()> {
+    write_authorization::require(cfg)?;
     let dir = metadata_dir_for_mutation(cfg)?;
     let session = integrity::sessions::begin_mutation(&dir, force)?;
     add_entry(&dir, target)?;
@@ -118,6 +134,7 @@ pub fn add(cfg: &Config, target: AddTarget, force: bool) -> Result<()> {
 }
 
 pub fn remove(cfg: &Config, target: RemoveTarget, force: bool) -> Result<()> {
+    write_authorization::require(cfg)?;
     let dir = metadata_dir_for_mutation(cfg)?;
     let session = integrity::sessions::begin_mutation(&dir, force)?;
     remove_entry(&dir, target)?;
@@ -133,10 +150,14 @@ fn remove_entry(dir: &Path, target: RemoveTarget) -> Result<()> {
             component_id,
         } => {
             residues::remove_coupling(dir, &force_id, &component_id)?;
-            println!(
-                "Removed residue coupling {} × {}",
-                force_id, component_id
-            );
+            println!("Removed residue coupling {} × {}", force_id, component_id);
+        }
+        RemoveTarget::Term { term } => {
+            if terminology::remove(dir, &term)? {
+                println!("Removed term '{term}'");
+            } else {
+                anyhow::bail!("term '{term}' does not exist");
+            }
         }
     }
     Ok(())
@@ -164,14 +185,17 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
             };
             let existing = stressors::load(dir)?;
             let id = stressors::next_id(&existing);
-            stressors::append(dir, stressors::Stressor {
-                id: id.clone(),
-                shortname,
-                description,
-                attractor_id,
-                naive_change,
-                outcomes,
-            })?;
+            stressors::append(
+                dir,
+                stressors::Stressor {
+                    id: id.clone(),
+                    shortname,
+                    description,
+                    attractor_id,
+                    naive_change,
+                    outcomes,
+                },
+            )?;
             if whole_system {
                 let residue_id = residues::append_whole_system(dir, &id, &notes)?;
                 println!("Added whole-system-residue {}", residue_id);
@@ -190,10 +214,7 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
                     anyhow::bail!("--move-to requires --component-id (source component)");
                 }
                 if !residues::force_exists(dir, &force_id)? {
-                    anyhow::bail!(
-                        "force id '{}' not found in stressors or purposes",
-                        force_id
-                    );
+                    anyhow::bail!("force id '{}' not found in stressors or purposes", force_id);
                 }
                 residues::move_coupling(dir, &force_id, &component_id, &move_to)?;
                 println!(
@@ -212,10 +233,7 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
                 }
                 let existing = residues::load(dir)?;
                 let id = residues::next_id(&existing);
-                residues::append(
-                    dir,
-                    Residue::coupling(id.clone(), force_id, component_id),
-                )?;
+                residues::append(dir, Residue::coupling(id.clone(), force_id, component_id))?;
                 println!("Added residue coupling {}", id);
             }
         }
@@ -240,17 +258,26 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
                 println!("Updated component '{}' status to '{}'", name, status);
             }
         }
-        AddTarget::Purpose { description, attractor_id, naive_change, shortname, outcomes } => {
+        AddTarget::Purpose {
+            description,
+            attractor_id,
+            naive_change,
+            shortname,
+            outcomes,
+        } => {
             let existing = purposes::load(dir)?;
             let id = purposes::next_id(&existing);
-            purposes::append(dir, purposes::Purpose {
-                id: id.clone(),
-                shortname,
-                description,
-                attractor_id,
-                naive_change,
-                outcomes,
-            })?;
+            purposes::append(
+                dir,
+                purposes::Purpose {
+                    id: id.clone(),
+                    shortname,
+                    description,
+                    attractor_id,
+                    naive_change,
+                    outcomes,
+                },
+            )?;
             println!("Added purpose {}", id);
         }
         AddTarget::Attractor {
@@ -273,37 +300,56 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
             )?;
             println!("Added attractor {}", id);
         }
-        AddTarget::Term { term, definition, domain, related } => {
-            format::append_lexicon(dir, crate::structure::definition::lexicon::Term {
-                term: term.clone(),
-                definition,
-                domain,
-                aliases: related,
-            })?;
+        AddTarget::Term {
+            term,
+            definition,
+            domain,
+            related,
+        } => {
+            format::append_lexicon(
+                dir,
+                crate::structure::definition::lexicon::Term {
+                    term: term.clone(),
+                    definition,
+                    domain,
+                    aliases: related,
+                },
+            )?;
             println!("Added term '{}'", term);
         }
-        AddTarget::Persona { name, role, concerns, desires } => {
-            personas::create(dir, personas::Persona {
-                name: name.clone(),
-                role,
-                concerns,
-                desires,
-                stressor_ids: vec![],
-            })?;
+        AddTarget::Persona {
+            name,
+            role,
+            concerns,
+            desires,
+        } => {
+            personas::create(
+                dir,
+                personas::Persona {
+                    name: name.clone(),
+                    role,
+                    concerns,
+                    desires,
+                    stressor_ids: vec![],
+                },
+            )?;
             println!("Added persona '{}'", name);
         }
         AddTarget::Iteration { notes, ri_score } => {
             let n = iterations::next_n(dir)?;
             let date = chrono::Local::now().format("%Y-%m-%d").to_string();
-            iterations::create(dir, iterations::IterationMeta {
-                n,
-                date,
-                ri_score,
-                n_val: String::new(),
-                k_val: String::new(),
-                p_val: String::new(),
-                notes,
-            })?;
+            iterations::create(
+                dir,
+                iterations::IterationMeta {
+                    n,
+                    date,
+                    ri_score,
+                    n_val: String::new(),
+                    k_val: String::new(),
+                    p_val: String::new(),
+                    notes,
+                },
+            )?;
             println!("Added iteration {}", n);
         }
         AddTarget::MetaStressor {
@@ -393,7 +439,10 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
                 println!("No stressors.");
             } else {
                 for s in &items {
-                    println!("[{}] {} {} (attractor: {})", s.id, s.shortname, s.description, s.attractor_id);
+                    println!(
+                        "[{}] {} {} (attractor: {})",
+                        s.id, s.shortname, s.description, s.attractor_id
+                    );
                 }
             }
         }
@@ -403,8 +452,15 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
                 println!("No purposes.");
             } else {
                 for p in &items {
-                    let extra = if p.outcomes.is_empty() { String::new() } else { format!(" | outcomes: {}", p.outcomes) };
-                    println!("[{}] {} {} (naive_change: {}{})", p.id, p.shortname, p.description, p.naive_change, extra);
+                    let extra = if p.outcomes.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" | outcomes: {}", p.outcomes)
+                    };
+                    println!(
+                        "[{}] {} {} (naive_change: {}{})",
+                        p.id, p.shortname, p.description, p.naive_change, extra
+                    );
                 }
             }
         }
@@ -444,7 +500,14 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
                 }
             }
         }
-        ListTarget::Residues => { let matrix = format::format_residues_matrix(&dir)?; if matrix.lines().count()<=1 { println!("No residues."); } else { print!("{matrix}"); } }
+        ListTarget::Residues => {
+            let matrix = format::format_residues_matrix(&dir)?;
+            if matrix.lines().count() <= 1 {
+                println!("No residues.");
+            } else {
+                print!("{matrix}");
+            }
+        }
         ListTarget::Iterations => {
             let items = iterations::list(&dir)?;
             if items.is_empty() {
@@ -453,7 +516,10 @@ pub fn list(cfg: &Config, target: ListTarget) -> Result<()> {
                 let mut sorted = items;
                 sorted.sort_by_key(|i| i.n);
                 for meta in &sorted {
-                    println!("Iteration {}: {} (Ri: {})", meta.n, meta.date, meta.ri_score);
+                    println!(
+                        "Iteration {}: {} (Ri: {})",
+                        meta.n, meta.date, meta.ri_score
+                    );
                 }
             }
         }
@@ -547,6 +613,7 @@ fn truncate_state(s: &str) -> String {
 
 /// Run naive → v3 migration for the project's residual/ directory.
 pub fn migrate(cfg: &Config, force: bool) -> Result<()> {
+    write_authorization::require(cfg)?;
     let dir = metadata_dir_for_mutation(cfg)?;
     let report = integrity::migration::migrate_residual_dir(&dir, force)?;
     git_sidecar::persist_if_sidecar(cfg, &dir)?;
@@ -603,7 +670,10 @@ mod tests {
         .unwrap();
 
         let residues_csv = std::fs::read_to_string(cfg.residual_dir.join("residues.csv")).unwrap();
-        assert!(residues_csv.contains("whole-system"), "expected whole-system column");
+        assert!(
+            residues_csv.contains("whole-system"),
+            "expected whole-system column"
+        );
         let row = residues_csv
             .lines()
             .find(|l| l.starts_with("S-01,"))
@@ -613,7 +683,8 @@ mod tests {
             "expected whole-system coupling mark, row={row}"
         );
 
-        let stressors_csv = std::fs::read_to_string(cfg.residual_dir.join("stressors.csv")).unwrap();
+        let stressors_csv =
+            std::fs::read_to_string(cfg.residual_dir.join("stressors.csv")).unwrap();
         assert!(
             stressors_csv.contains("whole-system-residue"),
             "notes should land on stressor naive_change"

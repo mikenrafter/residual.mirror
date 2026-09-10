@@ -41,3 +41,14 @@ pub fn term_index(residual_dir: &Path) -> Result<TermIndex> {
 
     Ok(TermIndex { words, phrases })
 }
+
+pub fn remove(residual_dir: &Path, term: &str) -> Result<bool> {
+    let mut terms = crate::storage::format::read_lexicon(residual_dir)?;
+    let before = terms.len();
+    terms.retain(|candidate| candidate.term != term);
+    if terms.len() == before {
+        return Ok(false);
+    }
+    crate::storage::format::write_lexicon(residual_dir, &terms)?;
+    Ok(true)
+}

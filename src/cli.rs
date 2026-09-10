@@ -41,6 +41,11 @@ pub enum Command {
         #[command(subcommand)]
         target: RemoveTarget,
     },
+    /// Grant short-lived permission for sidecar-backed metadata writes.
+    Write {
+        #[command(subcommand)]
+        op: WriteOp,
+    },
     /// List residual records (filter/group by attractor; not creation order).
     List {
         #[command(subcommand)]
@@ -183,6 +188,15 @@ pub enum WalkKindArg {
 }
 
 #[derive(Subcommand)]
+pub enum WriteOp {
+    /// Authorize metadata writes for 30 minutes by default.
+    Authorize {
+        #[arg(long, default_value_t = crate::storage::write_authorization::DEFAULT_MINUTES)]
+        minutes: i64,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum SkillCommand {
     /// Show an embedded phase skill definition.
     ///
@@ -228,10 +242,14 @@ pub enum AddTarget {
     /// Add a stressor force. Process: whole-system-residue first — record outcomes.
     /// Map components via `residual add residue --force-id … --component-id …`.
     Stressor {
-        #[arg(long)] description: String,
-        #[arg(long)] attractor_id: String,
-        #[arg(long)] naive_change: String,
-        #[arg(long, default_value = "")] shortname: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        attractor_id: String,
+        #[arg(long)]
+        naive_change: String,
+        #[arg(long, default_value = "")]
+        shortname: String,
         #[arg(long, default_value = "", visible_alias = "traits")]
         outcomes: String,
         #[arg(long)]
@@ -241,8 +259,10 @@ pub enum AddTarget {
     },
     /// Add force×component coupling to residues.csv (the NKP matrix).
     Residue {
-        #[arg(long)] force_id: String,
-        #[arg(long, default_value = "")] component_id: String,
+        #[arg(long)]
+        force_id: String,
+        #[arg(long, default_value = "")]
+        component_id: String,
         #[arg(long, default_value = "")]
         notes: String,
         #[arg(long)]
@@ -253,83 +273,123 @@ pub enum AddTarget {
     },
     /// Append a component to components.csv and extend residues.csv header.
     Component {
-        #[arg(long)] name: String,
-        #[arg(long)] description: String,
-        #[arg(long)] status: String,
-        #[arg(long)] architecture_set: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        status: String,
+        #[arg(long)]
+        architecture_set: String,
     },
     /// Add a purpose force. Process: whole-system-residue first — record outcomes.
     /// Map components via `residual add residue --force-id … --component-id …`.
     Purpose {
-        #[arg(long)] description: String,
-        #[arg(long)] attractor_id: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        attractor_id: String,
         #[arg(long, visible_alias = "feature")]
         naive_change: String,
-        #[arg(long, default_value = "")] shortname: String,
+        #[arg(long, default_value = "")]
+        shortname: String,
         #[arg(long, default_value = "", visible_alias = "traits")]
         outcomes: String,
     },
     Attractor {
-        #[arg(long)] name: String,
-        #[arg(long)] description: String,
-        #[arg(long)] positive_state: String,
-        #[arg(long)] negative_state: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        positive_state: String,
+        #[arg(long)]
+        negative_state: String,
     },
     Term {
-        #[arg(long)] term: String,
-        #[arg(long)] definition: String,
-        #[arg(long, default_value = "")] domain: String,
-        #[arg(long, default_value = "")] related: String,
+        #[arg(long)]
+        term: String,
+        #[arg(long)]
+        definition: String,
+        #[arg(long, default_value = "")]
+        domain: String,
+        #[arg(long, default_value = "")]
+        related: String,
     },
     Persona {
-        #[arg(long)] name: String,
-        #[arg(long)] role: String,
-        #[arg(long, default_value = "")] concerns: String,
-        #[arg(long, default_value = "")] desires: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        role: String,
+        #[arg(long, default_value = "")]
+        concerns: String,
+        #[arg(long, default_value = "")]
+        desires: String,
     },
     Iteration {
-        #[arg(long, default_value = "")] notes: String,
-        #[arg(long, default_value = "")] ri_score: String,
+        #[arg(long, default_value = "")]
+        notes: String,
+        #[arg(long, default_value = "")]
+        ri_score: String,
     },
     /// Add a meta-stressor (MS-*) to defense/meta-stressors.csv only.
     MetaStressor {
-        #[arg(long)] description: String,
-        #[arg(long, default_value = "")] shortname: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long, default_value = "")]
+        shortname: String,
     },
     /// Add a meta-attractor (MA-*) to defense/meta-attractors.csv only.
     MetaAttractor {
-        #[arg(long)] name: String,
-        #[arg(long)] description: String,
-        #[arg(long)] positive_state: String,
-        #[arg(long)] negative_state: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        positive_state: String,
+        #[arg(long)]
+        negative_state: String,
     },
     /// Add a meta-purpose (MP-*) to defense/meta-purposes.csv only.
     MetaPurpose {
-        #[arg(long)] description: String,
-        #[arg(long)] attractor_id: String,
-        #[arg(long)] naive_change: String,
-        #[arg(long, default_value = "")] shortname: String,
-        #[arg(long, default_value = "")] outcomes: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long)]
+        attractor_id: String,
+        #[arg(long)]
+        naive_change: String,
+        #[arg(long, default_value = "")]
+        shortname: String,
+        #[arg(long, default_value = "")]
+        outcomes: String,
     },
     /// Write a defense persona markdown under defense-personas/.
     DefensePersona {
-        #[arg(long)] name: String,
-        #[arg(long)] body: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        body: String,
     },
     /// Write a defense strategy markdown under defense/strategy/.
     DefenseStrategy {
-        #[arg(long)] name: String,
-        #[arg(long)] body: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        body: String,
     },
     /// Write a defense progress markdown under defense/progress/.
     DefenseProgress {
-        #[arg(long)] name: String,
-        #[arg(long)] body: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        body: String,
     },
     /// Write a defense pitch markdown under defense/pitches/.
     DefensePitch {
-        #[arg(long)] name: String,
-        #[arg(long)] body: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        body: String,
     },
 }
 
@@ -337,8 +397,15 @@ pub enum AddTarget {
 pub enum RemoveTarget {
     /// Clear force×component coupling from residues.csv.
     Residue {
-        #[arg(long)] force_id: String,
-        #[arg(long)] component_id: String,
+        #[arg(long)]
+        force_id: String,
+        #[arg(long)]
+        component_id: String,
+    },
+    /// Remove a lexicon term by its canonical spelling.
+    Term {
+        #[arg(long)]
+        term: String,
     },
 }
 
@@ -413,9 +480,7 @@ pub enum CommitOp {
         staged: bool,
     },
     /// Print a scaffold for a force id (S-nn or P-nn).
-    Template {
-        force_id: String,
-    },
+    Template { force_id: String },
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
@@ -454,9 +519,12 @@ pub enum MatrixOp {
     Calc,
     Criticality,
     Ri {
-        #[arg(long)] stressors: usize,
-        #[arg(long)] naive_survived: usize,
-        #[arg(long)] residual_survived: usize,
+        #[arg(long)]
+        stressors: usize,
+        #[arg(long)]
+        naive_survived: usize,
+        #[arg(long)]
+        residual_survived: usize,
     },
     Fusion,
     Fission,
@@ -465,10 +533,12 @@ pub enum MatrixOp {
 #[derive(Subcommand)]
 pub enum TagOp {
     Scan {
-        #[arg(default_value = ".")] path: String,
+        #[arg(default_value = ".")]
+        path: String,
     },
     Report {
-        #[arg(default_value = ".")] path: String,
+        #[arg(default_value = ".")]
+        path: String,
     },
 }
 
@@ -487,6 +557,17 @@ pub fn run() -> Result<()> {
         Command::Init { force } => crate::storage::init(&cfg, force),
         Command::Add { force, target } => crate::storage::add(&cfg, target, force),
         Command::Remove { force, target } => crate::storage::remove(&cfg, target, force),
+        Command::Write { op } => match op {
+            WriteOp::Authorize { minutes } => {
+                let expires_at = crate::storage::write_authorization::authorize(&cfg, minutes)?;
+                println!(
+                    "Authorized sidecar metadata writes until {}. Do not stage {}.",
+                    expires_at.to_rfc3339(),
+                    crate::storage::write_authorization::marker_path(&cfg).display()
+                );
+                Ok(())
+            }
+        },
         Command::List { target } => crate::storage::list(&cfg, target),
         Command::Verify { check } => match check {
             VerifyCheck::Outcomes => crate::verification::run(&cfg, VerifyCheck::Outcomes),
@@ -512,7 +593,10 @@ pub fn run() -> Result<()> {
             } => run_verify_commit_msg(&cfg, None, Some(message), enforce, warn, staged),
             CommitOp::Suggest { staged } => run_commit_suggest(&cfg, staged),
             CommitOp::Template { force_id } => {
-                print!("{}", crate::verification::commit_msg::template_for_force(&cfg, &force_id)?);
+                print!(
+                    "{}",
+                    crate::verification::commit_msg::template_for_force(&cfg, &force_id)?
+                );
                 Ok(())
             }
         },
@@ -521,9 +605,11 @@ pub fn run() -> Result<()> {
             SkillCommand::Show { name, version } => crate::skills::phases::show(&name, version),
             SkillCommand::Data { name } => crate::skills::phases::data(&cfg, &name),
             SkillCommand::List => crate::skills::phases::list_all(),
-            SkillCommand::Install { name, agent, global } => {
-                crate::skills::installer::install(&name, &agent, global)
-            }
+            SkillCommand::Install {
+                name,
+                agent,
+                global,
+            } => crate::skills::installer::install(&name, &agent, global),
             SkillCommand::CheckInstall { name, agent } => {
                 crate::skills::installer::check_install(&name, &agent)
             }
@@ -563,6 +649,9 @@ pub fn run() -> Result<()> {
                     WalkKindArg::Purpose => WalkKind::Purpose,
                     WalkKindArg::Stressor => WalkKind::Stressor,
                 };
+                // Deliberately not gated by write_authorization::require: walk stamps are
+                // low-blast-radius cadence bookkeeping, not ledger content, and gating them
+                // would force an explicit authorize step onto the routine reminder path.
                 if completed {
                     walk_reminder::record_completed(&meta, walk_kind)?;
                     crate::storage::git_sidecar::persist_if_sidecar(&cfg, &meta)?;
@@ -574,7 +663,7 @@ pub fn run() -> Result<()> {
                 }
                 Ok(())
             }
-        }
+        },
         Command::Branch { op } => run_branch(&cfg, op),
         Command::View { defense, out } => crate::view::run_view(&cfg, defense, out),
         Command::Serve { defense, port } => crate::view::run_serve(&cfg, defense, port),
@@ -593,6 +682,7 @@ fn run_branch(cfg: &crate::config::Config, op: BranchOp) -> Result<()> {
             Ok(())
         }
         BranchOp::Edit => {
+            crate::storage::write_authorization::require(cfg)?;
             let branch = git_sidecar::branch_edit(&cfg.repo_root, &sidecar, &cfg.config_host_dir)?;
             println!(
                 "Materialized '{branch}' into {} for manual editing",
@@ -601,6 +691,7 @@ fn run_branch(cfg: &crate::config::Config, op: BranchOp) -> Result<()> {
             Ok(())
         }
         BranchOp::Save { commit_msg, push } => {
+            crate::storage::write_authorization::require(cfg)?;
             let branch = git_sidecar::branch_save(
                 &cfg.repo_root,
                 &sidecar,
@@ -608,7 +699,10 @@ fn run_branch(cfg: &crate::config::Config, op: BranchOp) -> Result<()> {
                 &commit_msg,
                 push,
             )?;
-            println!("Saved edits to '{branch}'{}", if push { " and pushed" } else { "" });
+            println!(
+                "Saved edits to '{branch}'{}",
+                if push { " and pushed" } else { "" }
+            );
             Ok(())
         }
         BranchOp::Merge {
@@ -625,7 +719,10 @@ fn run_branch(cfg: &crate::config::Config, op: BranchOp) -> Result<()> {
                 commit_msg.as_deref(),
                 push,
             )?;
-            println!("Merged '{from_branch}' into '{to_branch}'{}", if push { " and pushed" } else { "" });
+            println!(
+                "Merged '{from_branch}' into '{to_branch}'{}",
+                if push { " and pushed" } else { "" }
+            );
             Ok(())
         }
         BranchOp::SyncCommit => {
@@ -774,9 +871,8 @@ mod tests {
             ("defense-progress", "week-1"),
             ("defense-pitch", "exec-summary"),
         ] {
-            let cli = Cli::try_parse_from([
-                "residual", "add", sub, "--name", name, "--body", "# md\n",
-            ]);
+            let cli =
+                Cli::try_parse_from(["residual", "add", sub, "--name", name, "--body", "# md\n"]);
             assert!(
                 cli.is_ok(),
                 "CLI must accept `add {sub}`, got err: {}",
@@ -808,13 +904,22 @@ mod tests {
     #[test]
     fn add_purpose_accepts_naive_change_flag() {
         let cli = Cli::try_parse_from([
-            "residual", "add", "purpose",
-            "--description", "d",
-            "--attractor-id", "A-01",
-            "--naive-change", "naive change text",
-        ]).unwrap();
+            "residual",
+            "add",
+            "purpose",
+            "--description",
+            "d",
+            "--attractor-id",
+            "A-01",
+            "--naive-change",
+            "naive change text",
+        ])
+        .unwrap();
         match cli.command {
-            Command::Add { target: AddTarget::Purpose { naive_change, .. }, .. } => {
+            Command::Add {
+                target: AddTarget::Purpose { naive_change, .. },
+                ..
+            } => {
                 assert_eq!(naive_change, "naive change text");
             }
             _ => panic!("expected Command::Add(AddTarget::Purpose)"),
@@ -824,13 +929,22 @@ mod tests {
     #[test]
     fn add_purpose_feature_alias_maps_to_naive_change() {
         let cli = Cli::try_parse_from([
-            "residual", "add", "purpose",
-            "--description", "d",
-            "--attractor-id", "A-01",
-            "--feature", "aliased text",
-        ]).unwrap();
+            "residual",
+            "add",
+            "purpose",
+            "--description",
+            "d",
+            "--attractor-id",
+            "A-01",
+            "--feature",
+            "aliased text",
+        ])
+        .unwrap();
         match cli.command {
-            Command::Add { target: AddTarget::Purpose { naive_change, .. }, .. } => {
+            Command::Add {
+                target: AddTarget::Purpose { naive_change, .. },
+                ..
+            } => {
                 assert_eq!(naive_change, "aliased text");
             }
             _ => panic!("expected Command::Add(AddTarget::Purpose)"),
@@ -840,12 +954,25 @@ mod tests {
     #[test]
     fn branch_merge_parses_from_to_and_flags() {
         let cli = Cli::try_parse_from([
-            "residual", "branch", "merge", "feature/x", "main",
-            "--commit-msg", "fold it in", "--push",
-        ]).unwrap();
+            "residual",
+            "branch",
+            "merge",
+            "feature/x",
+            "main",
+            "--commit-msg",
+            "fold it in",
+            "--push",
+        ])
+        .unwrap();
         match cli.command {
             Command::Branch {
-                op: BranchOp::Merge { from, to, commit_msg, push },
+                op:
+                    BranchOp::Merge {
+                        from,
+                        to,
+                        commit_msg,
+                        push,
+                    },
             } => {
                 assert_eq!(from, "feature/x");
                 assert_eq!(to, "main");
@@ -922,7 +1049,9 @@ mod tests {
     fn branch_init_branch_flag_defaults_to_none() {
         let cli = Cli::try_parse_from(["residual", "branch", "init"]).unwrap();
         match cli.command {
-            Command::Branch { op: BranchOp::Init { branch } } => {
+            Command::Branch {
+                op: BranchOp::Init { branch },
+            } => {
                 assert_eq!(branch, None);
             }
             _ => panic!("expected Command::Branch(BranchOp::Init)"),
@@ -1124,9 +1253,13 @@ mod tests {
                 String::from_utf8_lossy(&remove.stderr)
             );
 
-            let residues = std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            let residues =
+                std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
             assert!(
-                !residues.contains(",1") || !residues.lines().any(|l| l.starts_with("S-01,") && l.contains("1")),
+                !residues.contains(",1")
+                    || !residues
+                        .lines()
+                        .any(|l| l.starts_with("S-01,") && l.contains("1")),
                 "auth cell must be cleared after remove residue"
             );
         }
@@ -1196,7 +1329,8 @@ mod tests {
                 String::from_utf8_lossy(&move_to.stderr)
             );
 
-            let residues = std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            let residues =
+                std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
             let header = residues.lines().next().expect("header");
             let cols: Vec<&str> = header.split(',').map(str::trim).collect();
             let row = residues

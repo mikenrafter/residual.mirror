@@ -4,11 +4,13 @@
 use anyhow::Result;
 
 pub fn generate_completions() -> Result<()> {
-    print!(r#"# residual fish completions
+    print!(
+        r#"# residual fish completions
 complete -c residual -f
 complete -c residual -n '__fish_use_subcommand' -a 'init' -d 'Initialize residual/ directory'
 complete -c residual -n '__fish_use_subcommand' -a 'add' -d 'Add entries'
 complete -c residual -n '__fish_use_subcommand' -a 'remove' -d 'Remove entries'
+complete -c residual -n '__fish_use_subcommand' -a 'write' -d 'Authorize metadata writes'
 complete -c residual -n '__fish_use_subcommand' -a 'list' -d 'List entries'
 complete -c residual -n '__fish_use_subcommand' -a 'verify' -d 'Verify data integrity'
 complete -c residual -n '__fish_use_subcommand' -a 'matrix' -d 'NKP matrix operations'
@@ -22,7 +24,8 @@ complete -c residual -n '__fish_seen_subcommand_from skill' -a 'purpose-walk nai
 complete -c residual -n '__fish_seen_subcommand_from skill' -l agent -a 'claude cursor copilot agnostic'
 complete -c residual -n '__fish_seen_subcommand_from skill' -l global -d 'Install user-wide'
 complete -c residual -n '__fish_seen_subcommand_from add' -a 'stressor residue purpose attractor term persona iteration component meta-stressor meta-attractor meta-purpose defense-persona defense-strategy defense-progress defense-pitch'
-complete -c residual -n '__fish_seen_subcommand_from remove' -a 'residue'
+complete -c residual -n '__fish_seen_subcommand_from remove' -a 'residue term'
+complete -c residual -n '__fish_seen_subcommand_from write' -a 'authorize'
 complete -c residual -n '__fish_seen_subcommand_from list' -a 'stressors residues purposes attractors terminology personas iterations meta-stressors meta-attractors meta-purposes defense-personas defense-strategies defense-progress defense-pitches'
 complete -c residual -n '__fish_use_subcommand' -a 'walk' -d 'Record architecture walk cadence'
 complete -c residual -n '__fish_seen_subcommand_from verify' -a 'outcomes links all walk-reminder commit-msg'
@@ -32,7 +35,8 @@ complete -c residual -n '__fish_seen_subcommand_from commit' -a 'check suggest t
 complete -c residual -n '__fish_seen_subcommand_from matrix' -a 'show calc criticality ri fusion fission'
 complete -c residual -n '__fish_seen_subcommand_from tag' -a 'scan report'
 complete -c residual -n '__fish_seen_subcommand_from generate' -a 'completions man hook'
-"#);
+"#
+    );
     Ok(())
 }
 

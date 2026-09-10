@@ -14,6 +14,12 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::storage::config::parse_sidecar_section;
+use crate::storage::write_authorization::MARKER_FILE as WRITE_AUTH_MARKER_FILE;
+
+/// Written by `residual branch edit` in the config-host directory. It records the
+/// sidecar branch and every materialized metadata file that `branch save` must see.
+/// The marker is deliberately local state, never sidecar metadata.
+const BRANCH_EDIT_MARKER: &str = ".residual-branch-edit";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidecarConfig {
@@ -258,11 +264,7 @@ fn commit_tree(repo_root: &Path, tree: &str, parents: &[&str], message: &str) ->
 /// Compare-and-swap ref update: `old_sha` of `""` asserts the ref must not yet exist.
 fn update_ref(repo_root: &Path, branch: &str, new_sha: &str, old_sha: &str) -> Result<()> {
     let refname = format!("refs/heads/{branch}");
-    git_capture(
-        repo_root,
-        &["update-ref", &refname, new_sha, old_sha],
-        None,
-    )?;
+    git_capture(repo_root, &["update-ref", &refname, new_sha, old_sha], None)?;
     Ok(())
 }
 
@@ -392,6 +394,99 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
+fn metadata_files(root: &Path) -> Result<Vec<PathBuf>> {
+    fn visit(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+        for entry in
+            std::fs::read_dir(dir).with_context(|| format!("read_dir {}", dir.display()))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit(root, &path, files)?;
+            } else if path.is_file() {
+                files.push(
+                    path.strip_prefix(root)
+                        .with_context(|| {
+                            format!("{} is outside {}", path.display(), root.display())
+                        })?
+                        .to_path_buf(),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    let mut files = Vec::new();
+    visit(root, root, &mut files)?;
+    files.sort();
+    Ok(files)
+}
+
+fn write_branch_edit_marker(
+    dest_residual_dir: &Path,
+    branch: &str,
+    files: &[PathBuf],
+) -> Result<()> {
+    let mut marker = format!("branch={branch}\n");
+    for file in files {
+        marker.push_str(
+            file.to_str()
+                .with_context(|| format!("non-utf8 metadata path {}", file.display()))?,
+        );
+        marker.push('\n');
+    }
+    std::fs::write(dest_residual_dir.join(BRANCH_EDIT_MARKER), marker).with_context(|| {
+        format!(
+            "write branch-edit marker in {}",
+            dest_residual_dir.display()
+        )
+    })
+}
+
+fn validate_branch_edit_marker(dest_residual_dir: &Path, branch: &str) -> Result<()> {
+    let marker_path = dest_residual_dir.join(BRANCH_EDIT_MARKER);
+    let marker = std::fs::read_to_string(&marker_path).with_context(|| {
+        format!(
+            "residual branch save requires `residual branch edit` first; missing {}",
+            marker_path.display()
+        )
+    })?;
+    let mut lines = marker.lines();
+    let recorded_branch = lines
+        .next()
+        .and_then(|line| line.strip_prefix("branch="))
+        .context("invalid residual branch-edit marker; rerun `residual branch edit`")?;
+    if recorded_branch != branch {
+        bail!(
+            "residual branch save is for '{branch}', but the materialized metadata came from '{recorded_branch}'; rerun `residual branch edit`"
+        );
+    }
+
+    let mut found_file = false;
+    for relative in lines.filter(|line| !line.is_empty()) {
+        let path = Path::new(relative);
+        if path.is_absolute()
+            || path
+                .components()
+                .any(|part| matches!(part, std::path::Component::ParentDir))
+        {
+            bail!("invalid residual branch-edit marker path '{relative}'; rerun `residual branch edit`");
+        }
+        found_file = true;
+        let full_path = dest_residual_dir.join(path);
+        if !full_path.is_file() {
+            bail!(
+                "residual branch save refuses incomplete metadata: '{}' is missing; rerun `residual branch edit`",
+                full_path.display()
+            );
+        }
+    }
+    if !found_file {
+        bail!("invalid residual branch-edit marker has no metadata files; rerun `residual branch edit`");
+    }
+    Ok(())
+}
+
 /// Commit a snapshot of `source_dir` (excluding top-level `exclude` entries) as the new
 /// tip of `branch`, via plumbing only. Returns `Ok(None)` when the snapshot is identical
 /// to the branch tip (no-op, no empty commit). `source_dir` may safely alias a path
@@ -432,7 +527,13 @@ pub fn persist_metadata_to_branch(
     metadata_root: &Path,
     message: &str,
 ) -> Result<()> {
-    commit_snapshot_to_branch(repo_root, branch, metadata_root, &["config.toml"], message)?;
+    commit_snapshot_to_branch(
+        repo_root,
+        branch,
+        metadata_root,
+        &["config.toml", BRANCH_EDIT_MARKER, WRITE_AUTH_MARKER_FILE],
+        message,
+    )?;
     Ok(())
 }
 
@@ -443,7 +544,12 @@ pub fn persist_if_sidecar(cfg: &crate::config::Config, metadata_root: &Path) -> 
     let sidecar = SidecarConfig::from_config_file(&cfg.config_path)?;
     if sidecar.enabled {
         let branch = resolve_for_write(&cfg.repo_root, &sidecar)?;
-        persist_metadata_to_branch(&cfg.repo_root, &branch, metadata_root, DEFAULT_PERSIST_MESSAGE)?;
+        persist_metadata_to_branch(
+            &cfg.repo_root,
+            &branch,
+            metadata_root,
+            DEFAULT_PERSIST_MESSAGE,
+        )?;
     }
     Ok(())
 }
@@ -498,7 +604,9 @@ fn split_branch_name(name: &str) -> (&str, &str) {
 /// Resolve a code branch name to its metadata branch name via `pattern`.
 pub fn resolve_branch_name(pattern: &str, working_branch: &str) -> String {
     let (prefix, suffix) = split_branch_name(working_branch);
-    pattern.replace("{prefix}", prefix).replace("{suffix}", suffix)
+    pattern
+        .replace("{prefix}", prefix)
+        .replace("{suffix}", suffix)
 }
 
 fn resolve_named_for_read(
@@ -576,11 +684,16 @@ pub fn branch_init(
 
 /// Materialize the current branch's metadata into `dest_residual_dir` for manual repair.
 /// Strict: requires a resolved metadata branch (`residual branch init` first).
-pub fn branch_edit(repo_root: &Path, sidecar: &SidecarConfig, dest_residual_dir: &Path) -> Result<String> {
+pub fn branch_edit(
+    repo_root: &Path,
+    sidecar: &SidecarConfig,
+    dest_residual_dir: &Path,
+) -> Result<String> {
     let branch = resolve_for_write(repo_root, sidecar)?;
     let materialized = materialize_branch_tree(repo_root, &branch)?;
     std::fs::create_dir_all(dest_residual_dir)?;
     copy_dir_all(&materialized, dest_residual_dir)?;
+    write_branch_edit_marker(dest_residual_dir, &branch, &metadata_files(&materialized)?)?;
     Ok(branch)
 }
 
@@ -593,6 +706,7 @@ pub fn branch_save(
     push: bool,
 ) -> Result<String> {
     let branch = resolve_for_write(repo_root, sidecar)?;
+    validate_branch_edit_marker(src_residual_dir, &branch)?;
     let message = if commit_msg.is_empty() {
         "general - sidecar: manual branch save"
     } else {
@@ -602,6 +716,12 @@ pub fn branch_save(
     if push {
         push_branch(repo_root, &sidecar.remote, &branch)?;
     }
+    std::fs::remove_file(src_residual_dir.join(BRANCH_EDIT_MARKER)).with_context(|| {
+        format!(
+            "remove branch-edit marker from {}",
+            src_residual_dir.display()
+        )
+    })?;
     Ok(branch)
 }
 
@@ -643,9 +763,9 @@ pub fn branch_merge(
         .trim()
         .to_string();
 
-    let message = commit_msg.map(|m| m.to_string()).unwrap_or_else(|| {
-        format!("general - sidecar: merge {from_branch} into {to_branch}")
-    });
+    let message = commit_msg
+        .map(|m| m.to_string())
+        .unwrap_or_else(|| format!("general - sidecar: merge {from_branch} into {to_branch}"));
     let new_commit = commit_tree(repo_root, &merged_tree, &[&to_sha, &from_sha], &message)?;
     update_ref(repo_root, &to_branch, &new_commit, &to_sha)?;
 
@@ -948,10 +1068,8 @@ S-99,working-tree-only,stale,none,,A-01\n",
 
     #[test]
     fn resolve_branch_name_splits_on_last_slash_keeping_leading_slash_on_suffix() {
-        let resolved = resolve_branch_name(
-            "residual/branch-{prefix}{suffix}",
-            "super-cool-feature/poc",
-        );
+        let resolved =
+            resolve_branch_name("residual/branch-{prefix}{suffix}", "super-cool-feature/poc");
         assert_eq!(resolved, "residual/branch-super-cool-feature/poc");
     }
 
@@ -1074,6 +1192,11 @@ S-99,working-tree-only,stale,none,,A-01\n",
         .unwrap();
         branch_save(&repo, &sidecar, &dest, "feature edit", false).unwrap();
 
+        assert!(
+            !dest.join(BRANCH_EDIT_MARKER).exists(),
+            "a successful save consumes the edit marker so another save requires a fresh edit"
+        );
+
         let materialized = materialize_branch_tree(&repo, "residual/branch-feature/x").unwrap();
         let saved = std::fs::read_to_string(materialized.join("stressors.csv")).unwrap();
         assert!(saved.contains("S-01"));
@@ -1084,7 +1207,45 @@ S-99,working-tree-only,stale,none,,A-01\n",
 
         // No checkout ever happened.
         assert_eq!(current_branch(&repo).unwrap(), "feature/x");
-        assert!(repo.join("f").exists(), "primary working tree must be untouched");
+        assert!(
+            repo.join("f").exists(),
+            "primary working tree must be untouched"
+        );
+    }
+
+    #[test]
+    fn branch_save_requires_branch_edit_and_complete_metadata() {
+        let dir = tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        init_git_repo(&repo);
+        std::fs::write(repo.join("f"), "x").unwrap();
+        commit_all(&repo, "init");
+        checkout_new_branch(&repo, "feature/x");
+
+        let sidecar = branch_mode_sidecar();
+        let branch = branch_init(&repo, &sidecar, None).unwrap();
+        let before = rev_parse(&repo, &format!("refs/heads/{branch}")).unwrap();
+        let dest = repo.join("residual");
+        std::fs::create_dir_all(&dest).unwrap();
+
+        let missing_edit = branch_save(&repo, &sidecar, &dest, "save", false).unwrap_err();
+        assert!(missing_edit.to_string().contains("branch edit"));
+        assert_eq!(
+            rev_parse(&repo, &format!("refs/heads/{branch}")).unwrap(),
+            before,
+            "save without edit must not move the metadata branch"
+        );
+
+        branch_edit(&repo, &sidecar, &dest).unwrap();
+        std::fs::remove_file(dest.join("stressors.csv")).unwrap();
+        let incomplete = branch_save(&repo, &sidecar, &dest, "save", false).unwrap_err();
+        assert!(incomplete.to_string().contains("incomplete metadata"));
+        assert_eq!(
+            rev_parse(&repo, &format!("refs/heads/{branch}")).unwrap(),
+            before,
+            "save with a missing materialized file must not move the metadata branch"
+        );
     }
 
     #[test]
@@ -1101,7 +1262,10 @@ S-99,working-tree-only,stale,none,,A-01\n",
             ..SidecarConfig::default()
         };
         let result = branch_sync_commit(&repo, &sidecar, &repo.join("residual")).unwrap();
-        assert_eq!(result, None, "sync-commit must no-op without a materialized hand-edit");
+        assert_eq!(
+            result, None,
+            "sync-commit must no-op without a materialized hand-edit"
+        );
     }
 
     #[test]
@@ -1166,8 +1330,14 @@ S-99,working-tree-only,stale,none,,A-01\n",
         assert_eq!(to, sidecar.branch);
 
         let current = current_branch(&repo).unwrap();
-        assert_eq!(current, "feature/x", "merge must never touch the primary checkout");
-        assert!(repo.join("f").exists(), "primary working tree must be untouched");
+        assert_eq!(
+            current, "feature/x",
+            "merge must never touch the primary checkout"
+        );
+        assert!(
+            repo.join("f").exists(),
+            "primary working tree must be untouched"
+        );
 
         let merged = std::fs::read_to_string(
             materialize_branch_tree(&repo, &sidecar.branch)
@@ -1215,8 +1385,14 @@ S-99,working-tree-only,stale,none,,A-01\n",
 
         let trunk_after = rev_parse(&repo, &format!("refs/heads/{}", sidecar.branch)).unwrap();
         let feature_after = rev_parse(&repo, "refs/heads/residual/branch-feature/x").unwrap();
-        assert_eq!(trunk_before, trunk_after, "conflict must not move the trunk ref");
-        assert_eq!(feature_before, feature_after, "conflict must not move the feature ref");
+        assert_eq!(
+            trunk_before, trunk_after,
+            "conflict must not move the trunk ref"
+        );
+        assert_eq!(
+            feature_before, feature_after,
+            "conflict must not move the feature ref"
+        );
         assert_eq!(current_branch(&repo).unwrap(), "feature/x");
     }
 }

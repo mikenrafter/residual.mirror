@@ -16,6 +16,14 @@ pub fn install() -> Result<()> {
 # Hard block: residual metadata must live on the git-sidecar branch, never on the
 # working branch — except residual/config.toml, the in-repo pointer file. This check
 # has no override flag by design.
+WRITE_AUTH=$(git diff --cached --name-only | grep '^residual/\.residual-write-authorized$')
+if [ -n "$WRITE_AUTH" ]; then
+  echo "residual: refusing commit — the local write-authorization marker must remain unstaged:" >&2
+  echo "$WRITE_AUTH" | sed 's/^/  /' >&2
+  echo "Unstage it with: git restore --staged residual/.residual-write-authorized" >&2
+  exit 1
+fi
+
 LEAKED=$(git diff --cached --name-only | grep '^residual/' | grep -v '^residual/config\.toml$')
 if [ -n "$LEAKED" ]; then
   echo "residual: refusing commit — residual metadata staged on the working branch (belongs on the git-sidecar branch):" >&2
@@ -237,12 +245,42 @@ mod tests {
     }
 
     #[test]
+    fn pre_commit_blocks_staged_write_authorization_marker_with_unstage_instruction() {
+        let dir = tempdir().unwrap();
+        let repo = dir.path().to_path_buf();
+        init_git_repo(&repo);
+        std::fs::create_dir_all(repo.join("residual")).unwrap();
+        std::fs::write(
+            repo.join("residual/.residual-write-authorized"),
+            "expires_at=2099-01-01T00:00:00Z\n",
+        )
+        .unwrap();
+        install_in(&repo);
+
+        Command::new("git")
+            .args(["add", "residual/.residual-write-authorized"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        let out = run_hook(&repo, "pre-commit");
+        assert!(!out.status.success());
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("write-authorization marker"));
+        assert!(stderr.contains("git restore --staged residual/.residual-write-authorized"));
+    }
+
+    #[test]
     fn pre_commit_allows_residual_config_toml_alone() {
         let dir = tempdir().unwrap();
         let repo = dir.path().to_path_buf();
         init_git_repo(&repo);
         std::fs::create_dir_all(repo.join("residual")).unwrap();
-        std::fs::write(repo.join("residual/config.toml"), "format_version = \"v4\"\n").unwrap();
+        std::fs::write(
+            repo.join("residual/config.toml"),
+            "format_version = \"v4\"\n",
+        )
+        .unwrap();
 
         install_in(&repo);
 
@@ -302,7 +340,8 @@ mod tests {
         init_git_repo(&repo);
 
         let hooks_dir = repo.join(".git/hooks");
-        let foreign = "#!/bin/sh\n# Entire CLI hooks\nentire hooks git post-commit 2>/dev/null || true\n";
+        let foreign =
+            "#!/bin/sh\n# Entire CLI hooks\nentire hooks git post-commit 2>/dev/null || true\n";
         std::fs::write(hooks_dir.join("post-commit"), foreign).unwrap();
 
         install_in(&repo);

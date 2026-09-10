@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "ae38bec26951",
+  "session_id": "2edeb51e-a179-43fc-822e-93bfe6764ebd",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-10T16:15:24.470836832Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "residual/iterations/tdd-implement-defense-ledger-plan.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "0d35e650d317",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 9331,
+    "cache_read_tokens": 16779,
+    "output_tokens": 183,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-10T16:15:24.457821536Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 10236,
+    "human_modified": 322,
+    "human_removed": 0,
+    "total_committed": 10558,
+    "total_lines_changed": 13056,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}

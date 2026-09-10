@@ -1,0 +1,71 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "9bf366628f0f",
+  "session_id": "d3467ec7-0a14-4896-94ff-97f8a8d95396",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-10T22:30:08.868284345Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/storage/git_sidecar.rs",
+    "src/storage/mod.rs",
+    "src/storage/terminology.rs",
+    "src/storage/write_authorization.rs",
+    "src/verification/git_hook.rs"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "0b856dc8a302",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 10509,
+    "cache_read_tokens": 16799,
+    "output_tokens": 1891,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-10T22:30:08.848395841Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 4,
+    "human_removed": 178,
+    "total_committed": 1,
+    "total_lines_changed": 182,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 706,
+      "user_lines_removed": 182,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "residual/.residual-write-authorized": 1,
+        "src/cli.rs": 217,
+        "src/cli/help.rs": 7,
+        "src/storage/git_sidecar.rs": 197,
+        "src/storage/mod.rs": 139,
+        "src/storage/terminology.rs": 11,
+        "src/storage/write_authorization.rs": 93,
+        "src/verification/git_hook.rs": 41
+      },
+      "user_removed_per_file": {
+        "src/cli.rs": 86,
+        "src/cli/help.rs": 3,
+        "src/storage/git_sidecar.rs": 22,
+        "src/storage/mod.rs": 69,
+        "src/verification/git_hook.rs": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "9bf366628f0f",
+  "strategy": "manual-commit",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/storage/git_sidecar.rs",
+    "src/storage/mod.rs",
+    "src/storage/terminology.rs",
+    "src/storage/write_authorization.rs",
+    "src/verification/git_hook.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/9b/f366628f0f/0/metadata.json",
+      "transcript": "/9b/f366628f0f/0/full.jsonl",
+      "compact_transcript": "/9b/f366628f0f/0/transcript.jsonl",
+      "content_hash": "/9b/f366628f0f/0/content_hash.txt",
+      "prompt": "/9b/f366628f0f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 214,
+    "cache_creation_tokens": 174087,
+    "cache_read_tokens": 11124269,
+    "output_tokens": 88964,
+    "api_call_count": 107
+  }
+}

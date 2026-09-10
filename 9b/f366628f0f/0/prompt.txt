@@ -1,0 +1,45 @@
+It looks like codex doesn't have residual skills installed. Additionally, the new guru module would be helpful if it had agent hooks. Agent hooks that triggered on pre+post compaction. These would tell the compacting agent to really focus on the residual ledger details of the conversation, including the dead ends explored, corrections made and things already added, rather than the ceremony. The post compact would include a reminder to check in with the guru for next steps. Some other hooks would fire every nth turn, suggesting specific guru calls based on the contents of what was being discussed.
+
+That all said, how far along are we integrating this iteration? Is there a CLI or rust crate that residual could leverage to install skills in various agents with? The current set of Claude, cursor and agnostic is a good start, but I would like to minimize that maintenance effort. Stressor: agent tooling is frequently shifting. Purpose: work well with whatever tooling people are using. Attractor: residual gets incorrectly triggered or missed by an agent.
+
+I would like for you to get your bearings with agentgrep, I would like for you to use rtk for some file reads and git operations. Use the nix develop -c version of residual. If the devshell won't build and you still need the tooling, then work around it by pointing to the nix store. The one on PATH currently is out of date.
+
+Let's get our bearings, draft those forces, attractors, a new component called skill-hooks, look for that dependency to outsource and check the state of the project
+
+---
+
+Implemented and verified the safety changes.
+
+- `branch save` now requires a fresh `branch edit` marker and refuses incomplete materialized metadata.
+- `residual write authorize` creates `residual/.residual-write-authorized`, expiring after 30 minutes.
+- Sidecar-backed `init`, `add`, `remove`, `branch edit`, and `branch save` require that live authorization.
+- The pre-commit hook rejects a staged write marker and prints the exact `git restore --staged residual/.residual-write-authorized` command.
+- Added `residual remove term --term <term>`, then removed the mistaken `guru` lexicon entry.
+- Corrected A-20’s negative state to “so agents learn to ignore it.”
+- Added and verified A-21, S-61, and P-35, including CLI and skills-phases residue couplings.
+
+The lexicon already had the right dual-case concepts:
+
+- `operator`: human or non-human agent that runs residual commands.
+- `actor`: human operator or non-human agent where the distinction does not matter.
+
+So `agent` is too implementation-specific as a lexicon term. It remains currently because it supports the already-recorded hook outcomes, but I think the cleaner follow-up is to replace those references with `operator` or `actor`, then remove `agent` too.
+
+Verification passes after the ledger changes. The source test suite passed at 320 tests before the final ledger writes.
+
+One caveat: the new Rust write-gate and marker work is staged alongside formatting changes in the touched files. I restored unrelated formatter churn, but the staged diff still needs a careful review before commit. I have not yet added the external `skills` dependency or adapter module
+
+
+^ my initial prompt and the final summary from GPT5.6-terra in a prior conversation. I think adding the term of agent back to the lexicon and augmenting the operator and actor terms to include references to it. Operator should be user(new term: human actor) and an agent(model backed actor, a digital intelligence).
+
+Also, let's re-run this full analysis with the new changes.
+
+---
+
+agent-config vs skills-cli ... tradeoffs? These look better than the node based one from previously.
+
+actor including human-actor as part of its definition but agent not including -actor seems wrong... Let's change that term to agent-actor. And the human-actor definition is cyclical with operator. They should both read "an actor backed by human/digital intelligence" and actor should read as "A definable entity who's behavior or properties are relevant to residual analysis".
+
+branch edit should not clear that file. Make that trivial change. Then let's dig into that diff.
+
+I also would like to know how many / which of the recent forces still don't have their changes applied... Remember shortnames not IDs, please. In fact, the ledger should be short and focused... Is there any reason to keep the indice IDs? I think they make less sense than shortnames do. For all operators, especially since human-actors do better with shortnames and agent-actors need to communicate with those IDs... The numbers don't really buy us much... right? Even residues are better denoted by "R-<shortname>"... It does help to have S-/P-/A-/R- prefixes though.

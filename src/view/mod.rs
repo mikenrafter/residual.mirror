@@ -6,8 +6,9 @@
 //! the operator copies and runs.
 
 pub mod commands;
-pub mod html;
+pub mod components;
 pub mod snapshot;
+pub mod static_export;
 
 use anyhow::{anyhow, Context, Result};
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ use crate::config::Config;
 
 #[allow(unused_imports)] // re-exports for green agents / external callers
 pub use commands::{format_add_command, format_add_commands, StagedAdd};
-pub use html::render_landscape_html;
+pub use static_export::render_landscape_html;
 #[allow(unused_imports)] // re-exports for green agents / external callers
 pub use snapshot::{
     load_landscape_snapshot, load_landscape_snapshot_from_dir, load_landscape_snapshot_from_sources,

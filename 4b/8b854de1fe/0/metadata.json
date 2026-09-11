@@ -1,0 +1,136 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "4b8b854de1fe",
+  "session_id": "bf961f7c-50ed-477d-9084-b01332312377",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-11T07:42:25.452027647Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 9,
+  "save_step_count": 3,
+  "files_touched": [
+    "Cargo.lock",
+    "Cargo.toml",
+    "src/view/components/defense.rs",
+    "src/view/components/matrix.rs",
+    "src/view/components/mod.rs",
+    "src/view/html.rs",
+    "src/view/mod.rs",
+    "src/view/shell.html",
+    "src/view/static_export.rs",
+    "src/view/template.html"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "2b5da3e88649",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 166,
+    "cache_creation_tokens": 401734,
+    "cache_read_tokens": 10339458,
+    "output_tokens": 86355,
+    "api_call_count": 84,
+    "subagent_tokens": {
+      "input_tokens": 274,
+      "cache_creation_tokens": 479722,
+      "cache_read_tokens": 12609403,
+      "output_tokens": 117356,
+      "api_call_count": 137
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-residual-tdd-implement-2026-09-11T06:52:55.614819791Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "890bfd8889b2",
+      "timestamp": "2026-09-11T06:52:55.614819791Z",
+      "native": {
+        "command": "/residual-tdd-implement"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/residual-tdd-implement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-11T07:42:25.118949573Z",
+    "agent_lines": 609,
+    "agent_removed": 1451,
+    "human_added": 2320,
+    "human_modified": 27,
+    "human_removed": 0,
+    "total_committed": 2956,
+    "total_lines_changed": 4407,
+    "agent_percentage": 46.74381665532108,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 2,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        "residual/.residual-write-authorized": 1
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 612,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        "src/view/components/defense.rs": 26,
+        "src/view/components/matrix.rs": 94,
+        "src/view/mod.rs": 2,
+        "src/view/static_export.rs": 489
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 1737,
+      "user_lines_removed": 27,
+      "agent_lines_added": 617,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1,
+        "Cargo.lock": 1373,
+        "Cargo.toml": 2,
+        "src/view/components/defense.rs": 131,
+        "src/view/components/matrix.rs": 230
+      },
+      "user_removed_per_file": {
+        "Cargo.lock": 8,
+        "src/view/components/defense.rs": 13,
+        "src/view/components/matrix.rs": 6
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2983,
+      "agent_lines_removed": 1478,
+      "user_added_per_file": {
+        ".claude/scheduled_tasks.lock": 1
+      }
+    }
+  ]
+}

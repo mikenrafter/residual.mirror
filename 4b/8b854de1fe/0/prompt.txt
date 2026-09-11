@@ -1,0 +1,410 @@
+Commit the `view` work, use `nix develop -c residual`, `agentgrep` and `rtk`. Rebuild the HTML asset with a web framework. One that lets you still cast things into static HTML reasonably. What choices do we have here?
+
+---
+
+Are there more popular frameworks out there? They don't need to be super rust-centric. I'm leaning toward Dioxus since there will be both the static version of this page and the multiplayer version. Currently the version that is implemented now isn't robust enough, and the degree of change it would need is large enough to warrant better tooling.
+
+---
+
+Yes
+
+---
+
+<task-notification>
+<task-id>a0790aadc2a926906</task-id>
+<tool-use-id>toolu_01Gm75VWTMGdr592GFgdGVfh</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/bf961f7c-50ed-477d-9084-b01332312377/tasks/a0790aadc2a926906.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore view/serve module architecture" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I have enough to report comprehensively now.
+
+## Findings
+
+**1. Call sites for `render_landscape_html`**
+
+Defined `src/view/html.rs:26`. Callers, all in `src/view/mod.rs`:
+- `write_landscape_html` (mod.rs:51-68) — used by `residual view`
+- `build_serve_document` (mod.rs:89-97) — used by `residual serve`
+
+CLI wiring is in `src/cli.rs` (not `src/cli/` submodules — commands.rs doesn't exist there; only `src/cli/help.rs` is a submodule). `Command::View` variant at cli.rs:134-141, `Command::Serve` at cli.rs:143-149. Dispatch at cli.rs:724-725:
+```rust
+Command::View { defense, out } =&gt; crate::view::run_view(&amp;cfg, defense, out),
+Command::Serve { defense, port } =&gt; crate::view::run_serve(&amp;cfg, defense, port),
+```
+`run_view` / `run_serve` live in `src/view/mod.rs:71-81` and `:100-124`.
+
+**2. `serve` behavior — single static render, no polling**
+
+`run_serve` (mod.rs:100-124) builds `ServeDocument` **once** via `build_serve_document` before entering `server.incoming_requests()` — it does not re-render per request. Uses `tiny_http::Server::http` on `127.0.0.1:{port}` (`SERVE_HOST`/`DEFAULT_PORT` = 8787, mod.rs:30-33). Loop matches path: `/` → `doc.html`, `/snapshot.json` → `doc.snapshot_json`, else 404. Every request gets the identical bytes captured at startup — no live refresh; operator must restart `serve` to pick up ledger changes.
+
+Client-side `template.html` (663 lines) has **no polling/fetch/WebSocket/EventSource** — confirmed via grep (no matches for `setInterval`, `fetch(`, `WebSocket`, `EventSource`). Test `html_command_generator_does_not_mutate_the_ledger` (html.rs:696-705) explicitly asserts the rendered page never contains `fetch(`, `XMLHttpRequest`, or `navigator.sendBeacon`. All interactivity (filter, sort, accordion, fusion/fission threshold slider, command-generator forms) is client-side JS operating purely on the embedded snapshot; nothing talks back to a server today.
+
+**3. `LandscapeSnapshot`**
+
+Defined `src/view/snapshot.rs:110-119`:
+```rust
+pub struct LandscapeSnapshot {
+    pub attractors: Vec&lt;SnapshotAttractor&gt;,
+    pub stressors: Vec&lt;SnapshotForce&gt;,
+    pub purposes: Vec&lt;SnapshotForce&gt;,
+    pub components: Vec&lt;SnapshotComponent&gt;,
+    pub residues: Vec&lt;SnapshotResidue&gt;,
+    pub defense: Option&lt;DefenseSection&gt;,  // #[serde(skip_serializing_if = "Option::is_none")]
+}
+```
+Supporting types: `SnapshotForce`, `SnapshotAttractor`, `SnapshotComponent`, `SnapshotResidue`, `SnapshotMetaForce`, `DefenseSection`, plus enums `RecordSource {Sidecar, Working}` and `ForceKind {Stressor, Purpose}` (snapshot.rs:17-119).
+
+Construction: `load_landscape_snapshot(cfg, include_defense)` (snapshot.rs:347-350) → `resolve_sources` (:129-141) resolves sidecar (`crate::storage::metadata_dir`) and optional working (`cfg.config_host_dir`) dirs → `load_landscape_snapshot_from_sources` (:144-169) merges main ledger CSVs (`crate::storage::{attractors,stressors,purposes,components,residues}::load`) and, if `include_defense`, defense CSVs/artifacts (`crate::storage::defense::{meta_stressors,meta_attractors,meta_purposes,artifacts}`), via `merge_main_ledger`/`merge_defense` with an `upsert` helper (working records win on id collision).
+
+**4. Functions in `src/view/html.rs`**
+```rust
+pub fn render_landscape_html(snapshot: &amp;LandscapeSnapshot) -&gt; Result&lt;String&gt;          // :26
+pub fn extract_snapshot_json(html: &amp;str) -&gt; Option&lt;&amp;str&gt;                              // :47
+fn escape_script_json(json: &amp;str) -&gt; String                                           // :55
+fn esc(value: &amp;str) -&gt; String                                                         // :59
+fn force_kind_attr(kind: ForceKind) -&gt; &amp;'static str                                    // :67
+fn force_label(force: &amp;SnapshotForce) -&gt; String                                        // :75
+fn status_bucket(status: &amp;str) -&gt; &amp;'static str                                         // :86
+fn status_tooltip(status: &amp;str) -&gt; String                                              // :95
+fn row_total(force_id: &amp;str, residues: &amp;[SnapshotResidue]) -&gt; usize                     // :104
+fn col_total(component: &amp;str, residues: &amp;[SnapshotResidue]) -&gt; usize                    // :111
+fn architecture_sets_for_force(force_id: &amp;str, components: &amp;[SnapshotComponent], residues: &amp;[SnapshotResidue]) -&gt; String  // :118
+fn render_matrix(snapshot: &amp;LandscapeSnapshot) -&gt; String                               // :142
+fn render_defense_records(defense: &amp;DefenseSection) -&gt; String                          // :247
+fn render_meta_force_item(force: &amp;SnapshotMetaForce) -&gt; String                         // :275
+fn render_meta_attractor_item(attractor: &amp;SnapshotAttractor) -&gt; String                 // :284
+fn render_defense_forms(_defense: &amp;DefenseSection) -&gt; String                           // :293
+```
+Also public constants: `TEMPLATE` (`include_str!`), `SNAPSHOT_PLACEHOLDER`, `SNAPSHOT_ELEMENT_ID`, and private `MATRIX_PLACEHOLDER`/`DEFENSE_FORMS_PLACEHOLDER`/`DEFENSE_RECORDS_PLACEHOLDER`.
+
+**5. Existing tests** — `#[cfg(test)] mod tests` at html.rs:380-805, 19 tests covering: snapshot embedded as `&lt;script type="application/json"&gt;` and round-trips via `extract_snapshot_json`; matrix rows carry filterable `data-*` attrs (force id/kind/attractor/architecture-set); force rows render as `S-`/`P-&lt;shortname&gt;` accordions with hidden detail panel; row/column totals and grand total; sticky-position hooks; sortable/status-tooltip column headers; template JS wiring assertions (filter, click-to-sort, accordion toggle, live fusion/fission threshold slider) checked by string-matching `TEMPLATE` source; data-hook parity between rendered rows and filter JS; residue matrix cell attributes; presence of staging forms + copy-commands surface + `buildAddCommand`/`shellQuote` JS; **critically, `html_command_generator_does_not_mutate_the_ledger` asserts no `fetch(`/`XMLHttpRequest`/`navigator.sendBeacon` anywhere in output** — any live/websocket mode must not violate this for the static SSR path, or the test needs deliberate, documented revision; defense forms/records gated on/off by `include_defense`; XSS escaping of `&lt;script&gt;` terminators in ledger text. Companion tests in `src/view/mod.rs` (tests module ~mod.rs:319-554) assert `view`/`serve` don't mutate the ledger, produce identical HTML/JSON, and gate defense data — these guarantees must carry over to any Dioxus SSR path.
+
+**6. Cargo.toml / Cargo.lock — no async runtime present**
+
+Full `[dependencies]`: anyhow 1.0.104, thiserror 2.0.19, clap 4.5.53 (locked 4.6.6, derive+env), serde 1.0.229 (derive), serde_json 1.0.151, csv 1.4.0, toml 1.1.3, comfy-table 7.2.1, crossterm 0.29, owo-colors 4.3.0, chrono 0.4.45 (serde), which 8.0.5, regex 1.11.1, tokei 14.0.0 (default-features=false), tiny_http 0.12. Dev-dep: tempfile 3.27.0. Lints: `clippy::unwrap_used = "deny"`.
+
+Confirmed via `Cargo.lock` — **no** `tokio`, `async-std`, `hyper`, `axum`, `actix`, `warp`, `tungstenite`/`ws`, or `dioxus` anywhere in the dependency tree. Only `mio`/`signal-hook-mio` transitives exist (pulled in by `crossterm`, not by any async stack). tiny_http itself is fully synchronous (blocking `incoming_requests()` iterator). This means introducing a websocket "live" mode will require adding a new async runtime and websocket crate behind the planned Cargo feature flag — there's nothing to reuse today.</result>
+<usage><subagent_tokens>67377</subagent_tokens><tool_uses>13</tool_uses><duration_ms>65104</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aef921f6c67fca4a4</task-id>
+<tool-use-id>toolu_01Tsc8dcGvfmfD2fACppSCDU</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/bf961f7c-50ed-477d-9084-b01332312377/tasks/aef921f6c67fca4a4.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore storage/mutation and write-authorization layer" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I have everything needed. Here's the report.
+
+## 1. Mutation command flow
+
+CLI defs in `src/cli.rs` (e.g. `AddTarget::Stressor` enum variant, line ~273) parse into `Command::Add(AddTarget)`, dispatched to `src/storage/mod.rs:126` `pub fn add(cfg: &amp;Config, target: AddTarget, force: bool) -&gt; Result&lt;()&gt;`. That function: authorizes (`write_authorization::require`), resolves the metadata dir (`metadata_dir_for_mutation`), takes the session lock/drift-check (`integrity::sessions::begin_mutation`), calls `add_entry(&amp;dir, target)` (mod.rs:166, a big match per entity type), commits the session, then `git_sidecar::persist_if_sidecar`. For stressors, `add_entry` calls `stressors::load` + `stressors::next_id` + `stressors::append` (`src/storage/stressors.rs:35`). The core write primitive is `write_all(residual_dir: &amp;Path, rows: &amp;[Stressor]) -&gt; Result&lt;()&gt;` (stressors.rs:48) — a **full read-modify-rewrite of the whole CSV**, not an append; `append()` just loads all rows, pushes one, and calls `write_all`. Every entity module (purposes, attractors, components, residues, etc.) follows this same load-all/rewrite-all pattern.
+
+## 2. Write authorization (`.residual-write-authorized`)
+
+`src/storage/write_authorization.rs`. `authorize(cfg, minutes)` (line 20) is triggered only by `residual write authorize [minutes]` (`src/cli.rs:589-591`); it writes `expires_at=&lt;rfc3339&gt;` to `&lt;config_host_dir&gt;/.residual-write-authorized` (default 30 min, `DEFAULT_MINUTES`). `require(cfg)` (line 37) is called at the top of every mutating entrypoint (`storage::init`, `add`, `remove`, `migrate` in mod.rs lines 75/127/137/616) — **but only enforced when sidecar mode is enabled** (`if !sidecar.enabled { return Ok(()) }`). If enabled and the marker is missing or expired, the write bails with an error telling the operator to rerun `residual write authorize`. This is explicitly a **short-lived, single-operator, single-CLI-process model**: the comment says "Short-lived, local authorization for sidecar-backed metadata mutations," and the marker is deliberately *not* gitignored — the pre-commit hook (`src/verification/git_hook.rs`) detects it staged and tells the operator to `git restore --staged` it, treating an accidentally-committed marker as a leak. A live server holding this open indefinitely (or renewing it perpetually) would run against the grain of that design — it assumes a human runs a bounded-duration authorized session, not a long-running daemon.
+
+## 3. Git-sidecar model
+
+`src/storage/git_sidecar.rs`. When `git_sidecar_enabled = true` (config.toml), metadata isn't read from the working tree but from the tip of an orphan branch (`git_sidecar_branch = "residual/metadata"`), materialized read-only into a scratch dir under `.git/` via `materialize_branch_tree` (line 339, using `ls-tree`/`show`, no checkout). **Writes are committed synchronously, one commit per mutation**: `persist_if_sidecar` (line 543) is called at the end of every `add`/`remove`/`migrate` (mod.rs) and calls `commit_snapshot_to_branch` (line 495), which stages the whole metadata dir via git plumbing (`hash-object`/`update-index`/`write-tree`/`commit-tree`/`update-ref` with old-SHA CAS check) and commits immediately — not batched. So each CLI mutation = one git commit on the sidecar branch (no-op skipped if tree is unchanged, line 514).
+
+## 4. Concurrency control
+
+`src/storage/integrity/sessions.rs`. `.session.lock` (`.gitignore:15`) is a simple advisory PID+timestamp file (`SessionLock::acquire`, line 24) with a 30s TTL (`DEFAULT_TTL_SECS`) after which it's considered stale and silently stolen — no real cross-process mutex, just a courtesy check assuming one CLI invocation at a time. Alongside it, `.storage-hashes` records a hash snapshot of all managed files (`current_hashes`/`write_snapshot`); `begin_mutation` (line 214) fails with a `--force`-or-diff message if any managed file changed outside the last recorded session (drift detection), guarding against a human hand-editing CSVs between CLI runs — not against real concurrent writers. There is **no atomic file locking, no CAS on the CSV writes themselves**, and the stale-lock steal (30s) makes it actively unsafe for anything with true concurrency (e.g. two live-server writers racing) — last-writer's `write_all` simply clobbers the file.
+
+## 5. `LandscapeSnapshot` assembly
+
+`src/view/snapshot.rs:347` `load_landscape_snapshot(cfg, include_defense) -&gt; Result&lt;LandscapeSnapshot&gt;`, via `resolve_sources` + `load_landscape_snapshot_from_sources` (line 144). It reads sidecar-tip dir and optionally a distinct working/capture-session dir, calling `merge_main_ledger` (attractors, stressors, purposes, components, residues — each a full CSV `load()`) and, if `include_defense`, `merge_defense` (meta_stressors/purposes/attractors + persona/strategy/progress/pitch file listings), upserting by id with working-dir records winning on collision. This is pure in-memory CSV parsing (no git plumbing unless sidecar mode triggers `materialize_branch_tree`, which does shell out to `git ls-tree`/`show` per file) — cheap enough for occasional CLI calls, but calling it after every websocket mutation would mean re-parsing every CSV (and re-materializing the sidecar branch tree via subprocess git calls) each time, which is more overhead than an in-memory authoritative model should tolerate at high edit rates; a live-mode design would want an in-memory canonical state diffed/pushed incrementally rather than rebuilding from disk each time.</result>
+<usage><subagent_tokens>71355</subagent_tokens><tool_uses>13</tool_uses><duration_ms>59907</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae21e90a80153297b</task-id>
+<tool-use-id>toolu_012krutFJg6FqoUsyLZ4g1sd</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/bf961f7c-50ed-477d-9084-b01332312377/tasks/ae21e90a80153297b.output</output-file>
+<status>completed</status>
+<summary>Agent "Design Dioxus migration plan for residual view layer" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result># Implementation Plan: Migrating `residual`'s HTML View Layer to Dioxus
+
+## 0. Summary of the approach
+
+- Keep `render_landscape_html`/`extract_snapshot_json` as the stable public contract in `src/view/mod.rs`; reimplement their bodies on top of a shared Dioxus component tree rendered via `dioxus-ssr`.
+- Put shared components in `src/view/components/`, static-export glue in `src/view/static_export.rs` (replacing `src/view/html.rs`), and everything live-only behind `#[cfg(feature = "live")] pub mod live;` in `src/view/mod.rs`, backed by a new `src/view/live/` directory.
+- Decision (see §3): the CSS + client-side JS currently in `src/view/template.html` **stays a separate static asset**, spliced around the Dioxus-rendered fragments, rather than being absorbed into the component tree. This is the lowest-risk option for the existing test suite and matches the fact that filter/sort/accordion/threshold-slider are DOM-local behaviors that don't need server state either way (static or live).
+- `StagedAdd` (`src/view/commands.rs`) is already the right shared shape for the command-generator/Save state — reuse it verbatim as the live server's pending-additions model rather than inventing a parallel type.
+
+---
+
+## 1. `Cargo.toml` changes
+
+Current `[dependencies]` has no async runtime, no web framework, no templating crate (confirmed by reading `Cargo.toml` — just `anyhow`, `thiserror`, `clap`, `serde`/`serde_json`, `csv`, `toml`, `comfy-table`, `crossterm`, `owo-colors`, `chrono`, `which`, `regex`, `tokei`, `tiny_http`). No `[features]` table exists today — clean slate.
+
+Proposed:
+
+```toml
+[dependencies]
+# ... existing deps unchanged ...
+dioxus     = { version = "X", default-features = false, features = ["macro"] } # verify: does dioxus-ssr need the full `dioxus` crate or just dioxus-core?
+dioxus-ssr = "X"
+
+# live-mode only — optional, gated behind the `live` feature
+axum            = { version = "Y", optional = true }
+tokio           = { version = "Y", features = ["rt-multi-thread", "macros", "net", "signal"], optional = true }
+dioxus-liveview = { version = "X", optional = true, features = ["axum"] } # verify: exact feature name for the axum adapter
+
+[features]
+default = []
+live = ["dep:axum", "dep:tokio", "dep:dioxus-liveview"]
+```
+
+Notes / concrete choices:
+
+- `dioxus` + `dioxus-ssr` are always-on (non-optional) since static export needs them for every build, and they add no async runtime or heavy transitive deps by themselves (`dioxus-ssr` is a pure synchronous renderer over the `dioxus-core` VDOM).
+- `axum`, `tokio`, `dioxus-liveview` are `optional = true` and only pulled in by the `live` feature. This guarantees `cargo build` (no `--features live`) never links them, satisfying decision 2 ("zero live-mode code in the static build").
+- `[[bin]]` stays a single binary (`residual`) — no need for a second binary target. Feature-gating is done entirely via `#[cfg(feature = "live")]` on the `src/view/live` module declaration in `src/view/mod.rs`, plus a `#[cfg(feature = "live")]` arm in `src/cli.rs` for whatever new subcommand exposes it (e.g., `residual serve --live`, or a distinct `Command::Live`). If `--live` is requested without the feature compiled in, the CLI should fail with a clear "rebuild with `--features live`" error rather than silently falling back to the static server.
+- **Version verification required before implementation** (explicitly flagging per your instructions — do not guess semver):
+  - Confirm the current stable `dioxus` / `dioxus-ssr` version and whether `dioxus-ssr` requires matching-version `dioxus-core`, and whether SSR needs the `dioxus` proc-macro crate (`rsx!`) or can consume a hand-built VDOM without the macro feature.
+  - Confirm `dioxus-liveview`'s currently-supported axum version and tokio feature set — this pairing has historically been narrow/finicky (liveview tends to pin to a specific axum minor and a specific tokio feature combination for its websocket upgrade handling). Do not lock exact versions in `Cargo.toml` until this is checked against current docs/crates.io, since a mismatch here is a common source of a broken build that's hard to unwind after the fact.
+  - Confirm whether `dioxus-liveview`'s axum integration entrypoint is a `axum::Router` layer/extension function (e.g., something like `dioxus_liveview::axum_socket` or a `LiveViewPool` handed a websocket upgrade) — the exact function name and signature needs to be pulled from current docs, not assumed.
+  - Run `cargo tree` after adding these to confirm no duplicate/conflicting tokio or axum versions get pulled transitively by anything already in the tree (unlikely today since nothing async exists, but worth a one-time check).
+- `clippy::unwrap_used = "deny"` in `[lints.clippy]` applies repo-wide already, so it automatically covers all new Dioxus/live code — no lint config changes needed, but every new file must respect it (this matters especially in `src/view/live/`, where websocket/axum handler code often reaches for `.unwrap()` in examples).
+
+---
+
+## 2. Module layout
+
+```
+src/view/
+  mod.rs                  # unchanged public surface + feature-gated `pub mod live;`
+  snapshot.rs             # unchanged (data model, load_landscape_snapshot)
+  commands.rs             # unchanged (StagedAdd, format_add_command) — reused by both static &amp; live
+  components/             # NEW — shared Dioxus components, always compiled
+    mod.rs
+    matrix.rs              # matrix table: header row, force rows/accordion, totals
+    defense.rs             # defense records list + defense staging forms
+    page.rs                # top-level Landscape page component assembling matrix + defense + snapshot script tag
+  static_export.rs        # NEW — replaces html.rs; render_landscape_html/extract_snapshot_json via dioxus_ssr
+  shell.html              # NEW static asset — the CSS + client JS previously inline in template.html, now the shell that both static and live pages splice component-rendered HTML into (see §3)
+  live/                    # NEW — entirely #[cfg(feature = "live")]
+    mod.rs                 # module root, `run_live(cfg, opts)` entry point
+    state.rs               # LiveState { snapshot: LandscapeSnapshot, pending: Vec&lt;StagedAdd&gt; }, mutation methods, broadcast channel
+    server.rs              # axum Router setup, route wiring (/, /ws, /save, /command-preview)
+    liveview.rs             # dioxus-liveview wiring: VirtualDom construction from LiveState, diff broadcast
+    save.rs                 # Save handler: try storage::add-family -&gt; on auth failure, authorize+retry once
+    commands_panel.rs       # server-rendered command-generator panel driven by LiveState.pending
+  html.rs                  # DELETED at end of milestone (a) — superseded by static_export.rs + components/
+  template.html            # DELETED at end of milestone (a) — superseded by shell.html (CSS/JS unchanged, placeholders adjusted)
+```
+
+Key points:
+
+- `src/view/mod.rs`'s existing `pub use html::render_landscape_html;` becomes `pub use static_export::render_landscape_html;` — no change visible to `write_landscape_html`/`build_serve_document`/`run_serve` callers, satisfying "callers don't need to change."
+- `extract_snapshot_json` moves to `static_export.rs` unchanged (it's pure string parsing over the rendered output's `&lt;script id="residual-snapshot"&gt;` block — this doesn't care whether the surrounding HTML came from `.replace()` or `dioxus-ssr`, since the script tag's shape is dictated by `SNAPSHOT_ELEMENT_ID`/`escape_script_json`, which move over too).
+- `src/view/live/mod.rs` module declaration in `src/view/mod.rs` is exactly one line: `#[cfg(feature = "live")] pub mod live;`. Everything under `src/view/live/` is therefore invisible to a non-`live` build — the compiler never even parses it, which is a stronger guarantee than a runtime `if` check.
+- `src/cli.rs` changes: add a `#[cfg(feature = "live")]` field/variant for the live entrypoint (e.g. `Command::Serve { defense, port, #[arg(long)] live: bool }` with the `live` flag itself gated, or a wholly separate `Command::Live { defense, port }` gated with `#[cfg(feature = "live")]` on the variant). A separate variant is cleaner because clap's derive on a conditionally-present field inside a shared variant is more awkward than a conditionally-present variant; recommend `Command::Live { defense: bool, port: u16 }` gated at the variant level, dispatched at cli.rs's existing match arm alongside `Command::View`/`Command::Serve` with a matching `#[cfg(feature = "live")]` arm.
+
+---
+
+## 3. Component decomposition, and the static-shell decision
+
+### Mapping of the 16 existing functions in `html.rs` to components
+
+| Current function (`html.rs`) | New home | Dioxus form |
+|---|---|---|
+| `render_matrix` | `components/matrix.rs` | `MatrixTable` component, props: `&amp;LandscapeSnapshot` (or narrower: forces slice, components slice, residues slice, attractors slice) |
+| header row loop (`th data-component`) | `components/matrix.rs` | `MatrixHeaderRow` sub-component or inline `rsx!` loop over `snapshot.components` |
+| force row loop + accordion (`render_matrix`'s per-force block) | `components/matrix.rs` | `ForceRow` component, props: `&amp;SnapshotForce`, `&amp;[SnapshotComponent]`, `&amp;[SnapshotResidue]`, `&amp;[SnapshotAttractor]` |
+| `force_label`, `force_kind_attr` | `components/matrix.rs` (private helpers, pure functions, unchanged logic) | plain fns called from `ForceRow` |
+| `status_bucket`, `status_tooltip` | `components/matrix.rs` | plain fns called from `MatrixHeaderRow`/header cell rendering |
+| `row_total`, `col_total` | `components/matrix.rs` | plain fns, unchanged — pure computation, no reason to become components |
+| `architecture_sets_for_force` | `components/matrix.rs` | plain fn, unchanged |
+| totals footer (`&lt;tfoot&gt;` block in `render_matrix`) | `components/matrix.rs` | `MatrixTotalsRow` component |
+| `render_defense_records` | `components/defense.rs` | `DefenseRecords` component, props: `&amp;DefenseSection` |
+| `render_meta_force_item` | `components/defense.rs` | `MetaForceItem` component, props: `&amp;SnapshotMetaForce` |
+| `render_meta_attractor_item` | `components/defense.rs` | `MetaAttractorItem` component, props: `&amp;SnapshotAttractor` |
+| `render_defense_forms` | `components/defense.rs` | `DefenseForms` component (static — currently ignores its `_defense` argument entirely; keep that behavior, it's presence-gated not content-gated) |
+| `esc` | deleted — Dioxus's `rsx!`/text-node rendering escapes text content automatically; anywhere raw attribute strings are still hand-assembled (e.g. `data-search`), keep a small `esc_attr` helper for parity since Dioxus's automatic escaping only covers text nodes it controls, not manually formatted attribute values built with `format!` | `components/matrix.rs` |
+| `render_landscape_html`'s top-level assembly | `components/page.rs` | `LandscapePage` component, props: `&amp;LandscapeSnapshot`, composing `MatrixTable` + optional `DefenseRecords`/`DefenseForms` + the embedded snapshot `&lt;script&gt;` tag |
+| `extract_snapshot_json` | `static_export.rs` | unchanged, stays a pure string function (not a component concern) |
+| `escape_script_json` | `static_export.rs` (or `components/page.rs` if the script tag becomes part of the tree) | unchanged logic |
+
+Uncertain Dioxus API specifics to verify before writing code (flagging per your instructions):
+- Exact `#[component]` macro syntax and whether props with borrowed lifetimes (`&amp;LandscapeSnapshot`, `&amp;[SnapshotComponent]`) are supported directly, or whether current Dioxus requires owned/`Rc`-wrapped props (this matters a lot here — the existing code borrows heavily from `LandscapeSnapshot` rather than cloning, and Dioxus prop lifetime rules vary by version). If borrowed props aren't ergonomic, the plan should default to cloning the relevant slices into props (acceptable for SSR performance here — snapshots are small) rather than fighting the framework.
+- Whether attribute values that must stay dynamic (`data-force-id="{id}"`, `data-search="{search}"`) are best expressed via `rsx!`'s `"{expr}"` interpolation or via a `.attr()` builder call — confirm current idiomatic syntax.
+- Whether `dioxus-ssr`'s render function is `dioxus_ssr::render(&amp;vdom)` operating on a built `VirtualDom`, or a simpler `dioxus_ssr::render_element(rsx!)` style helper — confirm current entrypoint name.
+
+### Static-shell decision: keep `template.html`'s CSS/JS as a separate spliced asset
+
+**Decision: the CSS and client-side JS (filter/sort/accordion/threshold-slider/`buildAddCommand`/`shellQuote`) stay in a static asset file (`src/view/shell.html`, functionally `template.html` renamed), not folded into the Dioxus component tree.** `render_landscape_html` continues to do placeholder substitution — but now substitutes Dioxus-SSR-rendered fragments (`MATRIX`, `DEFENSE_RECORDS`, `DEFENSE_FORMS`) into `shell.html` instead of hand-built strings, plus the still-hand-built `SNAPSHOT_JSON` substitution (or that too can become a Dioxus-rendered `&lt;script&gt;` element — either works; hand-built is fine here since it's one line and already tested via `escape_script_json`).
+
+Justification against risk to the existing test suite:
+1. **`template_wires_working_filter_js_to_matrix_rows`, `template_wires_click_to_sort_on_matrix_headers`, `template_wires_force_accordion_toggle`, `template_wires_live_fusion_fission_threshold`, `template_asset_carries_placeholder_and_generator_js`** (in `src/view/html.rs`) all assert against the `TEMPLATE` constant's raw text (`querySelector(...)`, `function sortMatrixBy`, etc.). If this JS is kept as one untouched static file, these five tests port over with a one-line change each (assert against `SHELL` instead of `TEMPLATE`, same content). If instead the JS were rewritten as Dioxus event handlers, all five tests would need to be redesigned from scratch against fundamentally different generated output (Dioxus would emit its own event-delegation JS glue, not the hand-written functions these tests name explicitly), which is a much larger, riskier, and less mechanical migration for zero behavioral gain — the client JS doesn't touch server state either way.
+2. This client-side behavior (filter/sort/accordion open-close/threshold slider) is pure DOM manipulation with no dependency on whether the page is statically rendered once or a liveview socket — it's identical in both render targets. Rewriting it as Dioxus signals/`use_state` would only be justified if the live mode needed server-authoritative filter/sort state (it doesn't — decision 4 says only mutations and the pending-additions list are server-authoritative; filter/sort/accordion are pure client ergonomics).
+3. The one piece of client JS that *is* semantically tied to server state in live mode — `buildAddCommand`/`shellQuote`/the staged-commands textarea — is explicitly called out in decision 5 to move to server-side state (`LiveState.pending`) in live mode while staying client-only in static mode. This is handled by making the command-generator forms' *submission* behavior render-target-specific (static: forms only stage into client `localStorage`/JS array as today; live: forms POST/websocket-send into `LiveState.pending` and the server re-renders the staged-commands panel), while the *shell* (CSS, filter, sort, accordion, threshold slider) is unconditionally shared and untouched.
+
+Net structure: `render_landscape_html` (static) = `shell.html` with `{{MATRIX}}`/`{{DEFENSE_RECORDS}}`/`{{DEFENSE_FORMS}}` replaced by `dioxus_ssr::render(...)` output of the corresponding components, `{{SNAPSHOT_JSON}}` replaced as today. `live::liveview` renders `LandscapePage` (matrix + defense, same components) inside a page that also inlines `shell.html`'s `&lt;style&gt;` block and client JS verbatim, but swaps the command-generator forms' behavior and adds the websocket bootstrap script dioxus-liveview requires (this addition is the only genuinely new script content, and it is exclusively in the `live`-feature-gated path).
+
+---
+
+## 4. Test migration strategy
+
+Following the repo's "test colocation" convention (`.claude/CLAUDE.md`), tests stay next to the code they exercise as files move.
+
+### `src/view/html.rs` (~19 tests, lines 380-805) → split across new files
+
+- **Tests asserting on rendered `&lt;table&gt;`/`&lt;tr&gt;`/`data-*` output** (`html_embeds_snapshot_json_in_a_script_block`, `html_matrix_rows_carry_filterable_force_data`, `html_force_rows_are_accordions_labeled_by_shortname`, `html_matrix_has_row_and_column_totals`, `html_matrix_carries_sticky_hooks`, `html_matrix_headers_carry_sort_and_status_metadata`, `html_filter_js_and_rendered_rows_share_the_same_data_hooks`, `html_contains_residue_matrix_with_cell_data_attributes`, `html_escapes_script_terminator_in_snapshot_values`) move to `src/view/static_export.rs`'s `#[cfg(test)] mod tests`, calling the new `render_landscape_html` (same public signature) and asserting the exact same substrings. These should require **no assertion changes at all** if the Dioxus-rendered markup preserves the same tag names/attribute names/attribute value formatting — which is a hard constraint the component design in §3 must honor byte-for-byte (e.g. `data-force-id="S-01"` must render with that exact quoting/attribute name, not e.g. Dioxus defaulting to different boolean-attribute serialization for `hidden`). This is the highest-risk area: Dioxus's SSR output for things like boolean attributes (`hidden`), self-closing behavior, and attribute ordering may not byte-match the current hand-built HTML. Recommend adding one new temporary test early in milestone (a) — `static_export_matches_legacy_html_byte_for_byte` — that renders both old and new paths against the same fixture and diffs them, to catch drift immediately; delete that test once milestone (a) is confirmed stable (it's a migration aid, not a permanent contract).
+- **Tests asserting on `TEMPLATE` constant content** (`template_wires_working_filter_js_to_matrix_rows`, `template_wires_click_to_sort_on_matrix_headers`, `template_wires_force_accordion_toggle`, `template_wires_live_fusion_fission_threshold`, `template_asset_carries_placeholder_and_generator_js`) move to `src/view/static_export.rs` (or could live directly beside `shell.html` if a thin loader module is introduced) asserting on the renamed `SHELL` constant — same assertions, renamed identifier only.
+- **`html_contains_command_generator_and_copy_surface`** moves to `static_export.rs`, unchanged assertions (the forms and copy surface are still present in `shell.html`/`DefenseForms` output).
+- **`html_command_generator_does_not_mutate_the_ledger`** — the load-bearing no-`fetch`/no-`XMLHttpRequest`/no-`sendBeacon` test — moves to `static_export.rs` **unchanged in assertion, re-verified against the new `render_landscape_html` output**. This continues to hold trivially as long as (a) `shell.html`'s client JS is untouched (§3), and (b) the Dioxus-rendered fragments (`MatrixTable`, `DefenseRecords`, `DefenseForms`) never emit `&lt;script&gt;` content of their own in the static path (they emit markup only — the live-only websocket bootstrap script is feature-gated and physically cannot appear in a `cargo build`-without-`live` binary, so there's no risk of it leaking into `static_export::render_landscape_html`'s output even by accident, since that code path doesn't exist in the compiled artifact). Recommend adding a second assertion to this test once live mode exists: explicitly assert the output does not contain the live-mode bootstrap script's identifying string (e.g. a `dioxus-liveview` marker or a `new WebSocket(` literal), as defense in depth, even though the `live` feature being off already guarantees this by construction.
+- **`html_omits_defense_forms_and_records_without_defense`, `html_includes_defense_forms_and_records_with_defense`** move to `static_export.rs`, unchanged.
+
+### `src/view/mod.rs` tests (~lines 319-554)
+
+These test `write_landscape_html`/`build_serve_document`/`run_serve`/`serve_url` — none of them inspect HTML internals beyond substring checks (`contains("S-01")`, `contains("MS-01")`, `contains("data-copy-commands")`) or structural invariants (byte-identical `view` vs `serve` output, no ledger mutation). These stay in `src/view/mod.rs` entirely unchanged — they call `render_landscape_html` via its stable public signature and don't care that the implementation moved from `html.rs` to `static_export.rs`. `serve_document_matches_the_view_html_for_the_same_config` in particular is a good regression guard that both continue to produce byte-identical output through the migration.
+
+### New live-mode tests (introduced progressively per milestone, not written speculatively)
+
+Colocated under `src/view/live/` per module (e.g. `state.rs` gets `#[cfg(test)] mod tests` for `LiveState` mutation/broadcast logic using an in-process channel receiver, no network; `save.rs` gets tests for the reauth-retry flow using a fake/stubbed `write_authorization` state via `tempdir()`-backed `Config` the same way `src/storage/write_authorization.rs`'s own test does it). Full websocket/axum integration tests (spinning up the server and connecting a client) are lower priority and can be deferred to milestone (c)/(d) using `tokio::test` + a real (ephemeral-port) axum server plus a raw websocket client crate, or `axum::Router`'s in-process `tower::ServiceExt::oneshot` for HTTP-only routes (the `/save` endpoint doesn't need a socket).
+
+`clippy::unwrap_used = "deny"` applies to all this new test-adjacent and production code alike — note that `.unwrap()` remains acceptable *inside* `#[cfg(test)] mod tests` blocks per the repo's own stated exception ("acceptable only in tests and in `main()`"), matching what's already done throughout `src/storage/*.rs` and `src/view/mod.rs`'s existing tests.
+
+---
+
+## 5. Rollout sequencing
+
+**(a) Shared components + dioxus-ssr static path, old `html.rs` removed, tests green, byte-behavior preserved.**
+- Add `dioxus`/`dioxus-ssr` (always-on deps) to `Cargo.toml`.
+- Create `src/view/components/{mod.rs,matrix.rs,defense.rs,page.rs}` implementing the mapping in §3.
+- Create `src/view/static_export.rs` with `render_landscape_html`/`extract_snapshot_json`, wired to `dioxus_ssr::render(...)` + `shell.html` (renamed from `template.html`, content otherwise untouched).
+- Add the temporary byte-diff migration test described in §4; confirm parity; delete it.
+- Update `src/view/mod.rs`'s `pub use` to point at `static_export`.
+- Delete `src/view/html.rs` and rename `src/view/template.html` → `src/view/shell.html`, updating `include_str!` accordingly.
+- Run full test suite (`cargo test`), confirm zero regressions, confirm `cargo build` (no features) still has no new transitive deps beyond `dioxus`/`dioxus-ssr`.
+- This milestone alone delivers zero user-visible or CLI-visible change — it's a pure internal refactor and should be reviewable/mergeable independently.
+
+**(b) `live` feature skeleton: axum + tokio + dioxus-liveview wired to a trivial page.**
+- Add optional deps + `[features] live = [...]` to `Cargo.toml` (after the version-compatibility research flagged in §1).
+- Create `src/view/live/{mod.rs,server.rs,liveview.rs}` behind `#[cfg(feature = "live")]`.
+- `run_live(cfg, opts)` binds an axum server on `SERVE_HOST`/a port, serves a single hardcoded/trivial `LandscapePage` (e.g. render once from a snapshot loaded at startup, no mutation, no broadcast yet) via dioxus-liveview's websocket-backed rendering.
+- Add a `#[cfg(feature = "live")]`-gated `Command::Live` (or `--live` flag) in `src/cli.rs`, dispatching to `run_live`.
+- Verify `cargo build` (no `--features live`) still compiles and links none of the new optional deps (`cargo tree` / `ldd` sanity check), and `cargo build --features live` compiles and serves a page a browser can load.
+- No new persistent state yet — this milestone is purely "prove the liveview plumbing works end-to-end."
+
+**(c) In-memory `LiveState` + read-only broadcast of snapshot changes.**
+- `src/view/live/state.rs`: `LiveState { snapshot: LandscapeSnapshot, pending: Vec&lt;StagedAdd&gt; }` behind a `tokio::sync::RwLock` (read-heavy) or `Mutex`, plus a `tokio::sync::broadcast` channel (or dioxus-liveview's own diffing mechanism, if it natively supports pushing re-renders to connected clients — verify) that pushes re-renders to all connected sessions whenever `LiveState` changes.
+- At this stage, the only "change" source is a manual/test-triggered re-load (e.g. a debug endpoint that re-runs `load_landscape_snapshot` and pushes the new state) — no browser-originated mutation yet. This proves the broadcast path independent of the mutation path.
+
+**(d) Browser-originated mutations applied to `LiveState` + broadcast.**
+- Wire the matrix/defense components' interactive elements (accordion clicks already client-only; but staging-form submissions) to a websocket message or axum POST route (`/stage`) that appends a `StagedAdd` to `LiveState.pending` and broadcasts the updated pending list to all connected clients (satisfying decision 3: concurrent edits from multiple clients are visible to everyone, no conflict resolution logic beyond "last write to the list wins its own append", since these are additive, not competing edits, to the same fields).
+- `commands_panel.rs`: server-rendered version of the staged-commands textarea, sourced from `LiveState.pending`, re-rendered on every push.
+
+**(e) Save button with reauth-retry flush through existing `storage::add`.**
+- `src/view/live/save.rs`: `fn flush_pending(cfg: &amp;Config, state: &amp;LiveState) -&gt; Result&lt;()&gt;` implementing the try→fail→reauth→try flow:
+  1. If `state.pending` is empty, return `Ok(())` immediately (idempotency requirement).
+  2. For each `StagedAdd` in `state.pending`, convert to the corresponding `crate::cli::AddTarget` variant (a new small conversion, e.g. `StagedAdd::into_add_target(self) -&gt; AddTarget`, colocated in `src/view/commands.rs` since that's where `StagedAdd` already lives) and call `crate::storage::add(cfg, target, force)`.
+  3. On the first `write_authorization::require` failure (surfaced as an `Err` from `storage::add`), call `crate::storage::write_authorization::authorize(cfg, write_authorization::DEFAULT_MINUTES)` and retry the same batch once.
+  4. On success, clear `state.pending` and broadcast the cleared state (so the command-generator panel and Save button both reflect "nothing pending" afterward) — this is what makes repeated no-op Saves idempotent per decision 4.
+  5. Note explicitly: `storage::add` already re-reads/re-writes the full CSV and runs `integrity::sessions::begin_mutation`/`git_sidecar::persist_if_sidecar` per call — reusing it means each pending item in the batch is still one full CSV rewrite + one git-sidecar commit (if enabled), i.e. Save's cost is O(pending items), not O(1). That's acceptable per decision 4's "reuse existing machinery, don't reimplement" instruction, but should be called out to the user as a known cost of batching many pending adds into one Save click (a large batch will take a few seconds if git-sidecar mode does a real commit per item).
+- Add an axum route (`POST /save`) invoking `flush_pending` and returning success/error to the browser; wire a Save button in the live page's toolbar.
+
+**(f) Command-generator panel ported to shared pending-additions state.**
+- Confirm the static-mode command generator (client-only JS, `buildAddCommand`/`shellQuote` in `shell.html`, driven by a client-side JS array) and the live-mode command generator (server-rendered `commands_panel.rs`, driven by `LiveState.pending`, using `format_add_command`/`format_add_commands` from `src/view/commands.rs` — already Rust-side and directly reusable, no need to reimplement `buildAddCommand`/`shellQuote` in Rust since they already exist as `shell_quote`/`format_add_command`) both render from logically the same `StagedAdd` shape, satisfying decision 5 ("both see the same staged list" — in live mode, both features literally read `LiveState.pending`; in static mode, both are client-JS reading the same in-page array, as today).
+- This is largely a documentation/consistency pass plus final test coverage (`src/view/live/commands_panel.rs`'s colocated tests asserting the rendered panel matches `format_add_commands(&amp;state.pending)`), since the underlying pieces (`StagedAdd`, `format_add_command`) were already built for exactly this reuse.
+
+Each milestone should land as its own reviewable change with its own green test run; (a) is the only one that touches the static/default build path and should be validated most conservatively (full `cargo test` plus a manual `residual view`/`residual serve` smoke check, since `run` skill or manual browser check on the rendered page is cheap insurance against Dioxus SSR attribute-serialization drift).
+
+---
+
+### Critical Files for Implementation
+
+- /home/v0id/Documents/repos/residual/src/view/html.rs
+- /home/v0id/Documents/repos/residual/src/view/mod.rs
+- /home/v0id/Documents/repos/residual/src/view/commands.rs
+- /home/v0id/Documents/repos/residual/src/view/template.html
+- /home/v0id/Documents/repos/residual/Cargo.toml
+- /home/v0id/Documents/repos/residual/src/storage/write_authorization.rs
+- /home/v0id/Documents/repos/residual/src/cli.rs</result>
+<usage><subagent_tokens>66437</subagent_tokens><tool_uses>17</tool_uses><duration_ms>163424</duration_ms></usage>
+</task-notification>
+
+---
+
+/residual-tdd-implement Looks fine, begin
+
+---
+
+<task-notification>
+<task-id>a3236f3384db51c2b</task-id>
+<tool-use-id>toolu_012VztSR2XYHmRXfgpDxJoKH</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/bf961f7c-50ed-477d-9084-b01332312377/tasks/a3236f3384db51c2b.output</output-file>
+<status>completed</status>
+<summary>Agent "TDD red phase: static_export stub + migrated tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Working tree is clean and in the intended final state — no leftover stashes from my verification runs, and `src/view/html.rs`/`src/view/template.html` remain byte-identical to HEAD (confirmed via `git diff HEAD` returning empty for both, untouched throughout).
+
+## Summary
+
+Created the red-phase Dioxus-migration scaffolding for `residual`'s landscape view layer, per the plan at `/home/v0id/.claude/plans/fluttering-sparking-sedgewick.md`, milestone (a) scope only:
+
+**New files:**
+- `/home/v0id/Documents/repos/residual/src/view/components/mod.rs` — `pub mod matrix; pub mod defense;`
+- `/home/v0id/Documents/repos/residual/src/view/components/matrix.rs` — `esc`, `force_kind_attr`, `force_label`, `status_bucket`, `status_tooltip`, `row_total`, `col_total`, `architecture_sets_for_force` moved verbatim from `html.rs`; `render_matrix` is a `todo!()` stub (matrix.rs:93)
+- `/home/v0id/Documents/repos/residual/src/view/components/defense.rs` — `render_defense_records`, `render_meta_force_item`, `render_meta_attractor_item`, `render_defense_forms` all `todo!()` stubs
+- `/home/v0id/Documents/repos/residual/src/view/static_export.rs` — `escape_script_json`, `SNAPSHOT_PLACEHOLDER`, `SNAPSHOT_ELEMENT_ID`, placeholder consts, `extract_snapshot_json` moved verbatim; `TEMPLATE` re-exported via `use super::html::TEMPLATE;`; `render_landscape_html` rebuilt to call the new `components::matrix`/`components::defense` stubs; full 18-test `#[cfg(test)] mod tests` copied verbatim from `html.rs`
+
+**Edited:** `/home/v0id/Documents/repos/residual/src/view/mod.rs` — added exactly `pub mod components;` and `pub mod static_export;`; existing `pub mod html;` / `pub use html::render_landscape_html;` untouched.
+
+**Untouched, confirmed byte-identical to HEAD:** `src/view/html.rs`, `src/view/template.html`.
+
+**Verification** (via `nix develop -c cargo build` / `cargo test`; note: `--lib` isn't valid here since this crate is bin-only with no `[lib]` target, so I used `cargo test --bin residual view::` instead — same effect):
+- `cargo build` compiles cleanly (only pre-existing-pattern dead-code warnings on the new not-yet-wired stubs; no errors).
+- `cargo test --bin residual view::`: **55 passed, 13 failed**. All 13 failures are `view::static_export::tests::*` panicking with `not yet implemented: dioxus-based matrix rendering — implemented in the green phase` at `src/view/components/matrix.rs:93:5` — genuine `todo!()` panics, not compile errors.
+- The 5 moved `template_wires_*`/`template_asset_carries_placeholder_and_generator_js` tests in `static_export::tests` pass, as expected, since they assert only on `TEMPLATE`'s raw text and never invoke the stubbed renderers.
+- Full suite: **306 passed, 13 failed** (same 13), confirming every pre-existing test — all ~18 in `view::html::tests` and all 10 in `view::tests` — is still 100% green, untouched.
+- `cargo clippy --all-targets` shows no `unwrap_used` violations in any new file (the only `unwrap_used` errors are pre-existing ones in `tests/a02_terminology_drift.rs`, unrelated to this change).
+
+**Note on nix flake mechanics** (not a code issue, just how I had to work around it): this repo's `flake.nix` uses crane's `buildPackage`, which runs the full `cargo test` suite as part of building the `residual` package, and `devShells.default` puts that built package directly on `PATH`. That makes `nix develop` itself fail to instantiate while any test is red — a structural chicken-and-egg gate, unrelated to my scaffolding's correctness. I worked around it by stashing the new `src/view` files, entering `nix develop` on the clean (all-green) HEAD, then `git stash pop`-ing and running `cargo build`/`cargo test` directly inside that already-materialized shell process. The working tree was left in the correct final state (stash list has no leftovers from this).</result>
+<usage><subagent_tokens>126730</subagent_tokens><tool_uses>47</tool_uses><duration_ms>570703</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a6e4b24e104889d78</task-id>
+<tool-use-id>toolu_01UME8Epk4zD38x5NsPPuKuN</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/bf961f7c-50ed-477d-9084-b01332312377/tasks/a6e4b24e104889d78.output</output-file>
+<status>completed</status>
+<summary>Agent "TDD green phase: implement Dioxus static export" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything checks out. Final report:
+
+## Summary
+
+**Dependencies**: `cargo add dioxus dioxus-ssr` resolved **`dioxus = "0.7.10"`** and **`dioxus-ssr = "0.7.10"`** (default features — no `--no-default-features` needed; confirmed no `tokio` or async runtime got pulled in, matching the "no async runtime needed" constraint). Cargo.toml/Cargo.lock updated accordingly.
+
+**Test results**: Both the ad-hoc-toolchain run and the fully pinned `nix develop -c cargo test` run pass with **319 passed / 0 failed** (18/18 in `view::static_export::tests`, 301 elsewhere), across all four test binaries (`residual` lib, `a02_terminology_drift`, `completions_coverage`, `integration`).
+
+**Implementation**:
+- `src/view/components/matrix.rs`: `render_matrix` now builds the table via `rsx!{}` (with plain `for` loops, since the rsx `for`-body only accepts markup, not arbitrary `let` statements — I precomputed `HeaderCol`/`MatrixCell`/`ForceRow`/`FooterCol` structs beforehand so the loop bodies are pure field-access expressions) and renders through `dioxus_ssr::render_element`. The pre-existing pure helpers (`esc`, `force_kind_attr`, etc.) were left untouched; I stopped calling `esc()` from the new code since Dioxus applies its own HTML escaping automatically to every dynamic attribute/text value (via `askama_escape`) — calling `esc()` first would have double-escaped.
+- `src/view/components/defense.rs`: all four stub functions implemented with Dioxus. `render_meta_force_item`/`render_meta_attractor_item`/a small private `render_labeled_item` helper each render a single `&lt;li&gt;` via `dioxus_ssr::render_element`; `render_defense_records` concatenates those pre-escaped fragments and splices them into a `&lt;div&gt;/&lt;ul&gt;` shell via `dangerous_inner_html` (safe here since the fragments were already produced by our own escaping renderer, not raw ledger text). `render_defense_forms` is one big static `rsx!{}` fragment reproducing the 7 original forms.
+
+**Markup-shape adjustments from Dioxus's SSR serialization** (worth flagging to the parent):
+- Dioxus never emits bare/valueless boolean attributes (`hidden`, `required`, `data-accordion-toggle`, `data-residue-cell`) the way the hand-built `html.rs` string did (` hidden`, ` required` with no `=`). I used `hidden: "true"`, `required: "required"`, `"data-accordion-toggle": "true"`, `"data-residue-cell": "true"` instead — these render as `hidden="true"` etc. All 13 tests still pass because they use `.contains()` substring checks (e.g. `contains(r#"class="force-detail" hidden"#)`), which match a prefix of `hidden="true"` too; no test checks exact byte-for-byte entity encoding either, so this is a real (documented) divergence from `html.rs`'s exact bytes but not a behavioral one (browsers still treat both as "hidden").
+- Escaping now uses numeric HTML entities (`&amp;#60;`, `&amp;#62;`, `&amp;#34;`) via `askama_escape` instead of `html.rs`'s named entities (`&amp;lt;`, `&amp;gt;`, `&amp;quot;`) — functionally equivalent, no test depends on the entity style.
+- `dioxus_ssr::render_element(rsx!{...})` (no `VirtualDom`/component boilerplate needed) was the right tool for all of this — it renders a bare `Element` fragment synchronously with no hydration markers (`data-node-hydration`) since `pre_render` defaults to `false`.
+
+**Out-of-scope files confirmed untouched**: `git diff --stat -- src/view/html.rs src/view/template.html` is empty, and `src/view/mod.rs` still has unmodified `pub mod html;` / `pub use html::render_landscape_html;` lines (the only diff in `mod.rs` — from subagent 1, not me — is the addition of `pub mod components;` / `pub mod static_export;`).
+
+Relevant files: `/home/v0id/Documents/repos/residual/src/view/components/matrix.rs`, `/home/v0id/Documents/repos/residual/src/view/components/defense.rs`, `/home/v0id/Documents/repos/residual/Cargo.toml`, `/home/v0id/Documents/repos/residual/Cargo.lock`.</result>
+<usage><subagent_tokens>180767</subagent_tokens><tool_uses>70</tool_uses><duration_ms>1030804</duration_ms></usage>
+</task-notification>
+
+---
+
+continue

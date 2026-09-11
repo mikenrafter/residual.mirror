@@ -1,0 +1,58 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "5edb5656cce6",
+  "session_id": "d033bb34-a5d6-456d-bc21-d349df79f285",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-11T06:29:40.937060218Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/view/html.rs",
+    "src/view/template.html"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "dbc76776a1b7",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 7994,
+    "cache_read_tokens": 18190,
+    "output_tokens": 168,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-11T06:29:40.904467262Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 165,
+    "total_committed": 0,
+    "total_lines_changed": 165,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 602,
+      "user_lines_removed": 165,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "residual/.residual-write-authorized": 1,
+        "src/view/html.rs": 283,
+        "src/view/template.html": 318
+      },
+      "user_removed_per_file": {
+        "src/view/html.rs": 112,
+        "src/view/template.html": 53
+      }
+    }
+  ]
+}

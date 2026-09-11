@@ -3,6 +3,7 @@ use crate::config::Config;
 
 pub mod context;
 pub mod guru;
+pub mod hooks;
 pub mod install;
 pub mod installer;
 pub mod personas;
@@ -10,15 +11,15 @@ pub mod phases;
 pub mod research;
 
 pub const SKILLS: &[(&str, &str, u32)] = &[
-    ("framework",       include_str!("definitions/framework.md"),       0),
-    ("purpose-walk",    include_str!("definitions/purpose_walk.md"),    0),
-    ("naive-draft",     include_str!("definitions/naive_draft.md"),     0),
-    ("stressor-walk",   include_str!("definitions/stressor_walk.md"),   0),
-    ("integrate",       include_str!("definitions/integrate.md"),       0),
-    ("fmea",            include_str!("definitions/fmea.md"),            0),
-    ("atam",            include_str!("definitions/atam.md"),            0),
-    ("tdd-implement",   include_str!("definitions/tdd_implement.md"),   0),
-    ("defense-walk",    include_str!("definitions/defense_walk.md"),    0),
+    ("framework",       include_str!("definitions/framework/SKILL.md"),       0),
+    ("purpose-walk",    include_str!("definitions/purpose_walk/SKILL.md"),    0),
+    ("naive-draft",     include_str!("definitions/naive_draft/SKILL.md"),     0),
+    ("stressor-walk",   include_str!("definitions/stressor_walk/SKILL.md"),   0),
+    ("integrate",       include_str!("definitions/integrate/SKILL.md"),       0),
+    ("fmea",            include_str!("definitions/fmea/SKILL.md"),            0),
+    ("atam",            include_str!("definitions/atam/SKILL.md"),            0),
+    ("tdd-implement",   include_str!("definitions/tdd_implement/SKILL.md"),   0),
+    ("defense-walk",    include_str!("definitions/defense_walk/SKILL.md"),    0),
 ];
 
 pub fn find(name: &str) -> Option<(&'static str, u32)> {

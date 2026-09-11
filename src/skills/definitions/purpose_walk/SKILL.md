@@ -1,6 +1,7 @@
 ---
 name: purpose-walk
 version: 2
+description: Socratically defines the project's purposes until each has feature-level precision and a verifiable outcome.
 ---
 
 # Purpose Walk

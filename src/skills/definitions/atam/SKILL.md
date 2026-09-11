@@ -1,6 +1,7 @@
 ---
 name: atam
 version: 2
+description: Surfaces stakeholder trade-offs (political, cost, business) against a candidate architecture before it is built.
 ---
 
 # ATAM — Architecture Trade-off Analysis

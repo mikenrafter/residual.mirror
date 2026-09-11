@@ -1,6 +1,7 @@
 ---
 name: defense-walk
 version: 1
+description: Rehearses outsider-facing communication using the defense ledger, theorizing audience priors and channel safety before artifacts go out.
 ---
 
 # Defense Walk

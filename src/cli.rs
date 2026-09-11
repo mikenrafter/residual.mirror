@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 pub mod help;
@@ -110,6 +110,15 @@ pub enum Command {
         #[command(subcommand)]
         op: WalkOp,
     },
+    /// Agent lifecycle hooks (pre-compaction, post-compaction, periodic turn).
+    ///
+    /// Process: an adapter boundary for agent tooling, distinct from explicit skill
+    /// sessions. See skill-hooks (P-33 residual-ledger-continuity, P-34
+    /// contextual-guru-cadence). Does not register with any agent's config.
+    Hook {
+        #[command(subcommand)]
+        op: HookOp,
+    },
     /// Manage per-code-branch metadata branches (git sidecar branch mode).
     ///
     /// `init` is the only subcommand that creates a metadata branch — every other
@@ -185,6 +194,26 @@ pub enum WalkOp {
 pub enum WalkKindArg {
     Purpose,
     Stressor,
+}
+
+#[derive(Subcommand)]
+pub enum HookOp {
+    /// Short prompt instructing the compaction process what to preserve.
+    #[command(name = "pre-compaction")]
+    PreCompaction,
+    /// Short reminder to consult skills-guru before deciding next steps.
+    #[command(name = "post-compaction")]
+    PostCompaction,
+    /// Classify a discussion snippet against skills-guru topics and, subject to
+    /// per-topic cadence and dedup, print a suggestion (silent if none applies).
+    #[command(name = "periodic-turn")]
+    PeriodicTurn {
+        #[arg(long)]
+        turn: u32,
+        /// Discussion snippet to classify; reads stdin when omitted.
+        #[arg(long)]
+        text: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -660,6 +689,33 @@ pub fn run() -> Result<()> {
                     walk_reminder::record_deferred(&meta, walk_kind)?;
                     crate::storage::git_sidecar::persist_if_sidecar(&cfg, &meta)?;
                     println!("Recorded {}-walk deferral", walk_kind.as_str());
+                }
+                Ok(())
+            }
+        },
+        Command::Hook { op } => match op {
+            HookOp::PreCompaction => {
+                println!("{}", crate::skills::hooks::pre_compaction());
+                Ok(())
+            }
+            HookOp::PostCompaction => {
+                println!("{}", crate::skills::hooks::post_compaction());
+                Ok(())
+            }
+            HookOp::PeriodicTurn { turn, text } => {
+                let text = match text {
+                    Some(text) => text,
+                    None => {
+                        use std::io::Read;
+                        let mut buf = String::new();
+                        std::io::stdin()
+                            .read_to_string(&mut buf)
+                            .context("read discussion snippet from stdin")?;
+                        buf
+                    }
+                };
+                if let Some(suggestion) = crate::skills::hooks::periodic_turn(turn, &text)? {
+                    println!("{suggestion}");
                 }
                 Ok(())
             }

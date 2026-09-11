@@ -1,6 +1,7 @@
 ---
 name: naive-draft
 version: 2
+description: Produces a naive architecture and TDD-first prototype that highlights initial flaws for stakeholders.
 ---
 
 # Naive Draft

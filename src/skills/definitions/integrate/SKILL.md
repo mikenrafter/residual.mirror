@@ -1,6 +1,7 @@
 ---
 name: integrate
 version: 2
+description: Derives the residual architecture from the NKP matrix via fusion, fission, and criticality analysis.
 ---
 
 # Integrate Analysis

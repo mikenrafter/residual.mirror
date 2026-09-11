@@ -1,6 +1,7 @@
 ---
 name: stressor-walk
 version: 3
+description: Socratically discovers stressors and attractors by simulating the business environment, without probabilities.
 ---
 
 # Stressor Walk

@@ -1,6 +1,7 @@
 ---
 name: fmea
 version: 2
+description: Walks each component through its failure modes once the architecture is stable, to catch technical issues before production incidents.
 ---
 
 # FMEA — Failure Mode and Effects Analysis

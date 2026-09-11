@@ -413,6 +413,49 @@ mod tests {
         );
     }
 
+    /// The filter input is not just markup — real JS must wire it to the
+    /// data-search/data-force-kind/data-architecture-set attributes so typing
+    /// actually hides/shows rows (the markup-only test above doesn't cover this).
+    #[test]
+    fn template_wires_working_filter_js_to_force_rows() {
+        assert!(
+            TEMPLATE.contains(r#"querySelector("[data-force-filter]")"#),
+            "template must look up the filter input by its data-force-filter hook"
+        );
+        assert!(
+            TEMPLATE.contains(r#".addEventListener("input""#),
+            "filter input must react live as the operator types"
+        );
+        assert!(
+            TEMPLATE.contains(r#"querySelectorAll(".force-row, .component-chip")"#),
+            "filter must target force rows and component chips"
+        );
+        assert!(
+            TEMPLATE.contains(r#"getAttribute("data-search")"#),
+            "filter must read the per-row data-search haystack (which embeds kind and architecture_set)"
+        );
+        assert!(
+            TEMPLATE.contains("row.hidden ="),
+            "filter must actually toggle row visibility, not just compute a match"
+        );
+        assert!(
+            TEMPLATE.contains(r#"querySelectorAll("[data-attractor-group]")"#)
+                && TEMPLATE.contains("group.hidden ="),
+            "filter must also collapse attractor groups left empty by the filter"
+        );
+    }
+
+    /// End-to-end: rendered rows carry exactly the data the template's filter JS
+    /// reads, so a filter matching kind/architecture_set actually has something to match.
+    #[test]
+    fn html_filter_js_and_rendered_rows_share_the_same_data_hooks() {
+        let out = html(false);
+        assert!(
+            out.contains(r#"data-search="S-01 queue-overload stressor A-01 iter1""#),
+            "rendered data-search must embed id, shortname, kind, attractor, and architecture_set for the JS filter to match on"
+        );
+    }
+
     /// Matrix / heatmap affordance backed by data attributes.
     #[test]
     fn html_contains_residue_matrix_with_cell_data_attributes() {

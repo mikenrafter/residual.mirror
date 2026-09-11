@@ -30,6 +30,8 @@ complete -c residual -n '__fish_seen_subcommand_from list' -a 'stressors residue
 complete -c residual -n '__fish_use_subcommand' -a 'walk' -d 'Record architecture walk cadence'
 complete -c residual -n '__fish_seen_subcommand_from verify' -a 'outcomes links all walk-reminder commit-msg'
 complete -c residual -n '__fish_seen_subcommand_from walk' -a 'record'
+complete -c residual -n '__fish_use_subcommand' -a 'hook' -d 'Agent lifecycle hooks (skill-hooks)'
+complete -c residual -n '__fish_seen_subcommand_from hook' -a 'pre-compaction post-compaction periodic-turn'
 complete -c residual -n '__fish_use_subcommand' -a 'commit' -d 'Check/suggest commit messages'
 complete -c residual -n '__fish_seen_subcommand_from commit' -a 'check suggest template'
 complete -c residual -n '__fish_seen_subcommand_from matrix' -a 'show calc criticality ri fusion fission'
@@ -96,6 +98,11 @@ Validate or compose commit subjects using project vocabulary.
 .TP
 .B migrate [\-\-force]
 Migrate residual/ from legacy on-disk shape (naive→v3, v3→v4 coupling lift).
+.TP
+.B hook pre-compaction / post-compaction / periodic-turn
+Agent lifecycle hooks (skill-hooks): compact pre-compaction prompt, post-compaction
+skills-guru reminder, and cadence-gated periodic-turn topic suggestions. Does not
+register with any agent's config.
 .TP
 .B config
 Show the current configuration.

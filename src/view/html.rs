@@ -18,15 +18,18 @@ pub const SNAPSHOT_PLACEHOLDER: &str = "{{SNAPSHOT_JSON}}";
 /// Element id of the `<script type="application/json">` block holding the snapshot.
 pub const SNAPSHOT_ELEMENT_ID: &str = "residual-snapshot";
 
-const FORCE_LIST_PLACEHOLDER: &str = "{{FORCE_LIST}}";
 const MATRIX_PLACEHOLDER: &str = "{{MATRIX}}";
 const DEFENSE_FORMS_PLACEHOLDER: &str = "{{DEFENSE_FORMS}}";
+const DEFENSE_RECORDS_PLACEHOLDER: &str = "{{DEFENSE_RECORDS}}";
 
 /// Render the full landscape page for a snapshot.
 pub fn render_landscape_html(snapshot: &LandscapeSnapshot) -> Result<String> {
     let json = escape_script_json(&snapshot.to_json()?);
-    let force_list = render_force_list(snapshot);
     let matrix = render_matrix(snapshot);
+    let defense_records = match &snapshot.defense {
+        Some(defense) => render_defense_records(defense),
+        None => String::new(),
+    };
     let defense_forms = match &snapshot.defense {
         Some(defense) => render_defense_forms(defense),
         None => String::new(),
@@ -34,8 +37,8 @@ pub fn render_landscape_html(snapshot: &LandscapeSnapshot) -> Result<String> {
 
     let html = TEMPLATE
         .replace(SNAPSHOT_PLACEHOLDER, &json)
-        .replace(FORCE_LIST_PLACEHOLDER, &force_list)
         .replace(MATRIX_PLACEHOLDER, &matrix)
+        .replace(DEFENSE_RECORDS_PLACEHOLDER, &defense_records)
         .replace(DEFENSE_FORMS_PLACEHOLDER, &defense_forms);
     Ok(html)
 }
@@ -68,53 +71,48 @@ fn force_kind_attr(kind: ForceKind) -> &'static str {
     }
 }
 
-fn render_force_list(snapshot: &LandscapeSnapshot) -> String {
-    let mut out = String::new();
+/// `S-<shortname>` / `P-<shortname>` — the operator-facing label for a force.
+fn force_label(force: &SnapshotForce) -> String {
+    let prefix = match force.kind {
+        ForceKind::Stressor => "S",
+        ForceKind::Purpose => "P",
+    };
+    format!("{prefix}-{}", force.shortname)
+}
 
-    let mut attractor_ids: Vec<String> = snapshot.attractors.iter().map(|a| a.id.clone()).collect();
-    for force in snapshot.stressors.iter().chain(snapshot.purposes.iter()) {
-        if !attractor_ids.iter().any(|id| id == &force.attractor_id) {
-            attractor_ids.push(force.attractor_id.clone());
-        }
+/// Bucket an open-ended status string into the small set of known lifecycle
+/// stages the UI styles distinctly; anything else falls back to "other" but
+/// keeps its raw text in the tooltip.
+fn status_bucket(status: &str) -> &'static str {
+    match status {
+        "proposed" => "proposed",
+        "actual" => "actual",
+        "deprecated" => "deprecated",
+        _ => "other",
     }
+}
 
-    for attractor_id in &attractor_ids {
-        let label = snapshot
-            .attractors
-            .iter()
-            .find(|a| &a.id == attractor_id)
-            .map(|a| a.name.as_str())
-            .unwrap_or(attractor_id.as_str());
-        out.push_str(&format!(
-            r#"<div class="attractor-group" data-attractor-group="{}">"#,
-            esc(attractor_id)
-        ));
-        out.push_str(&format!("<h3>{} · {}</h3>", esc(attractor_id), esc(label)));
-
-        for force in snapshot
-            .stressors
-            .iter()
-            .chain(snapshot.purposes.iter())
-            .filter(|f| &f.attractor_id == attractor_id)
-        {
-            out.push_str(&render_force_row(force, &snapshot.components, &snapshot.residues));
-        }
-        out.push_str("</div>");
+fn status_tooltip(status: &str) -> String {
+    match status {
+        "proposed" => "proposed — staged in the ledger, not yet built".to_string(),
+        "actual" => "actual — implemented and present in the codebase".to_string(),
+        "deprecated" => "deprecated — superseded, scheduled for removal".to_string(),
+        other => format!("{other} — non-standard status"),
     }
+}
 
-    if !snapshot.components.is_empty() {
-        out.push_str(r#"<div class="component-chips">"#);
-        for component in &snapshot.components {
-            out.push_str(&render_component_chip(component));
-        }
-        out.push_str("</div>");
-    }
+fn row_total(force_id: &str, residues: &[SnapshotResidue]) -> usize {
+    residues
+        .iter()
+        .filter(|r| r.force_id == force_id && r.coupled)
+        .count()
+}
 
-    if let Some(defense) = &snapshot.defense {
-        out.push_str(&render_defense_records(defense));
-    }
-
-    out
+fn col_total(component: &str, residues: &[SnapshotResidue]) -> usize {
+    residues
+        .iter()
+        .filter(|r| r.component_id == component && r.coupled)
+        .count()
 }
 
 fn architecture_sets_for_force(
@@ -137,69 +135,78 @@ fn architecture_sets_for_force(
     sets.join(" ")
 }
 
-fn render_force_row(
-    force: &SnapshotForce,
-    components: &[SnapshotComponent],
-    residues: &[SnapshotResidue],
-) -> String {
-    let kind = force_kind_attr(force.kind);
-    let arch = architecture_sets_for_force(&force.id, components, residues);
-    let search = format!(
-        "{} {} {} {} {}",
-        force.id, force.shortname, kind, force.attractor_id, arch
-    );
-    format!(
-        r#"<div class="force-row" data-force-id="{id}" data-force-kind="{kind}" data-architecture-set="{arch}" data-search="{search}"><span class="force-id">{id}</span><span>{short} <span class="force-kind">{kind}</span></span><span></span><span>{desc}</span></div>"#,
-        id = esc(&force.id),
-        kind = kind,
-        arch = esc(&arch),
-        search = esc(&search),
-        short = esc(&force.shortname),
-        desc = esc(&force.description),
-    )
-}
-
-fn render_component_chip(component: &SnapshotComponent) -> String {
-    let search = format!(
-        "{} {} {}",
-        component.name, component.architecture_set, component.status
-    );
-    format!(
-        r#"<div class="component-chip" data-component="{name}" data-architecture-set="{arch}" data-search="{search}"><span class="force-id">{name}</span><span>{arch} · {status}</span></div>"#,
-        name = esc(&component.name),
-        arch = esc(&component.architecture_set),
-        status = esc(&component.status),
-        search = esc(&search),
-    )
-}
-
+/// Single unified table: sticky-left force column (accordion for full force
+/// detail), sticky-top component header row (status dot + tooltip), sticky-
+/// right row-totals column, sticky-bottom column-totals footer. Replaces the
+/// old side-by-side force list + component chips + bare matrix.
 fn render_matrix(snapshot: &LandscapeSnapshot) -> String {
     let forces: Vec<&SnapshotForce> = snapshot
         .stressors
         .iter()
         .chain(snapshot.purposes.iter())
         .collect();
-    let mut out = String::from(r#"<table class="matrix"><thead><tr><th>force</th>"#);
+
+    let mut out = String::from(r#"<table class="matrix"><thead><tr>"#);
+    out.push_str(
+        r#"<th class="sticky-col sticky-row corner" data-sort-key="force" tabindex="0" role="button">force</th>"#,
+    );
     for component in &snapshot.components {
+        let bucket = status_bucket(&component.status);
+        let tooltip = status_tooltip(&component.status);
         out.push_str(&format!(
-            r#"<th data-component="{}">{}</th>"#,
-            esc(&component.name),
-            esc(&component.name)
+            r#"<th class="sticky-row" data-component="{name}" data-status="{status}" data-architecture-set="{arch}" data-sort-key="component:{name}" title="{tooltip}" tabindex="0" role="button"><span class="status-dot status-{bucket}"></span>{name}</th>"#,
+            name = esc(&component.name),
+            status = esc(&component.status),
+            arch = esc(&component.architecture_set),
+            tooltip = esc(&tooltip),
+            bucket = bucket,
         ));
     }
+    out.push_str(
+        r#"<th class="sticky-row sticky-col-right corner" data-sort-key="total">total</th>"#,
+    );
     out.push_str("</tr></thead><tbody>");
 
-    for force in forces {
-        out.push_str("<tr>");
+    for force in &forces {
+        let kind = force_kind_attr(force.kind);
+        let arch = architecture_sets_for_force(&force.id, &snapshot.components, &snapshot.residues);
+        let search = format!(
+            "{} {} {} {} {}",
+            force.id, force.shortname, kind, force.attractor_id, arch
+        );
+        let label = force_label(force);
+        let total = row_total(&force.id, &snapshot.residues);
+        let attractor_label = snapshot
+            .attractors
+            .iter()
+            .find(|a| a.id == force.attractor_id)
+            .map(|a| format!("{} · {}", a.id, a.name))
+            .unwrap_or_else(|| force.attractor_id.clone());
+
         out.push_str(&format!(
-            r#"<th data-force-id="{}">{}</th>"#,
-            esc(&force.id),
-            esc(&force.id)
+            r#"<tr class="force-row" data-force-id="{id}" data-force-kind="{kind}" data-architecture-set="{arch}" data-attractor-id="{attractor_id}" data-search="{search}" data-row-total="{total}">"#,
+            id = esc(&force.id),
+            kind = kind,
+            arch = esc(&arch),
+            attractor_id = esc(&force.attractor_id),
+            search = esc(&search),
+            total = total,
         ));
+        out.push_str(&format!(
+            r#"<th class="sticky-col" data-force-id="{id}"><button type="button" class="force-accordion-toggle" data-accordion-toggle aria-expanded="false">{label}</button><div class="force-detail" hidden><dl><dt>id</dt><dd>{id}</dd><dt>attractor</dt><dd>{attractor}</dd><dt>description</dt><dd>{desc}</dd><dt>naive change</dt><dd>{naive}</dd><dt>outcomes</dt><dd>{outcomes}</dd></dl></div></th>"#,
+            id = esc(&force.id),
+            label = esc(&label),
+            attractor = esc(&attractor_label),
+            desc = esc(&force.description),
+            naive = esc(&force.naive_change),
+            outcomes = esc(&force.outcomes),
+        ));
+
         for component in &snapshot.components {
-            let residue = snapshot.residues.iter().find(|r| {
-                r.force_id == force.id && r.component_id == component.name
-            });
+            let residue = snapshot
+                .residues
+                .iter()
+                .find(|r| r.force_id == force.id && r.component_id == component.name);
             let coupled = residue.map(|r| r.coupled).unwrap_or(false);
             let coupled_attr = if coupled { "1" } else { "0" };
             let body = if coupled { "1" } else { "" };
@@ -211,9 +218,29 @@ fn render_matrix(snapshot: &LandscapeSnapshot) -> String {
                 body = body,
             ));
         }
+        out.push_str(&format!(
+            r#"<td class="sticky-col-right" data-row-total="{total}">{total}</td>"#,
+            total = total
+        ));
         out.push_str("</tr>");
     }
-    out.push_str("</tbody></table>");
+    out.push_str("</tbody><tfoot><tr>");
+    out.push_str(r#"<th class="sticky-col corner">totals</th>"#);
+    let mut grand_total = 0usize;
+    for component in &snapshot.components {
+        let total = col_total(&component.name, &snapshot.residues);
+        grand_total += total;
+        out.push_str(&format!(
+            r#"<td data-col-total="{total}" data-component="{name}">{total}</td>"#,
+            total = total,
+            name = esc(&component.name),
+        ));
+    }
+    out.push_str(&format!(
+        r#"<td class="sticky-col-right corner" data-grand-total="{gt}">{gt}</td>"#,
+        gt = grand_total
+    ));
+    out.push_str("</tr></tfoot></table>");
     out
 }
 
@@ -383,21 +410,14 @@ mod tests {
         assert_eq!(parsed.stressors[0].id, "S-01");
     }
 
-    /// Filterable force list plus attractor grouping.
+    /// Force rows live inside the matrix table itself (no separate force
+    /// list), addressable and filterable via the same data hooks as before.
     #[test]
-    fn html_contains_filterable_force_list_and_attractor_grouping() {
+    fn html_matrix_rows_carry_filterable_force_data() {
         let out = html(false);
         assert!(
-            out.contains(r#"data-view="force-list""#),
-            "force list view is missing"
-        );
-        assert!(
             out.contains("data-force-filter"),
-            "force list must expose a filter input hook"
-        );
-        assert!(
-            out.contains(r#"data-attractor-group="A-01""#),
-            "forces must be groupable by attractor id"
+            "the toolbar filter input must be present"
         );
         assert!(
             out.contains(r#"data-force-id="S-01""#),
@@ -411,13 +431,114 @@ mod tests {
             out.contains(r#"data-architecture-set="iter1""#),
             "architecture_set must be exposed for filtering"
         );
+        assert!(
+            out.contains(r#"data-attractor-id="A-01""#),
+            "force rows must expose their attractor id"
+        );
+    }
+
+    /// Forces render as `S-<shortname>` / `P-<shortname>` accordion toggles,
+    /// with full detail (description/naive-change/outcomes/attractor) folded
+    /// into a hidden panel rather than a separate list outside the table.
+    #[test]
+    fn html_force_rows_are_accordions_labeled_by_shortname() {
+        let out = html(false);
+        assert!(
+            out.contains(">S-queue-overload<"),
+            "stressor label must be S-<shortname>, got: {out}"
+        );
+        assert!(
+            out.contains(">P-landscape-view<"),
+            "purpose label must be P-<shortname>"
+        );
+        assert!(
+            out.contains("data-accordion-toggle"),
+            "force label must be an accordion toggle"
+        );
+        assert!(
+            out.contains(r#"class="force-detail" hidden"#),
+            "force detail must be present but collapsed by default"
+        );
+        assert!(
+            out.contains("queue overload") && out.contains("add retry") && out.contains("requests drain"),
+            "force detail must carry description/naive_change/outcomes"
+        );
+    }
+
+    /// Row totals (rightmost sticky column) and column totals (sticky
+    /// footer) are computed from coupled residues.
+    #[test]
+    fn html_matrix_has_row_and_column_totals() {
+        let out = html(false);
+        assert!(
+            out.contains(r#"data-row-total="1""#),
+            "S-01 couples to exactly one component (auth), row total must be 1"
+        );
+        assert!(
+            out.contains("<tfoot>"),
+            "column totals must render as a sticky table footer"
+        );
+        assert!(
+            out.contains(r#"data-col-total="1" data-component="auth""#),
+            "auth column total must be 1"
+        );
+        assert!(
+            out.contains(r#"data-col-total="0" data-component="db""#),
+            "db column total must be 0 (no coupling)"
+        );
+        assert!(
+            out.contains("data-grand-total"),
+            "the bottom-right corner cell must carry the grand total"
+        );
+    }
+
+    /// Sticky-positioning hooks: leftmost/rightmost columns and header/footer.
+    #[test]
+    fn html_matrix_carries_sticky_hooks() {
+        let out = html(false);
+        assert!(out.contains("sticky-col"), "leftmost column must be sticky");
+        assert!(out.contains("sticky-col-right"), "rightmost column must be sticky");
+        assert!(out.contains("sticky-row"), "header row must be sticky");
+        assert!(out.contains("<tfoot>"), "footer row exists to be sticky");
+    }
+
+    /// Column headers are click-sortable and carry component status metadata
+    /// (styled distinctly, tooltip explains the stage) for every component,
+    /// proposed included.
+    #[test]
+    fn html_matrix_headers_carry_sort_and_status_metadata() {
+        let out = html(false);
+        assert!(
+            out.contains(r#"data-sort-key="force""#),
+            "leftmost header must be sortable"
+        );
+        assert!(
+            out.contains(r#"data-sort-key="component:auth""#),
+            "component headers must be sortable"
+        );
+        assert!(
+            out.contains(r#"data-sort-key="total""#),
+            "totals header must be sortable"
+        );
+        assert!(
+            out.contains(r#"data-status="actual""#),
+            "component headers must expose raw status"
+        );
+        assert!(
+            out.contains("status-dot status-actual"),
+            "component status must be styled distinctly"
+        );
+        assert!(
+            out.contains("title=\"actual — implemented and present in the codebase\""),
+            "hovering a component header must explain its status via a tooltip"
+        );
     }
 
     /// The filter input is not just markup — real JS must wire it to the
-    /// data-search/data-force-kind/data-architecture-set attributes so typing
-    /// actually hides/shows rows (the markup-only test above doesn't cover this).
+    /// data-search attribute on matrix rows so typing actually hides/shows
+    /// rows in the table (the markup-only test above doesn't cover this).
     #[test]
-    fn template_wires_working_filter_js_to_force_rows() {
+    fn template_wires_working_filter_js_to_matrix_rows() {
         assert!(
             TEMPLATE.contains(r#"querySelector("[data-force-filter]")"#),
             "template must look up the filter input by its data-force-filter hook"
@@ -427,8 +548,8 @@ mod tests {
             "filter input must react live as the operator types"
         );
         assert!(
-            TEMPLATE.contains(r#"querySelectorAll(".force-row, .component-chip")"#),
-            "filter must target force rows and component chips"
+            TEMPLATE.contains(r#"querySelectorAll("table.matrix tbody tr.force-row")"#),
+            "filter must target matrix table rows"
         );
         assert!(
             TEMPLATE.contains(r#"getAttribute("data-search")"#),
@@ -438,10 +559,60 @@ mod tests {
             TEMPLATE.contains("row.hidden ="),
             "filter must actually toggle row visibility, not just compute a match"
         );
+    }
+
+    /// Click-to-sort JS: header clicks reorder tbody rows by force id,
+    /// row total, or a specific component's coupling.
+    #[test]
+    fn template_wires_click_to_sort_on_matrix_headers() {
         assert!(
-            TEMPLATE.contains(r#"querySelectorAll("[data-attractor-group]")"#)
-                && TEMPLATE.contains("group.hidden ="),
-            "filter must also collapse attractor groups left empty by the filter"
+            TEMPLATE.contains(r#"querySelectorAll("table.matrix thead th[data-sort-key]")"#),
+            "template must attach click handlers to sortable headers"
+        );
+        assert!(
+            TEMPLATE.contains("function sortMatrixBy"),
+            "template must define the sort function"
+        );
+        assert!(
+            TEMPLATE.contains("tbody.appendChild(row)"),
+            "sort must actually reorder DOM rows"
+        );
+    }
+
+    /// Force accordion toggle JS: clicking the S-/P- label expands the
+    /// hidden detail panel in place, no separate list involved.
+    #[test]
+    fn template_wires_force_accordion_toggle() {
+        assert!(
+            TEMPLATE.contains(r#"querySelectorAll("[data-accordion-toggle]")"#),
+            "template must wire up accordion toggles"
+        );
+        assert!(
+            TEMPLATE.contains(r#"detail.hidden = expanded"#),
+            "toggle must flip the detail panel's hidden state"
+        );
+    }
+
+    /// Fusion/fission candidates are recomputed client-side from the
+    /// rendered coupling cells, filterable, and the threshold is a live
+    /// slider (not baked into the server-rendered page).
+    #[test]
+    fn template_wires_live_fusion_fission_threshold() {
+        assert!(
+            TEMPLATE.contains("data-fusion-fission-filter"),
+            "template must expose a fusion/fission-only filter control"
+        );
+        assert!(
+            TEMPLATE.contains("data-threshold-input"),
+            "template must expose a live threshold slider"
+        );
+        assert!(
+            TEMPLATE.contains("function computeMatrixCandidates"),
+            "template must compute fusion/fission candidates client-side"
+        );
+        assert!(
+            TEMPLATE.contains(r#"thresholdInput.addEventListener("input""#),
+            "threshold slider must recompute candidates live as it moves"
         );
     }
 

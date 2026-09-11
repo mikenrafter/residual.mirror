@@ -1,0 +1,103 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "1c7c4c4fc608",
+  "session_id": "b6595627-123d-4497-88de-fe62e417ea47",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-11T05:45:42.349762061Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/skills/definitions/atam.md",
+    "src/skills/definitions/atam/SKILL.md",
+    "src/skills/definitions/defense_walk.md",
+    "src/skills/definitions/defense_walk/SKILL.md",
+    "src/skills/definitions/fmea.md",
+    "src/skills/definitions/fmea/SKILL.md",
+    "src/skills/definitions/framework.md",
+    "src/skills/definitions/framework/SKILL.md",
+    "src/skills/definitions/integrate.md",
+    "src/skills/definitions/integrate/SKILL.md",
+    "src/skills/definitions/naive_draft.md",
+    "src/skills/definitions/naive_draft/SKILL.md",
+    "src/skills/definitions/purpose_walk.md",
+    "src/skills/definitions/purpose_walk/SKILL.md",
+    "src/skills/definitions/stressor_walk.md",
+    "src/skills/definitions/stressor_walk/SKILL.md",
+    "src/skills/definitions/tdd_implement.md",
+    "src/skills/definitions/tdd_implement/SKILL.md",
+    "src/skills/hooks.rs",
+    "src/skills/mod.rs",
+    "src/view/html.rs",
+    "src/view/template.html"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "9f247c3705f5",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 30217,
+    "cache_read_tokens": 0,
+    "output_tokens": 270,
+    "api_call_count": 1
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-11T05:45:42.305290067Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 540,
+    "total_committed": 0,
+    "total_lines_changed": 540,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 980,
+      "user_lines_removed": 540,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "residual/.residual-write-authorized": 1,
+        "src/cli.rs": 57,
+        "src/cli/help.rs": 7,
+        "src/skills/definitions/atam/SKILL.md": 50,
+        "src/skills/definitions/defense_walk/SKILL.md": 24,
+        "src/skills/definitions/fmea/SKILL.md": 53,
+        "src/skills/definitions/framework/SKILL.md": 106,
+        "src/skills/definitions/integrate/SKILL.md": 53,
+        "src/skills/definitions/naive_draft/SKILL.md": 54,
+        "src/skills/definitions/purpose_walk/SKILL.md": 44,
+        "src/skills/definitions/stressor_walk/SKILL.md": 55,
+        "src/skills/definitions/tdd_implement/SKILL.md": 93,
+        "src/skills/hooks.rs": 312,
+        "src/skills/mod.rs": 10,
+        "src/view/html.rs": 43,
+        "src/view/template.html": 18
+      },
+      "user_removed_per_file": {
+        "src/cli.rs": 1,
+        "src/skills/definitions/atam.md": 49,
+        "src/skills/definitions/defense_walk.md": 23,
+        "src/skills/definitions/fmea.md": 52,
+        "src/skills/definitions/framework.md": 106,
+        "src/skills/definitions/integrate.md": 52,
+        "src/skills/definitions/naive_draft.md": 53,
+        "src/skills/definitions/purpose_walk.md": 43,
+        "src/skills/definitions/stressor_walk.md": 54,
+        "src/skills/definitions/tdd_implement.md": 93,
+        "src/skills/mod.rs": 9,
+        "src/view/template.html": 5
+      }
+    }
+  ]
+}

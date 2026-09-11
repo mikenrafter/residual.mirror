@@ -1,0 +1,111 @@
+The residue matrix needs to be full width. I need to be able to click on different headers and select sort options. When I filter on the filter bar, it should filter in the table. Thus, the filter bar needs to be a sticky header. The table should have sticky headers as well. I need for the force and attractor names in the table to be `S-<shortname>` or `P-<shortname>`, etc. I need a sticky rightmost column that is a row totals column, I need a sticky footer that is the column totals row. I need the proposed items to display in the table. I need for there to be a filter by fusion/fission candidates. I need for the fusion/fission threshold to be adjustable live. I need for the forces to be a accordions that give further details, like the explicit list we have now, the current list of items outside the table needs to go. The different stages for each component (proposed, actual, etc) need to be styled differently, a tooltip on hover should explain why. I also need the leftmost column to be sticky so force names are always legible... Basically, the header/footer are sticky, so too are the leftmost and rightmost columns... The table should take up about calc(100vh - 5em) and calc(100vw - 4em).
+
+⛓️babeltele·handoff⛓️
+
+セッション=residual(Rust CLI,NKP Residuality)@/home/v0id/Documents/repos/residual,branch=tdd-implement/defense-ledger-proposed-components,git-sidecar=residual/metadata(orphan branch,project ledger data)
+
+**R1·bearings**: user→"get bearings w/agentgrep,rtk file-ops,nix devshell residual,work around stale PATH if devshell won't build;draft skill-hooks forces+attractor+component;find skill-install-across-agents dependency;check project state"。agentgrep✓installed(grep/find/outline/trace)。rtk 0.48.0✓,41.6%savings/3336cmds,no global hook installed。PATH residual=stale(/etc/profiles/per-user/v0id/bin/residual→/nix/store/0nizzpwhchzjyq0sp6j5z04gdf6czl1s-residual-0.1.0)。`nix develop -c cargo build --release`✓successful(49.91s),使用./target/release/residual全程代替PATH版。
+
+Discovery: prior session(GPT5.6-terra)claimed added A-21/S-61/P-35+skill-hooks component but NOT YET done — 实际检查显示ALREADY EXISTS under different IDs: S-60(agent-hook-fragmentation)→A-20(Agent hook reliability),P-33(residual-ledger-continuity),P-34(contextual-guru-cadence),component skill-hooks(status=proposed,architecture_set=iter5-agent-hooks,residues.csv col-index5="1"coupling confirmed via header check)。research-study component也proposed(unrelated older set:P-14 longitudinal-study-ri,P-15 communicable-robustness,P-22 research-context-sidecar,S-22 prospect-efficacy-doubt)。
+
+Lexicon工作:user要求re-add"agent"term+augment operator/actor,但"user"term已有冲突定义(architected-system's end-user,explicitly NOT operator)→AskUserQuestion clarify→user选"add human-actor,don't touch user"。Added human-actor term via`residual add term`。Redefined operator/actor/agent definitions directly in lexicon.csv(no update-term CLI cmd exists,CLAUDE.md-sanctioned exception)。
+
+**KEY TECHNICAL DISCOVERY**: `residual verify`ALWAYS reads from git-sidecar branch TIP(`read_sidecar_metadata`→`materialize_branch_tree`fresh每次),NEVER local uncommitted files,即使`branch edit`已materialize到本地供hand-edit。局部edit未经`branch save`对verify不可见。当CLI mutating cmd(add/remove term)运行时,它经`metadata_dir_for_mutation`→独立scratch checkout(`.git/residual-sidecar-checkout`),与手动`branch edit`本地copy分离运作→两条路径易产生drift。Root-caused after false-positive confusion(agent rename commit看似生效但实际sidecar tip仍旧值)。
+
+Fix procedure established: `write authorize`→`branch edit`(re-materialize from TRUE tip)→hand-edit→`write authorize`(refresh,因branch edit会clobber)→`branch save --commit-msg`。
+
+**R2·rename+bugfix+review**: user反馈:actor循环定义错(human-actor↔operator);agent应改名agent-actor(与human-actor对称);human-actor/agent-actor应各自读"An actor backed by [human/digital] intelligence";actor应读"A definable entity whose behavior or properties are relevant to residual analysis"。
+
+执行:`residual remove --force term --term agent`+`residual add --force term --term agent-actor --definition "An actor backed by digital intelligence." --domain tool --related "operator skill hook human-actor"`(注:`--force`flag在`add`/`remove`父命令上,非子命令)。Rename破坏S-60 outcome word-match(原理:旧"agent"row本身即为独立phrase,substring-contains"agents"成立;rename后仅剩"agent-actor"phrase,不再substring-match"agents")→fix stressors.csv S-60 outcome:"agents"→"agent-actors"。全部经branch-edit-reconcile流程后commit到sidecar(f656a76→later ee01af3→20c0e4b→fdc933a→更多)。
+
+发现root-cause of write-authorization marker(`residual/.residual-write-authorized`,expires 30min)被`branch edit`clobber回旧值的bug:`persist_metadata_to_branch`(src/storage/git_sidecar.rs)排除列表`["config.toml", BRANCH_EDIT_MARKER]`未包含write-auth marker filename→每次`branch save`把marker烘焙进sidecar commit,下次`branch edit`还原旧值。Fix:import`write_authorization::MARKER_FILE`,加入exclude list(git_sidecar.rs)。Purge cycle清除已提交的stale copy。Verified:后续branch edit不再clobber。
+
+Code-review skill(medium effort)审查staged write-gate diff(cli.rs/help.rs/git_sidecar.rs/storage/mod.rs/terminology.rs/write_authorization.rs/verification/git_hook.rs)→2 CONFIRMED findings(manually verified via Read,非仅信任agent):
+①`storage::migrate`(src/storage/mod.rs:615-618)调`persist_if_sidecar`但缺`write_authorization::require(cfg)`门控,不同于add/remove/branch-edit/save
+②`Command::Walk::Record`(src/cli.rs:637-663)同样缺gate
+
+研究agent-config(whit3rabbit/agent-config,MIT,v0.4.0,2.7k dl/mo,24+harnesses,pure library无CLI,不含内容/包格式)vs skills-cli(qntx/skill,MIT/Apache-2.0dual,v0.7.0,39 harnesses,Vercel skills.sh生态backing,31k★原TS版,CLI+embeddable SkillManager,自有SKILL.md+YAML frontmatter+lockfile约定)。推荐agent-config(更匹配residual自有skill内容模型),但user最终选skills-cli(harness数量+backing)。
+
+ID-scheme讨论(numeric S-/P-/A-/R- IDs vs shortnames):建议保留前缀但让shortname成primary,quote为"reference-stability migration"非trivial(commit-msg hook,residues.csv attractor_id列,verify-links等touch面广)→建议drafting为force而非直接改schema。User回复:不新建force,加到已有P-26(operator-readable-dialogue,attractor A-14 Shared Framework Comprehension)naive_change。
+
+**R3·commit+skills-cli详情+design-talk**: user:"skills-cli更appealing,现有format需改什么?migrate加write-lock,walk-record明确不加(inline comment说明),commit现有+此fix。确保pre-commit hook防止residual数据直接存working branch。其他flag的defer。skill-hooks需要implementation,谈谈design。P-26 naive_change加:CLI只accept/show shortnames,IDs relegate到storage format。HTML renderer需改进(filter不work,横向滚动,sidebar太挤)"。
+
+Skills-cli format gap分析:①加description字段(trivial)②flat file→per-skill目录(moderate,需改include_str!位置)③invocation model fork——skills-cli/native Skill依description自动触发,residual现用explicit slash-command+Socratic gate("Act only with approval")→建议保留explicit invocation,仅借skills-cli做文件放置,回避该fork。
+
+Fix执行:src/storage/mod.rs`migrate()`加`write_authorization::require(cfg)?;`(在metadata_dir_for_mutation前)。src/cli.rs walk-record加inline comment解释故意不gate("Deliberately not gated...low-blast-radius cadence bookkeeping...")。确认pre-commit hook(src/verification/git_hook.rs)已有hard-block(`LEAKED=$(git diff --cached --name-only|grep '^residual/'|grep -v '^residual/config\.toml$')`→exit 1,no override flag)+测试覆盖,无需新增。
+
+Rebuild+test(320 tests全绿)→commit尝试失败2次:①pre-commit hook用PATH stale binary→"CSV deserialize error: record 1 (line: 2, byte: 60): missing field `components`"→PATH override修复(`export PATH=".../target/release:$PATH"`)②commit-msg hook要求`<component>: S-<nn>: summary`格式或`general - `前缀→无匹配force,用"general - "。**Commit c5c0b72**"general - storage: gate residual writes behind explicit write-authorization"(7 files,710insertions/182deletions)on working branch。
+
+P-26 edit:naive_change→"Skills render attractor names and force shortnames in dialogue, never IDs. The CLI interface accepts and displays only shortnames; numeric/prefixed IDs (S-/P-/A-/R-) are relegated to the storage format alone."(via branch-edit reconcile,saved to sidecar)。
+
+Skill-hooks design讨论:提出event enum(PreCompaction/PostCompaction/PeriodicTurn{turn_count}),重用skills-guru(src/skills/guru/mod.rs)topic registry(TOPIC_ATTRACTORS/STRESSORS/PURPOSES/PERSONAS/WHOLE_SYSTEM_RESIDUE/WALK_REMINDER),keyword-match分类避免model call依赖,cadence+dedup用state file。HTML view(src/view/html.rs 591行等)初步查:filter markup存在(`data-force-filter`,已有test)但疑似JS未wire。
+
+**R4·subagent orchestration(this turn)**: user:"skill format trivial→go;skill-hooks full setup+make P-33 fully-fledged;再查是否有hook-management版skills-cli;HTML=plain bug simple fix;go forth;完成后给babeltele handoff,不commit此branch;用subagent编排"。
+
+预处理:自行加`pub mod hooks;`到src/skills/mod.rs(避免两agent冲突同一行)。研究:weykon/agent-hooks(GitHub)=hook-management analog——"Unified hook registration for AI coding CLI tools(Claude Code,Cursor,Codex,Windsurf,Kiro,OpenCode,Gemini)",ToolAdapter trait,auto-detection,`auto_register_all()`,bridge script→common JSONL。次选:claude-hooks(pablolion/agent-console-dashboard,MIT/Apache-2.0,v0.1.2,仅Claude,12 events Start/Stop/BeforePrompt/.../AfterRun——与Claude Code真实hook名不完全match,存疑)。
+
+3× background subagents(general-purpose,disjoint file-scope):
+①**Agent-A**(skill format):9 skills flat md→`definitions/<name>/SKILL.md`,加description字段(7个新增,framework/tdd_implement已有),更新src/skills/mod.rs的9条include_str!路径。未碰cli.rs/help.rs/residual/,未commit。结果:320 baseline maintained,`skill show atam`验证OK。Flag到并发文件冲突(与Agent-B共享mod.rs/cli.rs需reset+restore若干次,byte-diff verify)。
+②**Agent-B**(skill-hooks,最大任务):新建src/skills/hooks.rs——`pre_compaction()->String`(静态,<500chars,含"decision/dead end/correction/completed",deprioritize"ceremony/narrative"),`post_compaction()->String`(reminder+全部6 guru topics),`periodic_turn(turn:u32,text:&str)->Result<Option<String>>`(keyword classify,`MIN_TURNS_BETWEEN_SAME_TOPIC=10`常量per-topic cadence,exact-string dedup against last suggestion,silent Ok(None)when no-match/cadence-blocked)。State persist:`.git/residual-hook-state.json`(JSON,`last_fired_turn`BTreeMap+`last_suggestion`),仿git_sidecar.rs scratch_path惯例,绝不入residual/或commit。CLI wiring:src/cli.rs新增`Command::Hook{op:HookOp}`,`HookOp::{PreCompaction,PostCompaction,PeriodicTurn{turn,text:Option<String>}}`,支持`--text`省略时读stdin。src/cli/help.rs加fish-completion+man entry。11新测试colocated。手动验证:`residual hook pre-compaction`/`post-compaction`静态输出确认;`periodic-turn --turn 1 --text "...attractor..."`触发建议;`--turn 2`同topic→silent(cadence);无关text→silent。
+③**Agent-C**(HTML renderer):读代码后发现filter JS其实ALREADY WORKING(非原判定"死掉")——真bug是CSS Grid`min-width:auto`默认值让宽table(NKP matrix)撑爆grid track→page横向滚动+sidebar被挤压(178px vs matrix 1015px,headless Chromium实测scrollWidth 1041 vs clientWidth 885@900px viewport)。Fix(src/view/template.html):`section{min-width:0}`+新`.matrix-scroll{overflow-x:auto;max-width:100%}`wrapper包`{{MATRIX}}`+grid-template-columns 1.1fr1fr→1.25fr1fr+sidebar padding/row-spacing放宽(0.45rem→0.6rem等)。2新colocated tests(src/view/html.rs)锁定filter JS存在性(非仅markup)。Verified via headless Chromium before/after(post-fix scrollWidth==clientWidth@1280px&900px两viewport)。
+
+**Integration(orchestrator亲自做)**:
+
+- Nix flake仅见git-tracked文件→新增/renamed文件需`git add`(仅staging非commit)才能被`nix develop -c cargo build`看到→每次verify走stage→build→test→`git reset HEAD --`unstage循环。
+- 首次integrated build失败(`error: couldn't read...tdd_implement/SKILL.md`等,因未staged)→staged后build✓,test 294+4+5+30=**333 passed 0 failed**(baseline 320→+13新增)。
+- **Self-caught regression**:审查hooks.rs发现dedup比较用turn-embedded完整string("[skill-hooks turn N]..."),实际sequential-turn场景永不byte-identical→dedup形同虚设(cadence才是真正防spam机制)——尝试"fix"改为topic-content-based key(无turn号)→**引入真bug**:guru block内容per-topic静态→改后任何同topic re-fire(即使cadence已elapsed)都被dedup永久拦截,破坏periodic re-reminder机制→测试`periodic_turn_fires_again_after_cadence_window_elapses`FAILED(293passed,1failed)→**revert干净**回agent原始实现(turn-stamped比较,虽是no-op但无害,cadence已足够满足P-34"do not become background noise")。Rebuild确认333/333 green。
+- 审查src/view/html.rs+template.html diff:确认Agent-C描述准确,diff proportionate。审查src/skills/mod.rs+cli/help.rs diff:确认干净,无冲突残留。
+- **Ledger update**(sidecar branch,非working branch commit):`residual/components.csv` skill-hooks row: status`proposed`→`actual`,description更新为准确反映范围("`residual hook pre-compaction/post-compaction/periodic-turn`implements the ledger-continuity prompts and cadence-gated skills-guru suggestions. Per-agent capability detection and config registration...is a follow-up, not yet built.")——诚实标注:未做真实agent(如Claude Code settings.json)hook注册,仅contract+logic层完成。`verify all`✓→commit到residual/metadata(28111c2 "components: skill-hooks: mark actual...")。
+
+**Final state**:
+working branch(tdd-implement/defense-ledger-proposed-components)HEAD=c5c0b72(无新commit,遵守"no committing on this branch")。working-tree modifications(uncommitted,ready for review):M src/cli.rs,M src/cli/help.rs,D+A(rename)9× src/skills/definitions/.md→/SKILL.md,M src/skills/mod.rs,A src/skills/hooks.rs,M src/view/html.rs,M src/view/template.html。untracked:residual/.residual-write-authorized(必须保持unstaged,pre-commit hook会拒绝)。
+
+sidecar branch(residual/metadata)HEAD=28111c2,链:28111c2→e6a0f83(P-26)→f29290e(agent-actor rename+S-60 fix)→fdc933a→20c0e4b→ee01af3(marker-exclude fix)→f656a76→808106d→afa090f。
+
+test count 320→333(全绿)。Deferred(未做,user明确说defer):walk-record write-gate(明确排除,非遗漏),其余code-review旧findings。Skills-cli adoption本身未实施(仅format-compat mechanical parts done:description字段+目录化;invocation-model决策未变,仍explicit slash-command)。Cross-agent hook registration(实际写入Claude Code settings.json等)未做,记录为skill-hooks组件description内的follow-up。
+
+⛓️end-handoff⛓️
+
+The residue matrix needs to be full width. I need to be able to click on different headers and select sort options. When I filter on the filter bar, it should filter in the table. Thus, the filter bar needs to be a sticky header. The table should have sticky headers as well. I need for the force and attractor names in the table to be `S-<shortname>` or `P-<shortname>`, etc. I need a sticky rightmost column that is a row totals column, I need a sticky footer that is the column totals row. I need the proposed items to display in the table. I need for there to be a filter by fusion/fission candidates. I need for the fusion/fission threshold to be adjustable live. I need for the forces to be a accordions that give further details, like the explicit list we have now, the current list of items outside the table needs to go. The different stages for each component (proposed, actual, etc) need to be styled differently, a tooltip on hover should explain why. I also need the leftmost column to be sticky so force names are always legible... Basically, the header/footer are sticky, so too are the leftmost and rightmost columns... The table should take up about calc(100vh - 5em) and calc(100vw - 4em).
+
+First commit the current working tree, then get to work on fixing all of these `residual view` issues. Please follow the same proceure as detailed in the babeltele handoff.
+
+Begin.
+
+---
+
+<task-notification>
+<task-id>a07281d6a263390c1</task-id>
+<tool-use-id>toolu_01M5QnbK2kVpYFuhkCKYE3ua</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/998c0f12-ad26-488c-9d11-0bef8409ac4e/tasks/a07281d6a263390c1.output</output-file>
+<status>completed</status>
+<summary>Agent "Find fusion/fission threshold logic" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>## Findings
+
+**1. Core logic location:** `/home/v0id/Documents/repos/residual/src/nkp/matrix.rs`
+- `fusion_candidates()` — lines 149–161
+- `fission_candidates(threshold)` — lines 163–171
+- `reorder_columns_fusion_fission()` — lines 175–233 (used by `matrix show --sort-by fusion-fission`)
+
+CLI/command wiring: `/home/v0id/Documents/repos/residual/src/nkp/mod.rs` (`MatrixOp::Fusion` lines 101–112, `MatrixOp::Fission` lines 113–125). CLI enum definitions: `/home/v0id/Documents/repos/residual/src/cli.rs` — `MatrixOp` lines 530–560, `MatrixSortBy` lines 515–527.
+
+**2. Formulas (both hardcoded, no CLI flag):**
+- **Fusion candidate** (pair of components `i,j`): identical column vectors across all force rows —
+  ```rust
+  let identical = self.cells.iter().all(|row| row[i] == row[j]);
+  ```
+  (matrix.rs:154) — i.e., every force couples to component `i` iff it couples to component `j`. No numeric threshold; it's exact-match only.
+- **Fission candidate**: a component whose coupling column-total exceeds a threshold —
+  ```rust
+  .filter(|(_, &amp;total)| total &gt; threshold)
+  ```
+  (matrix.rs:168), where `threshold = (force_ids.len() / 2).max(1)` — i.e. more than half of all forces couple to that component. This threshold is computed identically in three places (matrix.rs:181, matrix.rs:266, nkp/mod.rs:115) and is **not** CLI-configurable; `MatrixOp::Fission` (cli.rs:559) and `MatrixOp::Fusion` (cli.rs:558) take no arguments.
+
+**3. Data structures:** `NkpMatrix` (matrix.rs:12–19): `force_ids: Vec&lt;String&gt;`, `attractor_ids: Vec&lt;String&gt;`, `components: Vec&lt;String&gt;`, `cells: Vec&lt;Vec&lt;u8&gt;&gt;` (row-major, 0/1 coupling per stressor/purpose × component). Built via `build_from_residues` from `Residue` records (`crate::structure::analysis::residues::Residue`, fields `force_id`, `component_id`, `is_coupled()`), not a `SnapshotResidue`.
+
+**4. `residual matrix ri`:** cli.rs:550–557, implemented in `/home/v0id/Documents/repos/residual/src/nkp/residual_index.rs:1–8`: `Ri = (residual_survived - naive_survived) / stressors` (all three are required CLI flags: `--stressors`, `--naive-survived`, `--residual-survived`), interpreted purely by sign (&gt;0 positive, ==0 none, &lt;0 negative) — no fusion/fission relation, unrelated to the matrix cell threshold.
+
+**5. `src/view/commands.rs` and `src/view/mod.rs`:** unrelated to matrix fusion/fission. `commands.rs` (561 lines) only builds copy-pasteable `residual add ...` shell strings from staged UI adds (`format_add_command`/`format_add_commands`). `mod.rs` (554 lines) implements `residual view` (writes `landscape.html`, flags `--defense`, `--out DIR`) and `residual serve` (loopback HTML server, flags `--defense`, `--port`, default `DEFAULT_PORT=8787`) — both defined in cli.rs:134–150. The actual `render_matrix` function lives in `src/view/html.rs:176` (HTML table renderer for the landscape page), not in commands.rs/mod.rs, and has no fusion/fission threshold logic or flags.</result>
+<usage><subagent_tokens>28442</subagent_tokens><tool_uses>15</tool_uses><duration_ms>31841</duration_ms></usage>
+</task-notification>

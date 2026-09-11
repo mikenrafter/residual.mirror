@@ -1,0 +1,59 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "5edb5656cce6",
+  "session_id": "998c0f12-ad26-488c-9d11-0bef8409ac4e",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-11T06:29:40.164535406Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/view/html.rs",
+    "src/view/template.html"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "668d74182d34",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 140,
+    "cache_creation_tokens": 183394,
+    "cache_read_tokens": 8735103,
+    "output_tokens": 81029,
+    "api_call_count": 70,
+    "subagent_tokens": {
+      "input_tokens": 18,
+      "cache_creation_tokens": 27608,
+      "cache_read_tokens": 153988,
+      "output_tokens": 3405,
+      "api_call_count": 9
+    }
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-11T06:29:39.923621869Z",
+    "agent_lines": 601,
+    "agent_removed": 165,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 601,
+    "total_lines_changed": 766,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "residual/.residual-write-authorized": 1
+      }
+    }
+  ]
+}

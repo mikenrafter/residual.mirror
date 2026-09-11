@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "1c7c4c4fc608",
+  "strategy": "manual-commit",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/skills/definitions/atam.md",
+    "src/skills/definitions/atam/SKILL.md",
+    "src/skills/definitions/defense_walk.md",
+    "src/skills/definitions/defense_walk/SKILL.md",
+    "src/skills/definitions/fmea.md",
+    "src/skills/definitions/fmea/SKILL.md",
+    "src/skills/definitions/framework.md",
+    "src/skills/definitions/framework/SKILL.md",
+    "src/skills/definitions/integrate.md",
+    "src/skills/definitions/integrate/SKILL.md",
+    "src/skills/definitions/naive_draft.md",
+    "src/skills/definitions/naive_draft/SKILL.md",
+    "src/skills/definitions/purpose_walk.md",
+    "src/skills/definitions/purpose_walk/SKILL.md",
+    "src/skills/definitions/stressor_walk.md",
+    "src/skills/definitions/stressor_walk/SKILL.md",
+    "src/skills/definitions/tdd_implement.md",
+    "src/skills/definitions/tdd_implement/SKILL.md",
+    "src/skills/hooks.rs",
+    "src/skills/mod.rs",
+    "src/view/html.rs",
+    "src/view/template.html"
+  ],
+  "sessions": [
+    {
+      "metadata": "/1c/7c4c4fc608/0/metadata.json",
+      "transcript": "/1c/7c4c4fc608/0/full.jsonl",
+      "compact_transcript": "/1c/7c4c4fc608/0/transcript.jsonl",
+      "content_hash": "/1c/7c4c4fc608/0/content_hash.txt",
+      "prompt": "/1c/7c4c4fc608/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 84,
+    "cache_creation_tokens": 86449,
+    "cache_read_tokens": 9960387,
+    "output_tokens": 53451,
+    "api_call_count": 42,
+    "subagent_tokens": {
+      "input_tokens": 288,
+      "cache_creation_tokens": 363029,
+      "cache_read_tokens": 12503578,
+      "output_tokens": 132244,
+      "api_call_count": 144
+    }
+  }
+}

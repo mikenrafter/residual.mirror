@@ -1,0 +1,14 @@
+{
+  "tool_use_id": "toolu_012LjQYdzscfRAnpM2PArD8F",
+  "agent_id": "a22cf095faed884c0",
+  "subagent_type": "general-purpose",
+  "task_description": "Implement skill-hooks CLI feature",
+  "files": [
+    "src/cli.rs",
+    "src/cli/help.rs",
+    "src/skills/hooks.rs",
+    "src/skills/mod.rs"
+  ],
+  "started_at": "2026-09-10T17:33:56.345822914-06:00",
+  "completed_at": "2026-09-10T18:02:56.08461974-06:00"
+}

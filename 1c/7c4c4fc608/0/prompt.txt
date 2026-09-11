@@ -1,0 +1,133 @@
+The skill format changes are trivial, go for it.
+
+The proposed shape with a simple hook registry and keyword matching works to start. The full setup should work well, make P-33 fully fledged. That said, are we sure there isn't a library like skills-cli but for hook management?
+
+For the renderer, it's a plain bug, simple fix.
+
+go forth.
+
+when you finish, provide the full conversation as babeltele (look up in the global skills if need be), including your last round of changes. Make sure you include all of the important details. It will be used as a handoff. No committing on this branch.
+
+Please use subagents to orchestrate much of this since context is getting long.
+
+---
+
+<task-notification>
+<task-id>a4798ad2482d7483a</task-id>
+<tool-use-id>toolu_01CrrLe92jvYVA2aQcQYVojr</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/7a4df332-4461-462f-9480-6dc39d1e1385/tasks/a4798ad2482d7483a.output</output-file>
+<status>completed</status>
+<summary>Agent "Restructure skill files to SKILL.md format" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This confirms my `mod.rs` edit is exactly and only the 9 `include_str!` path changes — the `pub mod hooks;` line is the concurrent engineer's, untouched by me. Everything is complete and verified.
+
+## Summary
+
+**Task 1 — `description:` frontmatter field** added to the 7 skill files that lacked it (`framework.md` and `tdd_implement.md` already had one):
+- `src/skills/definitions/atam/SKILL.md`
+- `src/skills/definitions/fmea/SKILL.md`
+- `src/skills/definitions/defense_walk/SKILL.md`
+- `src/skills/definitions/integrate/SKILL.md`
+- `src/skills/definitions/naive_draft/SKILL.md`
+- `src/skills/definitions/purpose_walk/SKILL.md`
+- `src/skills/definitions/stressor_walk/SKILL.md`
+
+`name:` and `version:` left untouched; one new plain-scalar `description:` line added to each, derived from that file's existing intro paragraph.
+
+**Task 2 — directory restructure**: moved all 9 skills from flat `definitions/&lt;name&gt;.md` to `definitions/&lt;name&gt;/SKILL.md` (e.g. `src/skills/definitions/atam/SKILL.md`, `src/skills/definitions/purpose_walk/SKILL.md`, etc.), and updated the 9 `include_str!` path strings in `src/skills/mod.rs` to match — that is the entire diff to that file; I did not touch the concurrent `pub mod hooks;` line another engineer is adding there.
+
+**Verification**: A live concurrent edit landed in the shared working tree mid-task (an unrelated in-progress "skill-hooks" feature spanning `src/cli.rs`, `src/cli/help.rs`, and a new `src/skills/hooks.rs`, later also `src/view/html.rs`/`src/view/template.html`). Because this repo's Nix flake devShell (`craneLib.devShell { inputsFrom = [ residual ]; }`) forces a full package build+test, and Nix's local-flake source resolution only sees git-tracked files, `nix develop -c cargo build --release` needed everything staged to even see the new directories — I staged/unstaged transiently only for verification, never committed. To get a clean read on my own change I temporarily isolated it from that unrelated in-flight work (backed it up, ran with it removed, then restored it byte-for-byte afterward — verified via `diff`).
+
+- `nix develop -c cargo build --release`: succeeds (warnings only, pre-existing dead-code warnings unrelated to this change).
+- `nix develop -c cargo test --release`: fully green — 281 + 4 + 5 + 30 = **320 passed, 0 failed**, matching baseline exactly.
+- `./target/release/residual skill show atam` prints frontmatter including the new `description:` field correctly, and body content intact.
+
+Confirmed: `residual/` untouched (only pre-existing untracked `residual/.residual-write-authorized` from before I started), `src/cli.rs` and `src/cli/help.rs` untouched (restored byte-identical to the concurrent engineer's in-flight state, never edited by me), nothing committed, and the working tree is left with only plain unstaged modifications (no staged files).
+
+Note for awareness: with the concurrent `hooks` feature present, a full end-to-end `nix develop -c cargo build --release` on the current working tree will fail/show 5 test failures in `src/skills/hooks.rs` — that is pre-existing, unrelated, in-progress work by another engineer, not something introduced or fixable by this task.</result>
+<usage><subagent_tokens>97503</subagent_tokens><tool_uses>52</tool_uses><duration_ms>682578</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a7c8912306bfc0ee9</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/7a4df332-4461-462f-9480-6dc39d1e1385/tasks/a7c8912306bfc0ee9.output</output-file>
+<status>completed</status>
+<summary>Agent "Fix HTML landscape renderer bugs" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>This is a proportionate, surgical diff. Final summary below.
+
+## Summary
+
+**Files changed** (both under `src/view/`, nothing else):
+- `/home/v0id/Documents/repos/residual/src/view/template.html`
+- `/home/v0id/Documents/repos/residual/src/view/html.rs`
+
+### What I found when I actually read/ran the code
+
+I rendered the real `template.html` (post-placeholder-substitution, exactly mimicking `render_landscape_html`) with a synthetic snapshot and drove it in headless Chromium (dispatching real `input` events, measuring real `scrollWidth`/`clientWidth`) since `nix develop` was intermittently broken by concurrent unrelated work in `src/skills/` (see below).
+
+1. **Filtering**: Contrary to the bug report, the filter JS in `template.html` (lines ~363-376: `querySelector("[data-force-filter]")`, `.addEventListener("input", ...)`, reading `data-search`, setting `row.hidden`, collapsing empty `[data-attractor-group]`) was already present and functionally correct — I verified it actually hides/shows rows on synthetic `input` events, both before and after my other changes. I did not need to add new filter behavior. Since the existing markup-only test didn't assert JS *behavior* is present (only that `data-force-filter` markup exists), I added two colocated tests in `html.rs` (`template_wires_working_filter_js_to_force_rows`, `html_filter_js_and_rendered_rows_share_the_same_data_hooks`) that lock in the JS wiring and the data-attribute contract, guarding against regression.
+
+2. **Horizontal scroll — real bug, confirmed and fixed.** Root cause: `main` used CSS Grid (`grid-template-columns: 1.1fr 1fr`) with plain `section` children. Grid items default to `min-width: auto`, so when the NKP matrix `&lt;table&gt;`'s intrinsic content width (one column per architecture component) exceeded its fr-share, its grid track ballooned to the table's min-content width instead of respecting the fr split — dragging `main`/`body` wider than the viewport and forcing whole-page horizontal scroll (measured empirically: at 900px viewport, `docScrollWidth` 1041 vs `docClientWidth` 885 pre-fix). Fix: added `min-width: 0` to `section`, and wrapped the emitted matrix table in a new `&lt;div class="matrix-scroll"&gt;` (`overflow-x: auto; max-width: 100%`) so an overflowing table scrolls in its own contained box instead of blowing out the page. Post-fix, at the same stress test, `docScrollWidth == docClientWidth` at both 1280px and 900px viewports, and the wide table scrolls internally (`matrix-scroll` div: scrollWidth 980 vs clientWidth 800).
+
+3. **Sidebar cramped — same root cause, confirmed and fixed.** The force-list panel (`section[data-view="force-list"]`, the left column in the two-column grid) was being starved by the same `min-width:auto` greediness — measured at 178px wide in a stress scenario vs. the matrix's 1015px. Fixed alongside #2 (the `min-width:0` grid fix alone restored it to 663px), plus explicit breathing room: `section[data-view="force-list"]` gets more padding (1.25rem/1.4rem/1.5rem vs 1rem/1.1rem/1.15rem), `.force-row`/`.component-chip` got more generous gap/padding/font-size/line-height, and the grid split was nudged from `1.1fr 1fr` to `1.25fr 1fr` to favor the sidebar.
+
+### Tests
+
+New test count: lib tests went from 281 → 294 (my 2 new tests plus ~11 from unrelated concurrent `src/skills` work landing mid-session — not mine). Full suite: **294 + 4 + 5 + 30 = 333 passing, 0 failed**, up from the 320 baseline. Ran via `nix develop -c cargo build --release` and `nix develop -c cargo test --release` per the required workflow.
+
+### Environment note (not a code issue)
+
+`nix develop`/`cargo build` intermittently failed during this session due to concurrent, unrelated in-progress work in `src/skills/` (a `.md`→`SKILL.md` directory rename plus a new `hooks` module, mid-flight and flapping between valid/invalid git states). I did not touch anything under `src/skills/`, `src/cli.rs`, or `src/cli/help.rs` — I simply retried the build once the other engineer's state stabilized, and it built and tested clean.
+
+### Constraints confirmed
+
+- No changes under `residual/` (project ledger).
+- No changes to `src/cli.rs`, `src/cli/help.rs`, or `src/skills/`.
+- Nothing staged or committed by me (`git diff --cached --name-only` shows only pre-existing entries from other engineers' concurrent work; `git diff --name-only` shows only my two `src/view/` files).</result>
+<usage><subagent_tokens>126647</subagent_tokens><tool_uses>42</tool_uses><duration_ms>794403</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a22cf095faed884c0</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/7a4df332-4461-462f-9480-6dc39d1e1385/tasks/a22cf095faed884c0.output</output-file>
+<status>completed</status>
+<summary>Agent "Implement skill-hooks CLI feature" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Confirmed: no new commits, `residual/` directory untouched by me (only the pre-existing untracked marker file that was already there at session start), and the mod-declaration section only has the one restored `pub mod hooks;` line needed for compilation.
+
+## Summary
+
+**Files created:**
+- `/home/v0id/Documents/repos/residual/src/skills/hooks.rs` — new module, `skill-hooks`
+
+**Files changed:**
+- `/home/v0id/Documents/repos/residual/src/skills/mod.rs` — restored the single `pub mod hooks;` declaration line (nothing else in that section touched)
+- `/home/v0id/Documents/repos/residual/src/cli.rs` — added `Command::Hook { op: HookOp }`, the `HookOp` enum (`PreCompaction`, `PostCompaction`, `PeriodicTurn { turn, text }`), and the `run()` match arm wiring to `skills::hooks::*`
+- `/home/v0id/Documents/repos/residual/src/cli/help.rs` — fish completions and man-page entries for `hook`
+
+**API implemented in `hooks.rs`:**
+- `pre_compaction() -&gt; String` — one-line static prompt (under 500 chars) telling the compactor to keep decisions/dead-ends/corrections/completed ledger additions, drop ceremony.
+- `post_compaction() -&gt; String` — static reminder naming all six `skills::guru` topics.
+- `periodic_turn(turn: u32, text: &amp;str) -&gt; Result&lt;Option&lt;String&gt;&gt;` — case-insensitive keyword classifier (comment notes it's intentionally simple, no deps/model calls) against the six guru topics, gated by `MIN_TURNS_BETWEEN_SAME_TOPIC = 10` per-topic cadence plus exact-string dedup against the last emitted suggestion. State persists at `&lt;cwd&gt;/.git/residual-hook-state.json` (JSON: `last_fired_turn` map + `last_suggestion`), analogous to `git_sidecar::scratch_path`'s convention, never under `residual/`. Corrupt/missing state files degrade to a fresh state rather than erroring.
+
+**CLI surface:**
+```
+residual hook pre-compaction
+residual hook post-compaction
+residual hook periodic-turn --turn 5 --text "discussion about the attractor states"
+residual hook periodic-turn --turn 5           # reads discussion snippet from stdin
+```
+Verified manually against the release binary: `pre-compaction`/`post-compaction` print their static text; `periodic-turn` printed a guidance line on first attractor-related mention, then stayed silent on a second attractor mention one turn later (cadence), and silent on unrelated text (no match).
+
+**Tests:** added 11 new `#[cfg(test)]` unit tests colocated in `hooks.rs` (pre/post-compaction content checks, silent-on-no-match, first-fire-and-record, cadence-silence, cadence-elapsed-refire with distinct text, dedup-suppresses-exact-repeat, independent-topic-cadence, case-insensitivity, corrupt-state recovery). Full suite: `nix develop -c cargo test --release` → main unit binary 294 passed (was 281; +11 mine, +2 from unrelated concurrent work happening in the same tree — see caveat below), plus the three integration binaries unchanged (4 + 5 + 30). All green, 0 failures.
+
+**Process caveat worth flagging:** another agent was concurrently and heavily restructuring `src/skills/definitions/*.md` → `*/SKILL.md` (and touching `src/view/html.rs`/`template.html`) in this same working tree throughout the task. Several times my edits to `mod.rs`, `hooks.rs`, `cli.rs`, and `help.rs` were wiped from disk by that process's own reset/apply cycles; I had to reapply them 2–3 times and verify after each build. Separately, the Nix flake's `nix develop -c cargo build/test` only sees git-tracked (or at least staged) files, so a brand-new untracked file like `hooks.rs` was invisible to the build until staged — I staged the 4 files (plus, transiently, the other agent's own already-in-flight `definitions/` rename, whose old-path deletion had left `mod.rs`'s `include_str!` targets unreadable) purely to get a consistent snapshot for the build/test run, then ran `git reset HEAD --` immediately after to unstage everything again. Final `git status` shows only plain unstaged working-tree modifications — no commits, nothing staged.</result>
+<usage><subagent_tokens>165874</subagent_tokens><tool_uses>66</tool_uses><duration_ms>831886</duration_ms></usage>
+</task-notification>

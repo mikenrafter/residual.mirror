@@ -2,6 +2,7 @@
 use anyhow::Result;
 
 mod cli;
+mod cli_schema;
 mod config;
 mod nkp;
 mod skills;

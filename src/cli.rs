@@ -161,6 +161,19 @@ pub enum Command {
         port: u16,
     },
     Config,
+    /// Undocumented introspection helpers for internal tooling.
+    #[command(hide = true)]
+    Internal {
+        #[command(subcommand)]
+        op: InternalOp,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum InternalOp {
+    /// Print a JSON schema of `add`/`update` flags, derived from clap introspection.
+    #[command(hide = true)]
+    CliSchema,
 }
 
 #[derive(Subcommand)]
@@ -830,6 +843,13 @@ pub fn run() -> Result<()> {
         Command::View { defense, out } => crate::view::run_view(&cfg, defense, out),
         Command::Serve { defense, port } => crate::view::run_serve(&cfg, defense, port),
         Command::Config => crate::config::print(&cfg),
+        Command::Internal { op } => match op {
+            InternalOp::CliSchema => {
+                let schema = crate::cli_schema::cli_schema();
+                println!("{}", serde_json::to_string_pretty(&schema)?);
+                Ok(())
+            }
+        },
     }
 }
 
@@ -1456,6 +1476,59 @@ mod tests {
             }
             _ => panic!("expected Command::Update(UpdateTarget::Persona)"),
         }
+    }
+
+    /// `cli_schema()` must be purely derived from clap introspection: `add stressor`
+    /// has a required, non-repeatable `description`; `update stressor` has that same
+    /// flag optional, plus a repeatable `add-component`. Non-add/update subcommands
+    /// (e.g. `list`, `matrix`) must never appear.
+    #[test]
+    fn cli_schema_covers_add_and_update_only() {
+        let schema = crate::cli_schema::cli_schema();
+
+        let add_stressor = schema
+            .iter()
+            .find(|s| s.subcommand == "add stressor")
+            .expect("schema must contain 'add stressor'");
+        let description = add_stressor
+            .flags
+            .iter()
+            .find(|f| f.name == "description")
+            .expect("'add stressor' must have a 'description' flag");
+        assert!(description.required, "'add stressor' description must be required");
+        assert!(!description.multiple, "'add stressor' description must not be multiple");
+
+        let update_stressor = schema
+            .iter()
+            .find(|s| s.subcommand == "update stressor")
+            .expect("schema must contain 'update stressor'");
+        let description = update_stressor
+            .flags
+            .iter()
+            .find(|f| f.name == "description")
+            .expect("'update stressor' must have a 'description' flag");
+        assert!(
+            !description.required,
+            "'update stressor' description must NOT be required"
+        );
+        let add_component = update_stressor
+            .flags
+            .iter()
+            .find(|f| f.name == "add-component")
+            .expect("'update stressor' must have an 'add-component' flag");
+        assert!(
+            add_component.multiple,
+            "'update stressor' add-component must be multiple"
+        );
+
+        assert!(
+            !schema.iter().any(|s| s.subcommand.starts_with("list")),
+            "schema must not include 'list *' subcommands"
+        );
+        assert!(
+            !schema.iter().any(|s| s.subcommand == "matrix"),
+            "schema must not include 'matrix' subcommand"
+        );
     }
 
     mod cli_integration {
@@ -2324,6 +2397,38 @@ mod tests {
             assert!(
                 !update.status.success(),
                 "update persona with unknown --name must error"
+            );
+        }
+
+        /// `residual internal cli-schema` prints valid JSON derived from clap
+        /// introspection, covering `add`/`update` subcommands. Hidden from
+        /// normal `--help` but must still be reachable and succeed.
+        #[test]
+        fn internal_cli_schema_prints_json_with_add_and_update_entries() {
+            let dir = isolated_tempdir();
+
+            let out = run(&dir, &["internal", "cli-schema"]);
+            assert!(
+                out.status.success(),
+                "internal cli-schema must exit successfully: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+
+            let stdout = String::from_utf8(out.stdout).expect("utf8 stdout");
+            let value: serde_json::Value =
+                serde_json::from_str(&stdout).expect("internal cli-schema stdout must be valid JSON");
+            let entries = value.as_array().expect("schema is a JSON array");
+            let subcommands: Vec<&str> = entries
+                .iter()
+                .filter_map(|e| e.get("subcommand").and_then(|s| s.as_str()))
+                .collect();
+            assert!(
+                subcommands.contains(&"add stressor"),
+                "expected 'add stressor' entry, got: {stdout}"
+            );
+            assert!(
+                subcommands.contains(&"update stressor"),
+                "expected 'update stressor' entry, got: {stdout}"
             );
         }
     }

@@ -565,3 +565,60 @@ Ran 158 tests across 10 files.
 All 11 failures are `export-script.test.ts` tests failing via the stub's thrown `not yet implemented — green phase` error (confirmed via stack traces); all 147 pre-existing tests across the other 9 files pass unchanged.</result>
 <usage><subagent_tokens>50802</subagent_tokens><tool_uses>12</tool_uses><duration_ms>16750240</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a9a0b81792ee3c25b</task-id>
+<tool-use-id>toolu_01V6bT16i6zrPtxuJnYvqYSm</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/a9a0b81792ee3c25b.output</output-file>
+<status>completed</status>
+<summary>Agent "Green phase: implement bash script export" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Full `web/src/export-script.ts` implementation (only `buildBashScript`/`mountExportScript` bodies changed; rest of file untouched):
+
+```ts
+export function buildBashScript(state: PendingState): string {
+  const commandLines = toCommandLines(state).map((cl) =&gt; (cl.valid ? cl.line : `# ${cl.line}`));
+  const commandSection = commandLines.length &gt; 0 ? `${commandLines.join("\n")}\n` : "";
+  return `#!/bin/env bash\n\nresidual write authorize\n\n${commandSection}`;
+}
+
+// ... TriggerDownload / defaultTriggerDownload unchanged ...
+
+export function mountExportScript(
+  container: HTMLElement,
+  getState: () =&gt; PendingState,
+  options?: MountExportScriptOptions,
+): void {
+  const button = container.querySelector&lt;HTMLButtonElement&gt;("[data-generate-script]");
+  if (!button) return;
+
+  const triggerDownload = options?.triggerDownload ?? defaultTriggerDownload;
+
+  button.addEventListener("click", () =&gt; {
+    const script = buildBashScript(getState());
+    triggerDownload(EXPORT_SCRIPT_FILENAME, script);
+    options?.onChange?.();
+  });
+}
+```
+
+Test tail output:
+
+```
+ 158 pass
+ 0 fail
+ 663 expect() calls
+Ran 158 tests across 10 files. [382.00ms]
+```
+
+Deviations (both in the test file, not stable code):
+
+1. `buildBashScript` conditionally omits the command section when `toCommandLines` returns zero lines, rather than always appending `join("\n") + "\n"`. This is required so the "truly empty state" pinned test (`"#!/bin/env bash\n\nresidual write authorize\n\n"`, no third `\n`) passes.
+
+2. That conditional broke two pre-existing test cases that used base-only (`baseAttractors`/`baseForces` with no `updatedAttractors`/`updatedForces`) fixtures under the mistaken assumption that base entries alone produce command lines. Per `model.ts`'s documented, intentional design (`toCommandLines`/`orderedEntries`), only added/updated entries ever emit a line — base entries with no diff emit nothing. I verified this directly against `model.ts` (confirmed `toCommandLines` returns `[]` for base-only state). Given that ground truth, the "two-line state" test's own dynamically-computed `expected` (built from `toCommandLines`) and the hardcoded "truly empty state" `expected` are mathematically incompatible for any pure implementation of `buildBashScript`, since both fixtures produced identical (empty) `commandLines`. I fixed this by adding no-op `updatedAttractors: { "A-01": {} }` / `updatedForces: { "S-01": {} }` to those two test states (in `export-script.test.ts`, the "pins the exact full script format for a simple two-line state" test and the "reflects the latest getState()" test) so they actually exercise two real, distinct command lines as their names imply, rather than modifying `model.ts`'s intentional add/update-only semantics or the pinned-format assertions.
+
+Files touched: `/home/v0id/Documents/repos/residual/web/src/export-script.ts` (implementation), `/home/v0id/Documents/repos/residual/web/src/export-script.test.ts` (two fixture fixes, explained above; no assertions changed).</result>
+<usage><subagent_tokens>50887</subagent_tokens><tool_uses>25</tool_uses><duration_ms>198842</duration_ms></usage>
+</task-notification>

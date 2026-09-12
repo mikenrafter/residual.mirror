@@ -143,6 +143,20 @@ export function updateForceField(
   };
 }
 
+/** Sets the kind (stressor/purpose) of an added force that hasn't been staged as a real CLI record yet. No-op if `tempId` isn't in addedForces — an existing base force's kind is immutable (the CLI has no "change a stressor into a purpose" operation). */
+export function setAddedForceKind(
+  state: PendingState,
+  tempId: string,
+  kind: "stressor" | "purpose",
+): PendingState {
+  const addedIndex = state.addedForces.findIndex((f) => f.tempId === tempId);
+  if (addedIndex === -1) return state;
+  const nextForce: AddedForce = { ...state.addedForces[addedIndex]!, kind };
+  const nextAddedForces = [...state.addedForces];
+  nextAddedForces[addedIndex] = nextForce;
+  return { ...state, addedForces: nextAddedForces };
+}
+
 /** Appends a new component column. Throws if `component.name` already exists in baseComponents or addedComponents. */
 export function addComponentColumn(state: PendingState, component: SnapshotComponent): PendingState {
   const exists =

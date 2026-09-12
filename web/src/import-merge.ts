@@ -20,7 +20,7 @@
 //   error) instead of pretending the import fully succeeded.
 // - `{ kind: "add", type: "stressor" | "purpose" }` fields map onto
 //   `updateForceField`'s field names: fields.description -> "description",
-//   fields["attractor-id"] -> "attractorId", fields["naive-change"] ->
+//   fields["attractor-shortname"] -> "attractorId", fields["naive-change"] ->
 //   "naiveChangeOrFeature" (cli-schema.json uses "naive-change" for BOTH
 //   `add stressor` and `add purpose` — there is no separate "feature" flag
 //   name at the CLI layer, despite the plan prose using "feature" for
@@ -68,7 +68,7 @@ type ForceFieldName = "description" | "attractorId" | "naiveChangeOrFeature" | "
 /** Maps cli-schema.json flag names (kebab-case) to actions.ts's ForceUpdate field names, for stressor/purpose add & update. */
 const FORCE_FIELD_MAP: Record<string, ForceFieldName> = {
   description: "description",
-  "attractor-id": "attractorId",
+  "attractor-shortname": "attractorId",
   "naive-change": "naiveChangeOrFeature",
   outcomes: "outcomes",
   shortname: "shortname",
@@ -117,9 +117,12 @@ function applyComponentToggles(state: PendingState, forceKey: string, item: Pend
 function applyAddForce(state: PendingState, kind: "stressor" | "purpose", item: PendingItem): PendingState {
   const { state: withRow, tempId } = addForceRow(state, kind);
   let next = withRow;
-  for (const [flagName, value] of Object.entries(item.fields)) {
+  for (const [flagName, rawValue] of Object.entries(item.fields)) {
     const field = FORCE_FIELD_MAP[flagName];
     if (field === undefined) continue;
+    const value = flagName === "attractor-shortname"
+      ? [...next.baseAttractors, ...next.addedAttractors].find((attractor) => attractor.name === rawValue)?.id ?? rawValue
+      : rawValue;
     next = updateForceField(next, tempId, field, value);
   }
   // Defensive only — see module notes: add stressor/add purpose have no
@@ -156,10 +159,13 @@ function applyUpdateForce(state: PendingState, item: PendingItem): PendingState 
   if (forceKey === undefined) return state;
 
   let next = state;
-  for (const [flagName, value] of Object.entries(item.fields)) {
+  for (const [flagName, rawValue] of Object.entries(item.fields)) {
     if (flagName === "force-id") continue;
     const field = FORCE_FIELD_MAP[flagName];
     if (field === undefined) continue;
+    const value = flagName === "attractor-shortname"
+      ? [...next.baseAttractors, ...next.addedAttractors].find((attractor) => attractor.name === rawValue)?.id ?? rawValue
+      : rawValue;
     next = updateForceField(next, forceKey, field, value);
   }
   next = applyComponentToggles(next, forceKey, item);

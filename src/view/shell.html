@@ -213,6 +213,20 @@
         font: 12px/1.4 var(--sans);
         color: var(--muted);
       }
+      .force-detail-editor {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: end;
+      }
+      .force-detail-editor > label {
+        flex: 1 1 10rem;
+        min-width: 0;
+      }
+      .force-detail-editor > label > input,
+      .force-detail-editor > label > select {
+        margin-bottom: 0;
+      }
       .force-detail dl { margin: 0; }
       .force-detail dt {
         text-transform: uppercase;
@@ -361,12 +375,12 @@
               <legend>stressor</legend>
               <label>description</label>
               <input name="description" type="text" required />
-              <label>attractor-id</label>
-              <input name="attractor_id" type="text" required />
+              <label>attractor-shortname</label>
+              <input name="attractor_shortname" type="text" required />
               <label>naive-change</label>
               <input name="naive_change" type="text" required />
               <label>shortname</label>
-              <input name="shortname" type="text" />
+              <input name="shortname" type="text" required />
               <label>outcomes</label>
               <input name="outcomes" type="text" />
               <button type="submit">stage</button>
@@ -377,12 +391,12 @@
               <legend>purpose</legend>
               <label>description</label>
               <input name="description" type="text" required />
-              <label>attractor-id</label>
-              <input name="attractor_id" type="text" required />
+              <label>attractor-shortname</label>
+              <input name="attractor_shortname" type="text" required />
               <label>naive-change</label>
               <input name="naive_change" type="text" required />
               <label>shortname</label>
-              <input name="shortname" type="text" />
+              <input name="shortname" type="text" required />
               <label>outcomes</label>
               <input name="outcomes" type="text" />
               <button type="submit">stage</button>

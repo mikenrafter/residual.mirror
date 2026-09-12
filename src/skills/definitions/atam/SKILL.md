@@ -1,6 +1,6 @@
 ---
 name: atam
-version: 2
+version: 3
 description: Surfaces stakeholder trade-offs (political, cost, business) against a candidate architecture before it is built.
 ---
 
@@ -14,7 +14,7 @@ Surface political, cost, and business stakeholder concerns against the candidate
 - **Attractor** — a recurring system *state*, not a goal. Two sides: `positive_state` (healthy) and `negative_state` (broken). One per stable behavioral mode.
 - **Stressor** — a force that pushes the system from positive to negative attractor. Coherence matters, not likelihood. No probability required.
 - **Purpose** — a behavioral contract that must hold for the attractor to stay positive. Uses terms from the project lexicon in its outcomes.
-- **Component** — a fully-qualified name in `components.csv`. Forces do not list components. Coupling is recorded only in `residues.csv` (the NKP matrix) via `residual add residue --force-id … --component-id …`.
+- **Component** — a fully-qualified name in `components.csv`. Forces do not list components. Coupling is recorded only in `residues.csv` (the NKP matrix) via `residual add residue --shortname … --component-shortname …`.
 - **Ledger** — `attractors.csv`, `stressors.csv`, `purposes.csv`, `residues.csv`, `components.csv`, `lexicon.csv`, `personas/<name>.md`.
 
 ## Interaction Pattern

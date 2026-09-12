@@ -130,6 +130,15 @@ function updateForceField(state, forceKey, field, value) {
     }
   };
 }
+function setAddedForceKind(state, tempId, kind) {
+  const addedIndex = state.addedForces.findIndex((f) => f.tempId === tempId);
+  if (addedIndex === -1)
+    return state;
+  const nextForce = { ...state.addedForces[addedIndex], kind };
+  const nextAddedForces = [...state.addedForces];
+  nextAddedForces[addedIndex] = nextForce;
+  return { ...state, addedForces: nextAddedForces };
+}
 function addComponentColumn(state, component) {
   const exists = state.baseComponents.some((c) => c.name === component.name) || state.addedComponents.some((c) => c.name === component.name);
   if (exists) {
@@ -149,7 +158,8 @@ function addAttractorOption(state, attractor) {
 var REQUIRED_FORCE_FIELDS = [
   "description",
   "attractorId",
-  "naiveChangeOrFeature"
+  "naiveChangeOrFeature",
+  "shortname"
 ];
 function computeStateValidity(state) {
   const invalidForceIds = new Set;
@@ -173,6 +183,7 @@ function computeStateValidity(state) {
       description: update?.description ?? base.description,
       attractorId: update?.attractorId ?? base.attractorId,
       naiveChangeOrFeature: update?.naiveChangeOrFeature ?? base.naiveChangeOrFeature,
+      shortname: update?.shortname ?? base.shortname,
       components: update?.components ?? base.components
     });
   }
@@ -182,6 +193,7 @@ function computeStateValidity(state) {
       description: update?.description ?? added.description,
       attractorId: update?.attractorId ?? added.attractorId,
       naiveChangeOrFeature: update?.naiveChangeOrFeature ?? added.naiveChangeOrFeature,
+      shortname: update?.shortname ?? added.shortname,
       components: update?.components ?? added.components
     });
   }
@@ -212,9 +224,6 @@ function quoteValue(value) {
 function flagText(name, value) {
   return `--${name} ${quoteValue(value)}`;
 }
-function tempIdToVarName(tempId) {
-  return `${tempId.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_ID`;
-}
 function toCommandLines(state) {
   const validity = computeStateValidity(state);
   const entries = orderedEntries(state);
@@ -224,6 +233,7 @@ function toCommandLines(state) {
   const addedTermByTerm = new Map(state.addedTerms.map((t) => [t.term, t]));
   const addedForceByTempId = new Map(state.addedForces.map((f) => [f.tempId, f]));
   const baseForceById = new Map(state.baseForces.map((f) => [f.id, f]));
+  const attractorShortname = (id) => [...state.baseAttractors, ...state.addedAttractors].find((attractor) => attractor.id === id)?.name ?? id;
   const forceIsValid = (key) => !validity.invalidForceIds.has(key);
   const renderComponentAdd = (name) => {
     const c = addedComponentByName.get(name);
@@ -320,27 +330,19 @@ function toCommandLines(state) {
     const f = addedForceByTempId.get(tempId);
     const valid = forceIsValid(tempId);
     const flags = [
-      flagText("attractor-id", f.attractorId),
+      flagText("attractor-shortname", attractorShortname(f.attractorId)),
       flagText("description", f.description),
-      flagText("naive-change", f.naiveChangeOrFeature)
+      flagText("naive-change", f.naiveChangeOrFeature),
+      flagText("shortname", f.shortname)
     ];
     if (f.outcomes !== "")
       flags.push(flagText("outcomes", f.outcomes));
-    if (f.shortname !== "")
-      flags.push(flagText("shortname", f.shortname));
-    if (f.components.length === 0) {
-      return { line: ["residual add", f.kind, ...flags].join(" "), valid };
-    }
-    const varName = tempIdToVarName(tempId);
-    const inner = ["residual add", f.kind, ...flags].join(" ");
-    const line = `${varName}=$(${inner} | grep -oE '[A-Z]+-[0-9]+' | tail -1)`;
-    return { line, valid };
+    return { line: ["residual add", f.kind, ...flags].join(" "), valid };
   };
   const renderForceUpdateSynthetic = (tempId) => {
     const f = addedForceByTempId.get(tempId);
     const valid = forceIsValid(tempId);
-    const varName = tempIdToVarName(tempId);
-    const parts = [`residual update ${f.kind}`, `--force-id ${quoteValue(`$${varName}`)}`];
+    const parts = [`residual update ${f.kind}`, flagText("shortname", f.shortname)];
     for (const component of f.components) {
       parts.push(flagText("add-component", component));
     }
@@ -350,17 +352,17 @@ function toCommandLines(state) {
     const base = baseForceById.get(id);
     const update = state.updatedForces[id];
     const valid = forceIsValid(id);
-    const parts = [`residual update ${base.kind}`, `--force-id ${quoteValue(id)}`];
+    const parts = [`residual update ${base.kind}`, flagText("shortname", base.shortname)];
     if (update.description !== undefined)
       parts.push(flagText("description", update.description));
     if (update.attractorId !== undefined)
-      parts.push(flagText("attractor-id", update.attractorId));
+      parts.push(flagText("attractor-shortname", attractorShortname(update.attractorId)));
     if (update.naiveChangeOrFeature !== undefined)
       parts.push(flagText("naive-change", update.naiveChangeOrFeature));
     if (update.outcomes !== undefined)
       parts.push(flagText("outcomes", update.outcomes));
     if (update.shortname !== undefined)
-      parts.push(flagText("shortname", update.shortname));
+      parts.push(flagText("rename", update.shortname));
     if (update.components !== undefined) {
       const before = new Set(base.components);
       const after = new Set(update.components);
@@ -435,7 +437,8 @@ function getEffectiveForceValues(state, forceKey) {
     description: update?.description ?? base?.description ?? "",
     attractorId: update?.attractorId ?? base?.attractorId ?? "",
     naiveChangeOrFeature: update?.naiveChangeOrFeature ?? base?.naiveChangeOrFeature ?? "",
-    outcomes: update?.outcomes ?? base?.outcomes ?? ""
+    outcomes: update?.outcomes ?? base?.outcomes ?? "",
+    shortname: update?.shortname ?? base?.shortname ?? ""
   };
 }
 function effectiveComponents(state, forceKey) {
@@ -457,6 +460,24 @@ function createTextInput(name, value) {
   input.name = name;
   input.value = value;
   return input;
+}
+function labeledField(labelText, field) {
+  const label = document.createElement("label");
+  label.className = "force-detail-field";
+  label.textContent = labelText;
+  label.appendChild(field);
+  return label;
+}
+function createKindSelect(selected) {
+  const select = document.createElement("select");
+  for (const kind of ["stressor", "purpose"]) {
+    const option = document.createElement("option");
+    option.value = kind;
+    option.textContent = kind;
+    select.appendChild(option);
+  }
+  select.value = selected;
+  return select;
 }
 function createAttractorSelect(state, selectedId) {
   const select = document.createElement("select");
@@ -509,6 +530,7 @@ function mount(table, getState, setState, options) {
       dl.append(dt, dd);
     };
     addPair("id", forceKey);
+    addPair("shortname", values.shortname);
     addPair("attractor", getAttractorLabel(getState(), values.attractorId));
     addPair("description", values.description);
     addPair("naive change", values.naiveChangeOrFeature);
@@ -520,6 +542,7 @@ function mount(table, getState, setState, options) {
     detail.innerHTML = "";
     const state = getState();
     const values = getEffectiveForceValues(state, forceKey);
+    const shortnameInput = createTextInput("shortname", values.shortname);
     const descriptionInput = createTextInput("description", values.description);
     const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
     const outcomesInput = createTextInput("outcomes", values.outcomes);
@@ -533,6 +556,7 @@ function mount(table, getState, setState, options) {
     okButton.addEventListener("click", () => {
       let next = getState();
       const edited = [
+        ["shortname", shortnameInput.value],
         ["description", descriptionInput.value],
         ["attractorId", attractorSelect.value],
         ["naiveChangeOrFeature", naiveChangeInput.value],
@@ -551,7 +575,10 @@ function mount(table, getState, setState, options) {
     cancelButton.addEventListener("click", () => {
       renderReadOnly(detail, forceKey);
     });
-    detail.append(descriptionInput, naiveChangeInput, outcomesInput, attractorSelect, okButton, cancelButton);
+    const editor = document.createElement("div");
+    editor.className = "force-detail-editor";
+    editor.append(labeledField("shortname", shortnameInput), labeledField("description", descriptionInput), labeledField("naive change", naiveChangeInput), labeledField("outcomes", outcomesInput), labeledField("attractor", attractorSelect), okButton, cancelButton);
+    detail.appendChild(editor);
   }
   function wireLiveField(el, eventName, forceKey, field) {
     el.addEventListener(eventName, () => {
@@ -574,15 +601,36 @@ function mount(table, getState, setState, options) {
     th.setAttribute("data-force-id", tempId);
     const detail = document.createElement("div");
     detail.className = "force-detail";
+    const kindSelect = createKindSelect(kind);
+    const shortnameInput = createTextInput("shortname", values.shortname);
     const descriptionInput = createTextInput("description", values.description);
     const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
     const outcomesInput = createTextInput("outcomes", values.outcomes);
     const attractorSelect = createAttractorSelect(state, values.attractorId);
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.textContent = "Save";
+    kindSelect.addEventListener("change", () => {
+      const nextKind = kindSelect.value === "purpose" ? "purpose" : "stressor";
+      setState(setAddedForceKind(getState(), tempId, nextKind));
+      tr.setAttribute("data-force-kind", nextKind);
+      applyInvalidMarks();
+      options?.onChange?.();
+    });
+    wireLiveField(shortnameInput, "input", tempId, "shortname");
     wireLiveField(descriptionInput, "input", tempId, "description");
     wireLiveField(naiveChangeInput, "input", tempId, "naiveChangeOrFeature");
     wireLiveField(outcomesInput, "input", tempId, "outcomes");
     wireLiveField(attractorSelect, "change", tempId, "attractorId");
-    detail.append(descriptionInput, naiveChangeInput, outcomesInput, attractorSelect);
+    saveButton.addEventListener("click", () => {
+      renderReadOnly(detail, tempId);
+      applyInvalidMarks();
+      options?.onChange?.();
+    });
+    const editor = document.createElement("div");
+    editor.className = "force-detail-editor";
+    editor.append(labeledField("kind", kindSelect), labeledField("shortname", shortnameInput), labeledField("description", descriptionInput), labeledField("naive change", naiveChangeInput), labeledField("outcomes", outcomesInput), labeledField("attractor", attractorSelect), saveButton);
+    detail.appendChild(editor);
     th.appendChild(detail);
     tr.appendChild(th);
     for (const component of components) {
@@ -594,6 +642,30 @@ function mount(table, getState, setState, options) {
     totalTd.textContent = "0";
     tr.appendChild(totalTd);
     return tr;
+  }
+  function recomputeTotals(forceKey, component) {
+    const row = table.querySelector(`tr.force-row[data-force-id="${CSS.escape(forceKey)}"]`);
+    if (row !== null) {
+      const rowTotal = row.querySelectorAll('td[data-residue-cell][data-coupled="1"]').length;
+      row.setAttribute("data-row-total", String(rowTotal));
+      const rowTotalCell = row.querySelector(".sticky-col-right[data-row-total]");
+      if (rowTotalCell !== null) {
+        rowTotalCell.setAttribute("data-row-total", String(rowTotal));
+        rowTotalCell.textContent = String(rowTotal);
+      }
+    }
+    const colTotalCell = table.querySelector(`tfoot td[data-col-total][data-component="${CSS.escape(component)}"]`);
+    if (colTotalCell !== null) {
+      const colTotal = table.querySelectorAll(`tbody td[data-residue-cell][data-component="${CSS.escape(component)}"][data-coupled="1"]`).length;
+      colTotalCell.setAttribute("data-col-total", String(colTotal));
+      colTotalCell.textContent = String(colTotal);
+    }
+    const grandTotalCell = table.querySelector("tfoot [data-grand-total]");
+    if (grandTotalCell !== null) {
+      const grandTotal = table.querySelectorAll('tbody td[data-residue-cell][data-coupled="1"]').length;
+      grandTotalCell.setAttribute("data-grand-total", String(grandTotal));
+      grandTotalCell.textContent = String(grandTotal);
+    }
   }
   function closeContextMenu() {
     for (const el of Array.from(document.querySelectorAll('[role="menu"]'))) {
@@ -652,6 +724,7 @@ function mount(table, getState, setState, options) {
     const coupled = effectiveComponents(next, forceKey).includes(component);
     cell.setAttribute("data-coupled", coupled ? "1" : "0");
     cell.textContent = coupled ? "1" : "";
+    recomputeTotals(forceKey, component);
     applyInvalidMarks();
     options?.onChange?.();
   });
@@ -735,7 +808,7 @@ function mountForms(container, getState, setState, options) {
       let next = withRow;
       const fieldMap = [
         ["description", "description"],
-        ["attractor_id", "attractorId"],
+        ["attractor_shortname", "attractorId"],
         ["naive_change", "naiveChangeOrFeature"],
         ["shortname", "shortname"],
         ["outcomes", "outcomes"]
@@ -927,7 +1000,7 @@ function mountForms(container, getState, setState, options) {
 // src/import-merge.ts
 var FORCE_FIELD_MAP = {
   description: "description",
-  "attractor-id": "attractorId",
+  "attractor-shortname": "attractorId",
   "naive-change": "naiveChangeOrFeature",
   outcomes: "outcomes",
   shortname: "shortname"
@@ -971,10 +1044,11 @@ function applyComponentToggles(state, forceKey, item) {
 function applyAddForce(state, kind, item) {
   const { state: withRow, tempId } = addForceRow(state, kind);
   let next = withRow;
-  for (const [flagName, value] of Object.entries(item.fields)) {
+  for (const [flagName, rawValue] of Object.entries(item.fields)) {
     const field = FORCE_FIELD_MAP[flagName];
     if (field === undefined)
       continue;
+    const value = flagName === "attractor-shortname" ? [...next.baseAttractors, ...next.addedAttractors].find((attractor) => attractor.name === rawValue)?.id ?? rawValue : rawValue;
     next = updateForceField(next, tempId, field, value);
   }
   next = applyComponentToggles(next, tempId, item);
@@ -1003,12 +1077,13 @@ function applyUpdateForce(state, item) {
   if (forceKey === undefined)
     return state;
   let next = state;
-  for (const [flagName, value] of Object.entries(item.fields)) {
+  for (const [flagName, rawValue] of Object.entries(item.fields)) {
     if (flagName === "force-id")
       continue;
     const field = FORCE_FIELD_MAP[flagName];
     if (field === undefined)
       continue;
+    const value = flagName === "attractor-shortname" ? [...next.baseAttractors, ...next.addedAttractors].find((attractor) => attractor.name === rawValue)?.id ?? rawValue : rawValue;
     next = updateForceField(next, forceKey, field, value);
   }
   next = applyComponentToggles(next, forceKey, item);
@@ -1291,7 +1366,7 @@ var cli_schema_default = [
       },
       {
         name: "shortname",
-        required: false,
+        required: true,
         multiple: false
       }
     ]
@@ -1305,11 +1380,6 @@ var cli_schema_default = [
         multiple: false
       },
       {
-        name: "force-id",
-        required: true,
-        multiple: false
-      },
-      {
         name: "move-to",
         required: false,
         multiple: false
@@ -1317,6 +1387,11 @@ var cli_schema_default = [
       {
         name: "notes",
         required: false,
+        multiple: false
+      },
+      {
+        name: "shortname",
+        required: true,
         multiple: false
       },
       {
@@ -1356,7 +1431,7 @@ var cli_schema_default = [
       },
       {
         name: "shortname",
-        required: false,
+        required: true,
         multiple: false
       },
       {
@@ -1490,11 +1565,6 @@ var cli_schema_default = [
         multiple: false
       },
       {
-        name: "force-id",
-        required: true,
-        multiple: false
-      },
-      {
         name: "naive-change",
         required: false,
         multiple: false
@@ -1510,8 +1580,13 @@ var cli_schema_default = [
         multiple: true
       },
       {
-        name: "shortname",
+        name: "rename",
         required: false,
+        multiple: false
+      },
+      {
+        name: "shortname",
+        required: true,
         multiple: false
       }
     ]
@@ -1535,11 +1610,6 @@ var cli_schema_default = [
         multiple: false
       },
       {
-        name: "force-id",
-        required: true,
-        multiple: false
-      },
-      {
         name: "naive-change",
         required: false,
         multiple: false
@@ -1555,8 +1625,13 @@ var cli_schema_default = [
         multiple: true
       },
       {
-        name: "shortname",
+        name: "rename",
         required: false,
+        multiple: false
+      },
+      {
+        name: "shortname",
+        required: true,
         multiple: false
       }
     ]
@@ -2015,7 +2090,7 @@ var getState = () => state;
 var setState = (next) => {
   state = next;
 };
-var container = document.querySelector("main") ?? document.body;
+var container = document.body;
 var table = container.querySelector("table.matrix");
 if (table) {
   const matrixView = mountMatrixView(container);

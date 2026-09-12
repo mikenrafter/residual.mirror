@@ -25,7 +25,7 @@ On-disk ledger shape (`format_version = "v4"` in `config.toml`):
 directory above the repo. Verify resolves metadata from the sidecar tip; tag scan uses working-tree
 code + sidecar metadata.
 
-**Workflow:** `residual add stressor|purpose`, then `residual add residue --force-id … --component-id …` per coupling. `residual matrix show` reads `residues.csv` only — not inline force columns.
+**Workflow:** `residual add stressor|purpose`, then `residual add residue --shortname … --component-shortname …` per coupling. `residual matrix show` reads `residues.csv` only — not inline force columns.
 
 The iter4 tree below is the Rust module layout; NKP matrix columns come from `residues.csv` and the component registry, not from force rows.
 

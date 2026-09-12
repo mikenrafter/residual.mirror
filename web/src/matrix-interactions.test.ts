@@ -104,7 +104,7 @@ function forceRowHtml(spec: FixtureForceSpec, components: SnapshotComponent[]): 
     .join("");
 
   return `
-    <tr class="force-row" data-force-id="${force.id}" data-force-kind="${force.kind}" data-architecture-set="iter1" data-attractor-id="${force.attractorId}" data-search="${force.id}" data-row-total="${total}">
+    <tr class="force-row" data-force-id="${force.id}" data-force-kind="${force.kind}" data-architecture-set="iter1" data-attractor-shortname="${force.attractorId}" data-search="${force.id}" data-row-total="${total}">
       <th class="sticky-col" data-force-id="${force.id}">
         <button type="button" class="force-accordion-toggle" data-accordion-toggle="true" aria-expanded="false">${prefix}-${force.shortname}</button>
         <div class="force-detail" hidden="true">
@@ -237,6 +237,61 @@ describe("mount — double-click toggles an NKP cell", () => {
     cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
 
     expect(changeCount()).toBe(1);
+  });
+});
+
+describe("mount — toggling a cell recomputes row/column/grand totals", () => {
+  // baseState() starts with S-01 coupled to "cli" and S-02 coupled to
+  // "storage" — 2 coupled cells total, 1 per row, 1 per column. The fixture's
+  // tfoot data-col-total/data-grand-total placeholders are seeded "0" (they
+  // aren't computed by the test fixture), so assertions below check the
+  // real post-toggle counts recomputeTotals must produce, not a "before + 1"
+  // delta off the stale placeholder.
+  test("toggling a cell ON updates the row's sticky-right total, the column's tfoot total, and the grand total", () => {
+    const state = baseState();
+    const { table } = mountFixture(state);
+
+    const row = table.querySelector('tr.force-row[data-force-id="S-01"]');
+    if (!(row instanceof HTMLTableRowElement)) throw new Error("row not found");
+    const rowTotalCell = row.querySelector(".sticky-col-right[data-row-total]");
+    const colTotalCell = table.querySelector('tfoot td[data-col-total][data-component="storage"]');
+    const grandTotalCell = table.querySelector("tfoot [data-grand-total]");
+
+    const cell = table.querySelector('td[data-force-id="S-01"][data-component="storage"]');
+    if (!(cell instanceof HTMLTableCellElement)) throw new Error("cell not found");
+    cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+    // S-01 now carries cli + storage.
+    expect(row.getAttribute("data-row-total")).toBe("2");
+    expect(rowTotalCell?.getAttribute("data-row-total")).toBe("2");
+    expect(rowTotalCell?.textContent).toBe("2");
+    // "storage" is now coupled to both S-01 and S-02.
+    expect(colTotalCell?.getAttribute("data-col-total")).toBe("2");
+    expect(colTotalCell?.textContent).toBe("2");
+    // S-01/cli, S-01/storage, S-02/storage.
+    expect(grandTotalCell?.getAttribute("data-grand-total")).toBe("3");
+    expect(grandTotalCell?.textContent).toBe("3");
+  });
+
+  test("toggling a cell back OFF restores the row/column/grand totals", () => {
+    const state = baseState();
+    const { table } = mountFixture(state);
+
+    const cell = table.querySelector('td[data-force-id="S-01"][data-component="cli"]');
+    if (!(cell instanceof HTMLTableCellElement)) throw new Error("cell not found");
+    const row = table.querySelector('tr.force-row[data-force-id="S-01"]');
+    const cliColTotalCell = table.querySelector('tfoot td[data-col-total][data-component="cli"]');
+    const grandTotalCell = table.querySelector("tfoot [data-grand-total]");
+
+    cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); // off
+    expect(row?.getAttribute("data-row-total")).toBe("0");
+    expect(cliColTotalCell?.getAttribute("data-col-total")).toBe("0");
+    expect(grandTotalCell?.getAttribute("data-grand-total")).toBe("1"); // only S-02/storage remains
+
+    cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); // back on
+    expect(row?.getAttribute("data-row-total")).toBe("1");
+    expect(cliColTotalCell?.getAttribute("data-col-total")).toBe("1");
+    expect(grandTotalCell?.getAttribute("data-grand-total")).toBe("2");
   });
 });
 

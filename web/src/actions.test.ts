@@ -3,6 +3,7 @@ import {
   addAttractorOption,
   addComponentColumn,
   addForceRow,
+  setAddedForceKind,
   toggleComponent,
   updateForceField,
 } from "./actions";
@@ -317,5 +318,32 @@ describe("addAttractorOption", () => {
     const state = emptyState({ addedAttractors: [newAttractor] });
 
     expect(() => addAttractorOption(state, newAttractor)).toThrow();
+  });
+});
+
+describe("setAddedForceKind", () => {
+  test("changes the kind of an added force", () => {
+    const { state, tempId } = addForceRow(emptyState(), "stressor");
+
+    const next = setAddedForceKind(state, tempId, "purpose");
+
+    expect(next.addedForces[0]!.kind).toBe("purpose");
+  });
+
+  test("does not mutate the original state or force object", () => {
+    const { state, tempId } = addForceRow(emptyState(), "stressor");
+    const original = structuredClone(state);
+
+    setAddedForceKind(state, tempId, "purpose");
+
+    expect(state).toEqual(original);
+  });
+
+  test("is a no-op for a base force's id (kind is immutable once a force is a real CLI record)", () => {
+    const state = emptyState({ baseAttractors: [baseAttractor], baseForces: [baseStressor] });
+
+    const next = setAddedForceKind(state, baseStressor.id, "purpose");
+
+    expect(next).toEqual(state);
   });
 });

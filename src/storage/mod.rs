@@ -23,6 +23,63 @@ pub mod write_authorization;
 
 const WHOLE_SYSTEM_REMINDER: &str = "reminder: examine whole-system-residue (hardware, process, organization, policy) before defaulting to a software-only patch; use --whole-system --notes when the zig survives outside software";
 
+/// Resolve a stressor/purpose shortname to its internal force id (S-nn/P-nn).
+///
+/// Shortnames are the only handle the CLI exposes for forces; the S-nn/P-nn id
+/// remains an internal storage detail (residues.csv, matrix ordering).
+pub fn resolve_force_shortname(residual_dir: &Path, shortname: &str) -> Result<String> {
+    let mut matches: Vec<String> = stressors::load(residual_dir)?
+        .into_iter()
+        .filter(|s| s.shortname == shortname)
+        .map(|s| s.id)
+        .collect();
+    matches.extend(
+        purposes::load(residual_dir)?
+            .into_iter()
+            .filter(|p| p.shortname == shortname)
+            .map(|p| p.id),
+    );
+    match matches.len() {
+        0 => anyhow::bail!("no stressor or purpose with shortname '{shortname}'"),
+        1 => Ok(matches.remove(0)),
+        _ => anyhow::bail!(
+            "shortname '{shortname}' is ambiguous: matches {} forces",
+            matches.len()
+        ),
+    }
+}
+
+/// Resolve an attractor's public name to its internal A-nn id.
+///
+/// Existing ledgers and generated command files sometimes still carry an
+/// A-nn value. Accept it as a read-compatible value for the renamed flag,
+/// but emit and document only attractor names going forward.
+pub fn resolve_attractor_shortname(residual_dir: &Path, shortname: &str) -> Result<String> {
+    let matches: Vec<String> = attractors::load(residual_dir)?
+        .into_iter()
+        .filter(|a| a.name == shortname || a.id == shortname)
+        .map(|a| a.id)
+        .collect();
+    match matches.len() {
+        0 => anyhow::bail!("no attractor with shortname '{shortname}'"),
+        1 => Ok(matches.into_iter().next().expect("one match")),
+        _ => anyhow::bail!("attractor shortname '{shortname}' is ambiguous"),
+    }
+}
+
+/// Reject a new stressor/purpose shortname that is blank or already taken —
+/// shortnames are the sole handle used to address forces from the CLI, so
+/// they must stay unique across both stressors.csv and purposes.csv.
+fn ensure_new_shortname_available(residual_dir: &Path, shortname: &str) -> Result<()> {
+    if shortname.trim().is_empty() {
+        anyhow::bail!("--shortname must not be blank");
+    }
+    if resolve_force_shortname(residual_dir, shortname).is_ok() {
+        anyhow::bail!("shortname '{shortname}' is already in use by another stressor or purpose");
+    }
+    Ok(())
+}
+
 /// Resolve metadata directory for reads/mutations, honoring git sidecar when enabled.
 pub fn metadata_dir_from_parts(
     repo_root: &Path,
@@ -156,50 +213,60 @@ pub fn update(cfg: &Config, target: UpdateTarget, force: bool) -> Result<()> {
 fn update_entry(dir: &Path, target: UpdateTarget) -> Result<()> {
     match target {
         UpdateTarget::Stressor {
-            force_id,
-            description,
-            attractor_id,
-            naive_change,
             shortname,
+            description,
+            attractor_shortname,
+            naive_change,
+            rename,
             outcomes,
             add_component,
             remove_component,
         } => {
+            let force_id = resolve_force_shortname(dir, &shortname)?;
+            let attractor_id = attractor_shortname
+                .as_deref()
+                .map(|name| resolve_attractor_shortname(dir, name))
+                .transpose()?;
             stressors::update(
                 dir,
                 &force_id,
                 description,
                 attractor_id,
                 naive_change,
-                shortname,
+                rename,
                 outcomes,
                 add_component,
                 remove_component,
             )?;
-            println!("Updated stressor {}", force_id);
+            println!("Updated stressor {}", shortname);
         }
         UpdateTarget::Purpose {
-            force_id,
-            description,
-            attractor_id,
-            naive_change,
             shortname,
+            description,
+            attractor_shortname,
+            naive_change,
+            rename,
             outcomes,
             add_component,
             remove_component,
         } => {
+            let force_id = resolve_force_shortname(dir, &shortname)?;
+            let attractor_id = attractor_shortname
+                .as_deref()
+                .map(|name| resolve_attractor_shortname(dir, name))
+                .transpose()?;
             purposes::update(
                 dir,
                 &force_id,
                 description,
                 attractor_id,
                 naive_change,
-                shortname,
+                rename,
                 outcomes,
                 add_component,
                 remove_component,
             )?;
-            println!("Updated purpose {}", force_id);
+            println!("Updated purpose {}", shortname);
         }
         UpdateTarget::Attractor {
             id,
@@ -245,11 +312,12 @@ fn update_entry(dir: &Path, target: UpdateTarget) -> Result<()> {
 fn remove_entry(dir: &Path, target: RemoveTarget) -> Result<()> {
     match target {
         RemoveTarget::Residue {
-            force_id,
-            component_id,
+            shortname,
+            component_shortname,
         } => {
-            residues::remove_coupling(dir, &force_id, &component_id)?;
-            println!("Removed residue coupling {} × {}", force_id, component_id);
+            let force_id = resolve_force_shortname(dir, &shortname)?;
+            residues::remove_coupling(dir, &force_id, &component_shortname)?;
+            println!("Removed residue coupling {} × {}", shortname, component_shortname);
         }
         RemoveTarget::Term { term } => {
             if terminology::remove(dir, &term)? {
@@ -266,13 +334,15 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
     match target {
         AddTarget::Stressor {
             description,
-            attractor_id,
+            attractor_shortname,
             naive_change,
             shortname,
             outcomes,
             whole_system,
             notes,
         } => {
+            ensure_new_shortname_available(dir, &shortname)?;
+            let attractor_id = resolve_attractor_shortname(dir, &attractor_shortname)?;
             let naive_change = if whole_system {
                 if notes.is_empty() {
                     anyhow::bail!("--whole-system requires --notes describing the hardware, process, organization, or policy zig");
@@ -302,37 +372,32 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
             println!("Added stressor {}", id);
         }
         AddTarget::Residue {
-            force_id,
-            component_id,
+            shortname,
+            component_shortname,
             whole_system,
             notes,
             move_to,
         } => {
+            let force_id = resolve_force_shortname(dir, &shortname)?;
             if !move_to.is_empty() {
-                if component_id.is_empty() {
-                    anyhow::bail!("--move-to requires --component-id (source component)");
+                if component_shortname.is_empty() {
+                    anyhow::bail!("--move-to requires --component-shortname (source component)");
                 }
-                if !residues::force_exists(dir, &force_id)? {
-                    anyhow::bail!("force id '{}' not found in stressors or purposes", force_id);
-                }
-                residues::move_coupling(dir, &force_id, &component_id, &move_to)?;
+                residues::move_coupling(dir, &force_id, &component_shortname, &move_to)?;
                 println!(
                     "Moved residue coupling {} from {} to {}",
-                    force_id, component_id, move_to
+                    shortname, component_shortname, move_to
                 );
             } else if whole_system {
                 let id = residues::append_whole_system(dir, &force_id, &notes)?;
                 println!("Added whole-system-residue {}", id);
             } else {
-                if component_id.is_empty() {
-                    anyhow::bail!("provide --component-id or --whole-system");
-                }
-                if !residues::force_exists(dir, &force_id)? {
-                    anyhow::bail!("force id '{}' not found in stressors or purposes", force_id);
+                if component_shortname.is_empty() {
+                    anyhow::bail!("provide --component-shortname or --whole-system");
                 }
                 let existing = residues::load(dir)?;
                 let id = residues::next_id(&existing);
-                residues::append(dir, Residue::coupling(id.clone(), force_id, component_id))?;
+                residues::append(dir, Residue::coupling(id.clone(), force_id, component_shortname))?;
                 println!("Added residue coupling {}", id);
             }
         }
@@ -359,11 +424,13 @@ fn add_entry(dir: &Path, target: AddTarget) -> Result<()> {
         }
         AddTarget::Purpose {
             description,
-            attractor_id,
+            attractor_shortname,
             naive_change,
             shortname,
             outcomes,
         } => {
+            ensure_new_shortname_available(dir, &shortname)?;
+            let attractor_id = resolve_attractor_shortname(dir, &attractor_shortname)?;
             let existing = purposes::load(dir)?;
             let id = purposes::next_id(&existing);
             purposes::append(
@@ -758,9 +825,9 @@ mod tests {
             &cfg.residual_dir,
             AddTarget::Stressor {
                 description: "queue overload".into(),
-                attractor_id: "A-01".into(),
+                attractor_shortname: "X".into(),
                 naive_change: "add retry".into(),
-                shortname: "".into(),
+                shortname: "queue-overload".into(),
                 outcomes: "".into(),
                 whole_system: true,
                 notes: "policy zig: cap tickets".into(),
@@ -809,9 +876,9 @@ mod tests {
             &cfg.residual_dir,
             AddTarget::Stressor {
                 description: "load".into(),
-                attractor_id: "A-01".into(),
+                attractor_shortname: "X".into(),
                 naive_change: "cache".into(),
-                shortname: "".into(),
+                shortname: "cache-load".into(),
                 outcomes: "".into(),
                 whole_system: false,
                 notes: "".into(),

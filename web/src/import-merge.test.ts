@@ -80,7 +80,7 @@ describe("mergeImportedItems — add stressor/purpose", () => {
         type: "stressor",
         fields: {
           description: "cache stampede under load",
-          "attractor-id": "A-01",
+          "attractor-shortname": "A-01",
           "naive-change": "add jitter",
           outcomes: "cache serves stale gracefully",
           shortname: "cache-stampede",
@@ -108,7 +108,7 @@ describe("mergeImportedItems — add stressor/purpose", () => {
         type: "purpose",
         fields: {
           description: "operators trust the dashboard",
-          "attractor-id": "A-01",
+          "attractor-shortname": "A-01",
           "naive-change": "add a status page",
         },
       }),
@@ -142,7 +142,7 @@ describe("mergeImportedItems — add stressor/purpose", () => {
       item({
         kind: "add",
         type: "stressor",
-        fields: { description: "new one", "attractor-id": "A-01", "naive-change": "y" },
+        fields: { description: "new one", "attractor-shortname": "A-01", "naive-change": "y" },
       }),
     ]);
 

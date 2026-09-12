@@ -251,18 +251,17 @@ pub fn suggest_subjects(
     Ok(suggestions)
 }
 
-pub fn template_for_force(cfg: &Config, force_id: &str) -> Result<String> {
-    let force_id = force_id.to_uppercase();
+pub fn template_for_force(cfg: &Config, shortname: &str) -> Result<String> {
     let dir = crate::storage::metadata_dir(cfg)?;
     let stressors = crate::storage::stressors::load(&dir)?;
     let purposes = crate::storage::purposes::load(&dir)?;
 
-    let (canonical_id, shortname) = if let Some(s) = stressors.iter().find(|s| s.id.eq_ignore_ascii_case(&force_id)) {
+    let (canonical_id, shortname) = if let Some(s) = stressors.iter().find(|s| s.shortname == shortname) {
         (s.id.clone(), s.shortname.clone())
-    } else if let Some(p) = purposes.iter().find(|p| p.id.eq_ignore_ascii_case(&force_id)) {
+    } else if let Some(p) = purposes.iter().find(|p| p.shortname == shortname) {
         (p.id.clone(), p.shortname.clone())
     } else {
-        anyhow::bail!("force '{force_id}' not found in stressors or purposes");
+        anyhow::bail!("no stressor or purpose with shortname '{shortname}'");
     };
 
     let residues = format::read_residues(&dir)?;
@@ -490,7 +489,7 @@ mod tests {
         )
         .unwrap();
         let cfg = cfg_for(dir.path());
-        let tpl = template_for_force(&cfg, "S-28").unwrap();
+        let tpl = template_for_force(&cfg, "lexicon-commit-drift").unwrap();
         assert!(tpl.contains("verification-git-hook: S-28:"));
     }
 }

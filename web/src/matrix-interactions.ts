@@ -70,7 +70,7 @@
 //   does not special-case that emptiness, it just naturally does nothing
 //   when the set is empty.
 
-import { addForceRow, toggleComponent, updateForceField } from "./actions";
+import { addForceRow, setAddedForceKind, toggleComponent, updateForceField } from "./actions";
 import type { PendingState } from "./model";
 import { attractorOptions, computeInvalidMarks } from "./render-decisions";
 
@@ -85,13 +85,14 @@ export interface MountOptions {
   onChange?: () => void;
 }
 
-type EditableField = "description" | "attractorId" | "naiveChangeOrFeature" | "outcomes";
+type EditableField = "description" | "attractorId" | "naiveChangeOrFeature" | "outcomes" | "shortname";
 
 interface EffectiveForceValues {
   description: string;
   attractorId: string;
   naiveChangeOrFeature: string;
   outcomes: string;
+  shortname: string;
 }
 
 /** Resolves the currently-effective (base/added merged with any pending update) text field values for a force key. */
@@ -104,6 +105,7 @@ function getEffectiveForceValues(state: PendingState, forceKey: string): Effecti
     attractorId: update?.attractorId ?? base?.attractorId ?? "",
     naiveChangeOrFeature: update?.naiveChangeOrFeature ?? base?.naiveChangeOrFeature ?? "",
     outcomes: update?.outcomes ?? base?.outcomes ?? "",
+    shortname: update?.shortname ?? base?.shortname ?? "",
   };
 }
 
@@ -128,6 +130,32 @@ function createTextInput(name: string, value: string): HTMLInputElement {
   input.name = name;
   input.value = value;
   return input;
+}
+
+/**
+ * Wraps a field element in a `<label>` carrying its visible text, matching
+ * the labeled-field pattern already used by the below-table "Stage adds"
+ * forms (src/view/shell.html). The editor's flex container wraps these
+ * labeled fields across lines instead of making the sticky column overflow.
+ */
+function labeledField(labelText: string, field: HTMLElement): HTMLLabelElement {
+    const label = document.createElement("label");
+    label.className = "force-detail-field";
+  label.textContent = labelText;
+  label.appendChild(field);
+  return label;
+}
+
+function createKindSelect(selected: "stressor" | "purpose"): HTMLSelectElement {
+  const select = document.createElement("select");
+  for (const kind of ["stressor", "purpose"] as const) {
+    const option = document.createElement("option");
+    option.value = kind;
+    option.textContent = kind;
+    select.appendChild(option);
+  }
+  select.value = selected;
+  return select;
 }
 
 function createAttractorSelect(state: PendingState, selectedId: string): HTMLSelectElement {
@@ -207,6 +235,7 @@ export function mount(
       dl.append(dt, dd);
     };
     addPair("id", forceKey);
+    addPair("shortname", values.shortname);
     addPair("attractor", getAttractorLabel(getState(), values.attractorId));
     addPair("description", values.description);
     addPair("naive change", values.naiveChangeOrFeature);
@@ -220,6 +249,7 @@ export function mount(
     const state = getState();
     const values = getEffectiveForceValues(state, forceKey);
 
+    const shortnameInput = createTextInput("shortname", values.shortname);
     const descriptionInput = createTextInput("description", values.description);
     const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
     const outcomesInput = createTextInput("outcomes", values.outcomes);
@@ -235,6 +265,7 @@ export function mount(
     okButton.addEventListener("click", () => {
       let next = getState();
       const edited: Array<[EditableField, string]> = [
+        ["shortname", shortnameInput.value],
         ["description", descriptionInput.value],
         ["attractorId", attractorSelect.value],
         ["naiveChangeOrFeature", naiveChangeInput.value],
@@ -255,7 +286,18 @@ export function mount(
       renderReadOnly(detail, forceKey);
     });
 
-    detail.append(descriptionInput, naiveChangeInput, outcomesInput, attractorSelect, okButton, cancelButton);
+    const editor = document.createElement("div");
+    editor.className = "force-detail-editor";
+    editor.append(
+      labeledField("shortname", shortnameInput),
+      labeledField("description", descriptionInput),
+      labeledField("naive change", naiveChangeInput),
+      labeledField("outcomes", outcomesInput),
+      labeledField("attractor", attractorSelect),
+      okButton,
+      cancelButton,
+    );
+    detail.appendChild(editor);
   }
 
   function wireLiveField(
@@ -289,17 +331,47 @@ export function mount(
     const detail = document.createElement("div");
     detail.className = "force-detail";
 
+    const kindSelect = createKindSelect(kind);
+    const shortnameInput = createTextInput("shortname", values.shortname);
     const descriptionInput = createTextInput("description", values.description);
     const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
     const outcomesInput = createTextInput("outcomes", values.outcomes);
     const attractorSelect = createAttractorSelect(state, values.attractorId);
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.textContent = "Save";
 
+    kindSelect.addEventListener("change", () => {
+      const nextKind = kindSelect.value === "purpose" ? "purpose" : "stressor";
+      setState(setAddedForceKind(getState(), tempId, nextKind));
+      tr.setAttribute("data-force-kind", nextKind);
+      applyInvalidMarks();
+      options?.onChange?.();
+    });
+    wireLiveField(shortnameInput, "input", tempId, "shortname");
     wireLiveField(descriptionInput, "input", tempId, "description");
     wireLiveField(naiveChangeInput, "input", tempId, "naiveChangeOrFeature");
     wireLiveField(outcomesInput, "input", tempId, "outcomes");
     wireLiveField(attractorSelect, "change", tempId, "attractorId");
 
-    detail.append(descriptionInput, naiveChangeInput, outcomesInput, attractorSelect);
+    saveButton.addEventListener("click", () => {
+      renderReadOnly(detail, tempId);
+      applyInvalidMarks();
+      options?.onChange?.();
+    });
+
+    const editor = document.createElement("div");
+    editor.className = "force-detail-editor";
+    editor.append(
+      labeledField("kind", kindSelect),
+      labeledField("shortname", shortnameInput),
+      labeledField("description", descriptionInput),
+      labeledField("naive change", naiveChangeInput),
+      labeledField("outcomes", outcomesInput),
+      labeledField("attractor", attractorSelect),
+      saveButton,
+    );
+    detail.appendChild(editor);
     th.appendChild(detail);
     tr.appendChild(th);
 
@@ -314,6 +386,45 @@ export function mount(
     tr.appendChild(totalTd);
 
     return tr;
+  }
+
+  /**
+   * Recomputes the row total for `forceKey`, the column total for
+   * `component`, and the grand total, from the current `data-coupled`
+   * attributes in the DOM — mirrors src/view/components/matrix.rs's
+   * row_total/col_total/grand_total, which only ever run at initial
+   * server-render time. Without this, toggling a cell leaves every total
+   * (sticky-right row total, tfoot column total, tfoot grand total) stale.
+   */
+  function recomputeTotals(forceKey: string, component: string): void {
+    const row = table.querySelector<HTMLTableRowElement>(`tr.force-row[data-force-id="${CSS.escape(forceKey)}"]`);
+    if (row !== null) {
+      const rowTotal = row.querySelectorAll('td[data-residue-cell][data-coupled="1"]').length;
+      row.setAttribute("data-row-total", String(rowTotal));
+      const rowTotalCell = row.querySelector(".sticky-col-right[data-row-total]");
+      if (rowTotalCell !== null) {
+        rowTotalCell.setAttribute("data-row-total", String(rowTotal));
+        rowTotalCell.textContent = String(rowTotal);
+      }
+    }
+
+    const colTotalCell = table.querySelector(
+      `tfoot td[data-col-total][data-component="${CSS.escape(component)}"]`,
+    );
+    if (colTotalCell !== null) {
+      const colTotal = table.querySelectorAll(
+        `tbody td[data-residue-cell][data-component="${CSS.escape(component)}"][data-coupled="1"]`,
+      ).length;
+      colTotalCell.setAttribute("data-col-total", String(colTotal));
+      colTotalCell.textContent = String(colTotal);
+    }
+
+    const grandTotalCell = table.querySelector("tfoot [data-grand-total]");
+    if (grandTotalCell !== null) {
+      const grandTotal = table.querySelectorAll('tbody td[data-residue-cell][data-coupled="1"]').length;
+      grandTotalCell.setAttribute("data-grand-total", String(grandTotal));
+      grandTotalCell.textContent = String(grandTotal);
+    }
   }
 
   function closeContextMenu(): void {
@@ -380,6 +491,7 @@ export function mount(
     const coupled = effectiveComponents(next, forceKey).includes(component);
     cell.setAttribute("data-coupled", coupled ? "1" : "0");
     cell.textContent = coupled ? "1" : "";
+    recomputeTotals(forceKey, component);
 
     applyInvalidMarks();
     options?.onChange?.();

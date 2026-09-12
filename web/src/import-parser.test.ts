@@ -7,7 +7,7 @@ describe("parseImportText", () => {
       "",
       "# this is a comment",
       "   ",
-      "# residual add stressor --description x --attractor-id A-01 --naive-change y",
+      "# residual add stressor --description x --attractor-shortname A-01 --naive-change y",
     ].join("\n");
 
     const result = parseImportText(text);
@@ -18,7 +18,7 @@ describe("parseImportText", () => {
 
   test("parses a basic `residual add stressor` line into a PendingItem", () => {
     const line =
-      'residual add stressor --description "db migration fails midway" --attractor-id A-01 --naive-change "rollback script"';
+      'residual add stressor --description "db migration fails midway" --attractor-shortname A-01 --naive-change "rollback script" --shortname db-migration-fails';
 
     const result = parseImportText(line);
 
@@ -28,12 +28,13 @@ describe("parseImportText", () => {
     expect(item.kind).toBe("add");
     expect(item.type).toBe("stressor");
     expect(item.fields.description).toBe("db migration fails midway");
-    expect(item.fields["attractor-id"]).toBe("A-01");
+    expect(item.fields["attractor-shortname"]).toBe("A-01");
     expect(item.fields["naive-change"]).toBe("rollback script");
+    expect(item.fields.shortname).toBe("db-migration-fails");
   });
 
   test("parses a basic `residual update stressor` line into a PendingItem", () => {
-    const line = 'residual update stressor --force-id S-01 --description "revised text"';
+    const line = 'residual update stressor --shortname db-migration-fails --description "revised text"';
 
     const result = parseImportText(line);
 
@@ -42,7 +43,7 @@ describe("parseImportText", () => {
     const item = result.items[0]!;
     expect(item.kind).toBe("update");
     expect(item.type).toBe("stressor");
-    expect(item.fields["force-id"]).toBe("S-01");
+    expect(item.fields.shortname).toBe("db-migration-fails");
     expect(item.fields.description).toBe("revised text");
   });
 
@@ -72,7 +73,7 @@ describe("parseImportText", () => {
 
   test("collects repeated `multiple: true` flags into an array on update stressor", () => {
     const line =
-      "residual update stressor --force-id S-01 --add-component cli --add-component storage";
+      "residual update stressor --shortname db-migration-fails --add-component cli --add-component storage";
 
     const result = parseImportText(line);
 
@@ -83,7 +84,7 @@ describe("parseImportText", () => {
 
   test("collects repeated `remove-component` flags on update purpose", () => {
     const line =
-      "residual update purpose --force-id P-01 --remove-component web --remove-component cli";
+      "residual update purpose --shortname persona-depth --remove-component web --remove-component cli";
 
     const result = parseImportText(line);
 
@@ -94,7 +95,7 @@ describe("parseImportText", () => {
 
   test("supports both add-component and remove-component together", () => {
     const line =
-      "residual update stressor --force-id S-01 --add-component cli --remove-component storage";
+      "residual update stressor --shortname db-migration-fails --add-component cli --remove-component storage";
 
     const result = parseImportText(line);
 
@@ -105,7 +106,7 @@ describe("parseImportText", () => {
   });
 
   test("produces a ParseError when a required flag is missing (add stressor missing --description)", () => {
-    const line = "residual add stressor --attractor-id A-01 --naive-change y";
+    const line = "residual add stressor --attractor-shortname A-01 --naive-change y";
 
     const result = parseImportText(line);
 
@@ -115,19 +116,19 @@ describe("parseImportText", () => {
     expect(result.errors[0]!.message.toLowerCase()).toContain("description");
   });
 
-  test("produces a ParseError when update stressor is missing required --force-id", () => {
+  test("produces a ParseError when update stressor is missing required --shortname", () => {
     const line = 'residual update stressor --description "revised text"';
 
     const result = parseImportText(line);
 
     expect(result.items).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]!.message.toLowerCase()).toContain("force-id");
+    expect(result.errors[0]!.message.toLowerCase()).toContain("shortname");
   });
 
   test("produces a ParseError for an unrecognized flag on a known subcommand", () => {
     const line =
-      'residual add stressor --description x --attractor-id A-01 --naive-change y --bogus-flag z';
+      'residual add stressor --description x --attractor-shortname A-01 --naive-change y --bogus-flag z';
 
     const result = parseImportText(line);
 
@@ -169,9 +170,9 @@ describe("parseImportText", () => {
 
   test("parses multiple lines independently, collecting both items and errors", () => {
     const text = [
-      'residual add stressor --description x --attractor-id A-01 --naive-change y',
+      'residual add stressor --description x --attractor-shortname A-01 --naive-change y --shortname db-migration-fails',
       "not a residual command at all",
-      'residual update stressor --force-id S-01 --add-component cli',
+      'residual update stressor --shortname db-migration-fails --add-component cli',
     ].join("\n");
 
     const result = parseImportText(text);
@@ -197,13 +198,13 @@ describe("parseImportText", () => {
 
   test("optional flags are omitted from fields when not provided", () => {
     const line =
-      'residual add stressor --description x --attractor-id A-01 --naive-change y';
+      'residual add stressor --description x --attractor-shortname A-01 --naive-change y --shortname db-migration-fails';
 
     const result = parseImportText(line);
 
     expect(result.errors).toHaveLength(0);
     const item = result.items[0]!;
     expect(item.fields.notes).toBeUndefined();
-    expect(item.fields.shortname).toBeUndefined();
+    expect(item.fields.outcomes).toBeUndefined();
   });
 });

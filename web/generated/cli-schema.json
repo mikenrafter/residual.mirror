@@ -223,7 +223,7 @@
     "subcommand": "add purpose",
     "flags": [
       {
-        "name": "attractor-id",
+        "name": "attractor-shortname",
         "required": true,
         "multiple": false
       },
@@ -244,7 +244,7 @@
       },
       {
         "name": "shortname",
-        "required": false,
+        "required": true,
         "multiple": false
       }
     ]
@@ -253,13 +253,8 @@
     "subcommand": "add residue",
     "flags": [
       {
-        "name": "component-id",
+        "name": "component-shortname",
         "required": false,
-        "multiple": false
-      },
-      {
-        "name": "force-id",
-        "required": true,
         "multiple": false
       },
       {
@@ -273,6 +268,11 @@
         "multiple": false
       },
       {
+        "name": "shortname",
+        "required": true,
+        "multiple": false
+      },
+      {
         "name": "whole-system",
         "required": false,
         "multiple": false
@@ -283,7 +283,7 @@
     "subcommand": "add stressor",
     "flags": [
       {
-        "name": "attractor-id",
+        "name": "attractor-shortname",
         "required": true,
         "multiple": false
       },
@@ -309,7 +309,7 @@
       },
       {
         "name": "shortname",
-        "required": false,
+        "required": true,
         "multiple": false
       },
       {
@@ -433,18 +433,13 @@
         "multiple": true
       },
       {
-        "name": "attractor-id",
+        "name": "attractor-shortname",
         "required": false,
         "multiple": false
       },
       {
         "name": "description",
         "required": false,
-        "multiple": false
-      },
-      {
-        "name": "force-id",
-        "required": true,
         "multiple": false
       },
       {
@@ -463,8 +458,13 @@
         "multiple": true
       },
       {
-        "name": "shortname",
+        "name": "rename",
         "required": false,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": true,
         "multiple": false
       }
     ]
@@ -478,18 +478,13 @@
         "multiple": true
       },
       {
-        "name": "attractor-id",
+        "name": "attractor-shortname",
         "required": false,
         "multiple": false
       },
       {
         "name": "description",
         "required": false,
-        "multiple": false
-      },
-      {
-        "name": "force-id",
-        "required": true,
         "multiple": false
       },
       {
@@ -508,8 +503,13 @@
         "multiple": true
       },
       {
-        "name": "shortname",
+        "name": "rename",
         "required": false,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": true,
         "multiple": false
       }
     ]

@@ -132,7 +132,7 @@ function forceFormHtml(kind: "stressor" | "purpose"): string {
       <fieldset>
         <legend>${kind}</legend>
         <input name="description" type="text" />
-        <input name="attractor_id" type="text" />
+        <input name="attractor_shortname" type="text" />
         <input name="naive_change" type="text" />
         <input name="shortname" type="text" />
         <input name="outcomes" type="text" />
@@ -290,7 +290,7 @@ describe("mountForms — stressor/purpose form submit", () => {
     const form = container.querySelector('form[data-command-generator="stressor"]');
     if (!form) throw new Error("fixture setup failed");
     setInput(form, "description", "disk fills under sustained writes");
-    setInput(form, "attractor_id", "A-01");
+    setInput(form, "attractor_shortname", "A-01");
     setInput(form, "naive_change", "add cleanup job");
     setInput(form, "shortname", "disk-full");
     // outcomes left empty on purpose.
@@ -316,7 +316,7 @@ describe("mountForms — stressor/purpose form submit", () => {
     const form = container.querySelector('form[data-command-generator="purpose"]');
     if (!form) throw new Error("fixture setup failed");
     setInput(form, "description", "users need audit trail");
-    setInput(form, "attractor_id", "A-01");
+    setInput(form, "attractor_shortname", "A-01");
     setInput(form, "naive_change", "add logging");
 
     submit(form);
@@ -331,13 +331,13 @@ describe("mountForms — stressor/purpose form submit", () => {
     const form = container.querySelector('form[data-command-generator="stressor"]');
     if (!(form instanceof HTMLFormElement)) throw new Error("fixture setup failed");
     setInput(form, "description", "x");
-    setInput(form, "attractor_id", "A-01");
+    setInput(form, "attractor_shortname", "A-01");
     setInput(form, "naive_change", "y");
 
     submit(form);
 
     expect(form.querySelector<HTMLInputElement>('[name="description"]')!.value).toBe("");
-    expect(form.querySelector<HTMLInputElement>('[name="attractor_id"]')!.value).toBe("");
+    expect(form.querySelector<HTMLInputElement>('[name="attractor_shortname"]')!.value).toBe("");
     expect(form.querySelector<HTMLInputElement>('[name="naive_change"]')!.value).toBe("");
   });
 
@@ -347,7 +347,7 @@ describe("mountForms — stressor/purpose form submit", () => {
     const form = container.querySelector('form[data-command-generator="stressor"]');
     if (!form) throw new Error("fixture setup failed");
     setInput(form, "description", "x");
-    setInput(form, "attractor_id", "A-01");
+    setInput(form, "attractor_shortname", "A-01");
     setInput(form, "naive_change", "y");
 
     submit(form);

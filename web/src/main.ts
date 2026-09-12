@@ -38,7 +38,15 @@ const setState = (next: PendingState): void => {
   state = next;
 };
 
-const container = document.querySelector("main") ?? document.body;
+// document.body, not <main> — the toolbar (search filter, fusion/fission-only
+// checkbox, show-proposed/show-unrelated toggles, fission threshold slider)
+// is a sibling of <main> in shell.html, not a descendant. Scoping every
+// mount*() call's querySelector root to <main> silently broke all of that
+// toolbar's interactivity (most visibly: the threshold slider stuck at its
+// static min="1" max="1" markup, since mountMatrixView's dynamic min/max/
+// value init — see matrix-view.ts — could never find `[data-threshold-input]`
+// to update it).
+const container = document.body;
 const table = container.querySelector<HTMLTableElement>("table.matrix");
 
 if (table) {

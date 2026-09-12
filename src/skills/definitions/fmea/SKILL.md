@@ -1,6 +1,6 @@
 ---
 name: fmea
-version: 2
+version: 3
 description: Walks each component through its failure modes once the architecture is stable, to catch technical issues before production incidents.
 ---
 
@@ -14,7 +14,7 @@ Walk each component through its failure modes once the architecture is stable. C
 - **Attractor** — a recurring system *state*, not a goal. Two sides: `positive_state` (healthy) and `negative_state` (broken). One per stable behavioral mode.
 - **Stressor** — a force that pushes the system from positive to negative attractor. Coherence matters, not likelihood. No probability required.
 - **Purpose** — a behavioral contract that must hold for the attractor to stay positive. Uses terms from the project lexicon in its outcomes.
-- **Component** — a fully-qualified name in `components.csv`. Forces do not list components. Coupling is recorded only in `residues.csv` (the NKP matrix) via `residual add residue --force-id … --component-id …`. FMEA walks components that appear as matrix columns.
+- **Component** — a fully-qualified name in `components.csv`. Forces do not list components. Coupling is recorded only in `residues.csv` (the NKP matrix) via `residual add residue --shortname … --component-shortname …`. FMEA walks components that appear as matrix columns.
 - **Ledger** — `attractors.csv`, `stressors.csv`, `purposes.csv`, `residues.csv`, `components.csv`, `lexicon.csv`, `personas/<name>.md`.
 
 ## Interaction Pattern

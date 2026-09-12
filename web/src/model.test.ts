@@ -82,7 +82,7 @@ describe("isForceValid", () => {
     ).toBe(false);
   });
 
-  test("invalid when attractor-id is empty", () => {
+  test("invalid when attractor-shortname is empty", () => {
     expect(
       isForceValid({
         description: "d",
@@ -143,7 +143,7 @@ describe("computeStateValidity", () => {
     expect(validity.invalidReasonsByForce["S-01"]).toContain("description");
   });
 
-  test("an added force missing attractor-id is invalid, keyed by its tempId", () => {
+  test("an added force missing attractor-shortname is invalid, keyed by its tempId", () => {
     const addedForce: AddedForce = {
       tempId: "NEW-1",
       id: "",
@@ -305,7 +305,7 @@ describe("toCommandLines", () => {
     expect(addLine).toBeDefined();
     expect(addLine!.valid).toBe(true);
     expect(addLine!.line).toContain('--description "queue backs up under load"');
-    expect(addLine!.line).toContain('--attractor-id "A-01"');
+    expect(addLine!.line).toContain('--attractor-shortname "A-01"');
     expect(addLine!.line).toContain('--naive-change "add retry"');
   });
 
@@ -379,11 +379,11 @@ describe("toCommandLines", () => {
     expect(item.kind).toBe("add");
     expect(item.type).toBe("stressor");
     expect(item.fields.description).toBe('text with "quotes" inside');
-    expect(item.fields["attractor-id"]).toBe("A-01");
+    expect(item.fields["attractor-shortname"]).toBe("A-01");
     expect(item.fields["naive-change"]).toBe("add retry");
   });
 
-  test("an added force's real id is not known until `add stressor` actually runs (it has no --force-id flag — id is server-assigned and only printed on success as 'Added stressor S-NN'), so a synthetic component-toggle update MUST NOT reference the tempId as a literal --force-id value — that string will never exist in residues.csv/stressors.csv and the generated script would silently fail", () => {
+  test("an added force's real id is not known until `add stressor` actually runs (id is server-assigned and only printed on success as 'Added stressor S-NN'), but its shortname IS known up front, so the generated `add` line is a plain invocation and the synthetic component-toggle update addresses the force by --shortname, not by id or tempId", () => {
     const addedForce: AddedForce = {
       tempId: "NEW-1",
       id: "",
@@ -392,7 +392,7 @@ describe("toCommandLines", () => {
       attractorId: "A-01",
       naiveChangeOrFeature: "n",
       outcomes: "",
-      shortname: "",
+      shortname: "new-stressor",
       components: ["cli"],
     };
     const state = emptyState({ addedForces: [addedForce] });
@@ -401,26 +401,23 @@ describe("toCommandLines", () => {
     const addLine = lines.find((l) => l.line.includes("residual add stressor"))!;
     const updateLine = lines.find((l) => l.line.includes("residual update stressor"))!;
 
-    // The add line captures the real assigned id into a shell variable
-    // derived from the tempId (sanitized: non-alphanumeric -> "_", suffixed
-    // "_ID") instead of emitting a bare `residual add ...` invocation.
-    expect(addLine.line.startsWith("NEW_1_ID=$(residual add stressor")).toBe(true);
-    expect(addLine.line).toContain("residual add stressor");
+    // No shell-variable capture: the shortname is chosen by the caller
+    // before the `add` line ever runs, so this is a plain CLI invocation.
+    expect(addLine.line.startsWith("residual add stressor")).toBe(true);
     expect(addLine.line).toContain('--description "d"');
-    // Whatever the exact capture mechanism, it must extract the id token
-    // `residual add stressor` prints on success ("Added stressor S-NN").
-    expect(addLine.line).toMatch(/\)\s*$/);
+    expect(addLine.line).toContain('--shortname "new-stressor"');
+    expect(addLine.line).not.toContain("$(");
 
-    // The update line references that shell variable, NOT the tempId.
+    // The update line references the shortname, NOT the tempId or an id.
     expect(updateLine.line).toBe(
-      'residual update stressor --force-id "$NEW_1_ID" --add-component "cli"',
+      'residual update stressor --shortname "new-stressor" --add-component "cli"',
     );
     expect(updateLine.line).not.toContain("NEW-1");
 
-    // This line is intentionally NOT parseImportText-round-trippable: it's
-    // shell-variable-dependent, not a standalone `residual` invocation, so
-    // import only needs to handle plain add/update lines (see the other
-    // round-trip tests above/below), not this synthetic scripting form.
+    // Unlike the old capture-wrapped form, this line round-trips cleanly
+    // through parseImportText — it's a plain `residual` invocation.
+    const parsed = parseImportText(updateLine.line);
+    expect(parsed.errors).toHaveLength(0);
   });
 
   test("an updated base force's component diff emits --add-component for newly toggled-on components and --remove-component for toggled-off ones", () => {
@@ -439,7 +436,7 @@ describe("toCommandLines", () => {
 
     expect(parsed.errors).toHaveLength(0);
     const item = parsed.items[0]!;
-    expect(item.fields["force-id"]).toBe("S-01");
+    expect(item.fields.shortname).toBe("queue-overload");
     expect(item.multipleFields["add-component"]).toEqual(["gateway"]);
     expect(item.multipleFields["remove-component"]).toEqual(["cli"]);
   });

@@ -130,16 +130,16 @@ Prefer **force then residue**: record the purpose or stressor, then map which co
 residual add attractor --name "..." --description "..." \
   --positive-state "..." --negative-state "..."
 
-residual add stressor --description "..." --attractor-id A-01 \
-  --naive-change "..." --outcomes "..."
-residual add residue --force-id S-01 --component-id my-component
+residual add stressor --description "..." --attractor-shortname A-01 \
+  --naive-change "..." --outcomes "..." --shortname "..."
+residual add residue --shortname "..." --component-shortname my-component
 
 # When the surviving change is not software
-residual add stressor --description "..." --attractor-id A-01 \
+residual add stressor --description "..." --attractor-shortname A-01 \
   --naive-change "..." --outcomes "..." \
   --whole-system --notes "policy zig: ..."
 
-residual add purpose --description "..." --attractor-id A-01 \
+residual add purpose --description "..." --attractor-shortname A-01 \
   --feature "..." --outcomes "..."
 residual add term --term "..." --definition "..."
 

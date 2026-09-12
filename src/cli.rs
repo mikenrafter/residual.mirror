@@ -295,15 +295,18 @@ pub enum SkillCommand {
 #[derive(Subcommand)]
 pub enum AddTarget {
     /// Add a stressor force. Process: whole-system-residue first — record outcomes.
-    /// Map components via `residual add residue --force-id … --component-id …`.
+    /// Map components via `residual add residue --shortname … --component-shortname …`.
     Stressor {
         #[arg(long)]
         description: String,
+        /// Attractor name; the CLI resolves it to its internal A-nn id.
         #[arg(long)]
-        attractor_id: String,
+        attractor_shortname: String,
         #[arg(long)]
         naive_change: String,
-        #[arg(long, default_value = "")]
+        /// Unique kebab-case shortname; the only handle used to reference this
+        /// force from `add residue`, `update stressor`, and `commit template`.
+        #[arg(long)]
         shortname: String,
         #[arg(long, default_value = "", visible_alias = "traits")]
         outcomes: String,
@@ -314,15 +317,17 @@ pub enum AddTarget {
     },
     /// Add force×component coupling to residues.csv (the NKP matrix).
     Residue {
+        /// Shortname of the stressor or purpose (as set by `--shortname` on add).
         #[arg(long)]
-        force_id: String,
+        shortname: String,
+        /// Component name, which is its stable public handle.
         #[arg(long, default_value = "")]
-        component_id: String,
+        component_shortname: String,
         #[arg(long, default_value = "")]
         notes: String,
         #[arg(long)]
         whole_system: bool,
-        /// Repoint an existing coupling from --component-id to this component.
+        /// Repoint an existing coupling from --component-shortname to this component.
         #[arg(long, default_value = "")]
         move_to: String,
     },
@@ -338,15 +343,18 @@ pub enum AddTarget {
         architecture_set: String,
     },
     /// Add a purpose force. Process: whole-system-residue first — record outcomes.
-    /// Map components via `residual add residue --force-id … --component-id …`.
+    /// Map components via `residual add residue --shortname … --component-shortname …`.
     Purpose {
         #[arg(long)]
         description: String,
+        /// Attractor name; the CLI resolves it to its internal A-nn id.
         #[arg(long)]
-        attractor_id: String,
+        attractor_shortname: String,
         #[arg(long, visible_alias = "feature")]
         naive_change: String,
-        #[arg(long, default_value = "")]
+        /// Unique kebab-case shortname; the only handle used to reference this
+        /// force from `add residue`, `update purpose`, and `commit template`.
+        #[arg(long)]
         shortname: String,
         #[arg(long, default_value = "", visible_alias = "traits")]
         outcomes: String,
@@ -452,10 +460,11 @@ pub enum AddTarget {
 pub enum RemoveTarget {
     /// Clear force×component coupling from residues.csv.
     Residue {
+        /// Shortname of the stressor or purpose (as set by `--shortname` on add).
         #[arg(long)]
-        force_id: String,
+        shortname: String,
         #[arg(long)]
-        component_id: String,
+        component_shortname: String,
     },
     /// Remove a lexicon term by its canonical spelling.
     Term {
@@ -468,16 +477,19 @@ pub enum RemoveTarget {
 pub enum UpdateTarget {
     /// Update a stressor force in place; also folds residues.csv couplings.
     Stressor {
+        /// Shortname of the stressor to update (as set by `--shortname` on add).
         #[arg(long)]
-        force_id: String,
+        shortname: String,
         #[arg(long)]
         description: Option<String>,
+        /// New attractor name; the CLI resolves it to its internal A-nn id.
         #[arg(long)]
-        attractor_id: Option<String>,
+        attractor_shortname: Option<String>,
         #[arg(long)]
         naive_change: Option<String>,
+        /// New shortname to rename this stressor to.
         #[arg(long)]
-        shortname: Option<String>,
+        rename: Option<String>,
         #[arg(long, visible_alias = "traits")]
         outcomes: Option<String>,
         /// Component id to couple to this stressor (repeatable).
@@ -489,16 +501,19 @@ pub enum UpdateTarget {
     },
     /// Update a purpose force in place; also folds residues.csv couplings.
     Purpose {
+        /// Shortname of the purpose to update (as set by `--shortname` on add).
         #[arg(long)]
-        force_id: String,
+        shortname: String,
         #[arg(long)]
         description: Option<String>,
+        /// New attractor name; the CLI resolves it to its internal A-nn id.
         #[arg(long)]
-        attractor_id: Option<String>,
+        attractor_shortname: Option<String>,
         #[arg(long, visible_alias = "feature")]
         naive_change: Option<String>,
+        /// New shortname to rename this purpose to.
         #[arg(long)]
-        shortname: Option<String>,
+        rename: Option<String>,
         #[arg(long, visible_alias = "traits")]
         outcomes: Option<String>,
         /// Component id to couple to this purpose (repeatable).
@@ -626,8 +641,8 @@ pub enum CommitOp {
         #[arg(long)]
         staged: bool,
     },
-    /// Print a scaffold for a force id (S-nn or P-nn).
-    Template { force_id: String },
+    /// Print a scaffold for a stressor/purpose shortname.
+    Template { shortname: String },
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
@@ -740,10 +755,10 @@ pub fn run() -> Result<()> {
                 staged,
             } => run_verify_commit_msg(&cfg, None, Some(message), enforce, warn, staged),
             CommitOp::Suggest { staged } => run_commit_suggest(&cfg, staged),
-            CommitOp::Template { force_id } => {
+            CommitOp::Template { shortname } => {
                 print!(
                     "{}",
-                    crate::verification::commit_msg::template_for_force(&cfg, &force_id)?
+                    crate::verification::commit_msg::template_for_force(&cfg, &shortname)?
                 );
                 Ok(())
             }
@@ -1091,10 +1106,12 @@ mod tests {
             "purpose",
             "--description",
             "d",
-            "--attractor-id",
+            "--attractor-shortname",
             "A-01",
             "--naive-change",
             "naive change text",
+            "--shortname",
+            "test-purpose",
         ])
         .unwrap();
         match cli.command {
@@ -1116,10 +1133,12 @@ mod tests {
             "purpose",
             "--description",
             "d",
-            "--attractor-id",
+            "--attractor-shortname",
             "A-01",
             "--feature",
             "aliased text",
+            "--shortname",
+            "test-purpose",
         ])
         .unwrap();
         match cli.command {
@@ -1242,32 +1261,32 @@ mod tests {
 
     #[test]
     fn cli_parses_update_stressor_with_only_identity_flag() {
-        let cli = Cli::try_parse_from(["residual", "update", "stressor", "--force-id", "S-01"]);
+        let cli = Cli::try_parse_from(["residual", "update", "stressor", "--shortname", "test-shortname"]);
         assert!(
             cli.is_ok(),
-            "CLI must accept `update stressor` with only --force-id (all other fields optional), got err: {}",
+            "CLI must accept `update stressor` with only --shortname (all other fields optional), got err: {}",
             cli.err().map(|e| e.to_string()).unwrap_or_default()
         );
         match cli.unwrap().command {
             Command::Update {
                 target:
                     UpdateTarget::Stressor {
-                        force_id,
-                        description,
-                        attractor_id,
-                        naive_change,
                         shortname,
+                        description,
+                        attractor_shortname,
+                        naive_change,
+                        rename,
                         outcomes,
                         add_component,
                         remove_component,
                     },
                 ..
             } => {
-                assert_eq!(force_id, "S-01");
+                assert_eq!(shortname, "test-shortname");
                 assert_eq!(description, None);
-                assert_eq!(attractor_id, None);
+                assert_eq!(attractor_shortname, None);
                 assert_eq!(naive_change, None);
-                assert_eq!(shortname, None);
+                assert_eq!(rename, None);
                 assert_eq!(outcomes, None);
                 assert!(add_component.is_empty());
                 assert!(remove_component.is_empty());
@@ -1282,8 +1301,8 @@ mod tests {
             "residual",
             "update",
             "stressor",
-            "--force-id",
-            "S-01",
+            "--shortname",
+            "test-shortname",
             "--description",
             "new desc",
             "--add-component",
@@ -1319,8 +1338,8 @@ mod tests {
             "residual",
             "update",
             "purpose",
-            "--force-id",
-            "P-01",
+            "--shortname",
+            "test-purpose",
             "--naive-change",
             "revised feature",
             "--add-component",
@@ -1331,7 +1350,7 @@ mod tests {
             Command::Update {
                 target:
                     UpdateTarget::Purpose {
-                        force_id,
+                        shortname,
                         naive_change,
                         description,
                         add_component,
@@ -1339,7 +1358,7 @@ mod tests {
                     },
                 ..
             } => {
-                assert_eq!(force_id, "P-01");
+                assert_eq!(shortname, "test-purpose");
                 assert_eq!(naive_change.as_deref(), Some("revised feature"));
                 assert_eq!(description, None);
                 assert_eq!(add_component, vec!["auth".to_string()]);
@@ -1691,10 +1710,12 @@ mod tests {
                     "stressor",
                     "--description",
                     "load",
-                    "--attractor-id",
+                    "--attractor-shortname",
                     "A-01",
                     "--naive-change",
                     "cache",
+                    "--shortname",
+                    "load-spike",
                 ],
             );
             run(
@@ -1702,9 +1723,9 @@ mod tests {
                 &[
                     "add",
                     "residue",
-                    "--force-id",
-                    "S-01",
-                    "--component-id",
+                    "--shortname",
+                    "load-spike",
+                    "--component-shortname",
                     "auth",
                 ],
             );
@@ -1714,9 +1735,9 @@ mod tests {
                 &[
                     "remove",
                     "residue",
-                    "--force-id",
-                    "S-01",
-                    "--component-id",
+                    "--shortname",
+                    "load-spike",
+                    "--component-shortname",
                     "auth",
                 ],
             );
@@ -1765,10 +1786,12 @@ mod tests {
                     "stressor",
                     "--description",
                     "load",
-                    "--attractor-id",
+                    "--attractor-shortname",
                     "A-01",
                     "--naive-change",
                     "cache",
+                    "--shortname",
+                    "load-spike",
                 ],
             );
             run(
@@ -1776,9 +1799,9 @@ mod tests {
                 &[
                     "add",
                     "residue",
-                    "--force-id",
-                    "S-01",
-                    "--component-id",
+                    "--shortname",
+                    "load-spike",
+                    "--component-shortname",
                     "auth",
                 ],
             );
@@ -1788,9 +1811,9 @@ mod tests {
                 &[
                     "add",
                     "residue",
-                    "--force-id",
-                    "S-01",
-                    "--component-id",
+                    "--shortname",
+                    "load-spike",
+                    "--component-shortname",
                     "auth",
                     "--move-to",
                     "db",
@@ -1848,6 +1871,9 @@ mod tests {
             );
         }
 
+        const TEST_STRESSOR_SHORTNAME: &str = "test-stressor";
+        const TEST_PURPOSE_SHORTNAME: &str = "test-purpose";
+
         fn add_stressor(dir: &tempfile::TempDir, description: &str, naive_change: &str) {
             let status = run(
                 dir,
@@ -1856,10 +1882,12 @@ mod tests {
                     "stressor",
                     "--description",
                     description,
-                    "--attractor-id",
+                    "--attractor-shortname",
                     "A-01",
                     "--naive-change",
                     naive_change,
+                    "--shortname",
+                    TEST_STRESSOR_SHORTNAME,
                 ],
             );
             assert!(
@@ -1877,10 +1905,12 @@ mod tests {
                     "purpose",
                     "--description",
                     description,
-                    "--attractor-id",
+                    "--attractor-shortname",
                     "A-01",
                     "--naive-change",
                     naive_change,
+                    "--shortname",
+                    TEST_PURPOSE_SHORTNAME,
                 ],
             );
             assert!(
@@ -1907,8 +1937,8 @@ mod tests {
                 &[
                     "update",
                     "stressor",
-                    "--force-id",
-                    "S-01",
+                    "--shortname",
+                    TEST_STRESSOR_SHORTNAME,
                     "--description",
                     "revised desc",
                 ],
@@ -1949,15 +1979,15 @@ mod tests {
                 &[
                     "update",
                     "stressor",
-                    "--force-id",
-                    "S-99",
+                    "--shortname",
+                    "does-not-exist",
                     "--description",
                     "should not land",
                 ],
             );
             assert!(
                 !update.status.success(),
-                "update stressor with unknown --force-id must error"
+                "update stressor with unknown --shortname must error"
             );
 
             let after =
@@ -1978,7 +2008,7 @@ mod tests {
 
             let update = run(
                 &dir,
-                &["update", "stressor", "--force-id", "S-01", "--add-component", "auth"],
+                &["update", "stressor", "--shortname", TEST_STRESSOR_SHORTNAME, "--add-component", "auth"],
             );
             assert!(
                 update.status.success(),
@@ -2023,9 +2053,9 @@ mod tests {
                 &[
                     "add",
                     "residue",
-                    "--force-id",
-                    "S-01",
-                    "--component-id",
+                    "--shortname",
+                    TEST_STRESSOR_SHORTNAME,
+                    "--component-shortname",
                     "auth",
                 ],
             );
@@ -2034,9 +2064,9 @@ mod tests {
                 &[
                     "add",
                     "residue",
-                    "--force-id",
-                    "S-01",
-                    "--component-id",
+                    "--shortname",
+                    TEST_STRESSOR_SHORTNAME,
+                    "--component-shortname",
                     "db",
                 ],
             );
@@ -2046,8 +2076,8 @@ mod tests {
                 &[
                     "update",
                     "stressor",
-                    "--force-id",
-                    "S-01",
+                    "--shortname",
+                    TEST_STRESSOR_SHORTNAME,
                     "--remove-component",
                     "auth",
                 ],
@@ -2087,8 +2117,8 @@ mod tests {
                 &[
                     "update",
                     "purpose",
-                    "--force-id",
-                    "P-01",
+                    "--shortname",
+                    TEST_PURPOSE_SHORTNAME,
                     "--naive-change",
                     "revised feature",
                 ],
@@ -2127,15 +2157,15 @@ mod tests {
                 &[
                     "update",
                     "purpose",
-                    "--force-id",
-                    "P-99",
+                    "--shortname",
+                    "does-not-exist",
                     "--naive-change",
                     "nope",
                 ],
             );
             assert!(
                 !update.status.success(),
-                "update purpose with unknown --force-id must error"
+                "update purpose with unknown --shortname must error"
             );
         }
 

@@ -1,6 +1,6 @@
 ---
 name: framework
-version: 1
+version: 2
 description: >-
   NKP Residuality framework primer. Read this when starting a skill session on
   a project you have not seen before, or when the ledger is empty and you need
@@ -35,7 +35,7 @@ Stressors are linked to an attractor. Map stressed components via `residual add 
 A behavioral contract that must hold for the attractor to remain positive. If a purpose is absent or broken, the system moves toward its negative attractor. Every purpose must produce at least one outcome using terms from the project lexicon. Purposes are anchors for architecture: every vertical slice in the design should map to at least one purpose.
 
 ### Component
-A fully-qualified name registered in `components.csv` (implementation status lives there). **Forces do not carry component lists.** Coupling is recorded only in `residues.csv` — the NKP matrix — via `residual add residue --force-id … --component-id …`. `residual matrix show` reads that matrix.
+A fully-qualified name registered in `components.csv` (implementation status lives there). **Forces do not carry component lists.** Coupling is recorded only in `residues.csv` — the NKP matrix — via `residual add residue --shortname … --component-shortname …`. `residual matrix show` reads that matrix.
 
 When a stressor affects two components that were not expected to be related, that is *hyperliminal coupling* — the naïve architecture did not anticipate this dependency.
 
@@ -58,7 +58,7 @@ Core CSV files — nothing else belongs to the model:
 | `lexicon.csv` | domain vocabulary |
 | `personas/<name>.md` | stakeholder voices (used in stressor-walk, fmea, atam) |
 
-**Workflow:** `residual add stressor` or `add purpose`, then `residual add residue --force-id … --component-id …` for each coupling.
+**Workflow:** `residual add stressor` or `add purpose`, then `residual add residue --shortname … --component-shortname …` for each coupling.
 
 **Always use `residual add …` commands. Never edit CSVs directly** — direct edits bypass ID generation, idempotency guards, and `verify`.
 

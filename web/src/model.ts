@@ -20,23 +20,19 @@
 //   `toCommandLines` unable to ever emit a valid `add attractor` line.
 // - Required-fields ground truth for validation comes from
 //   web/generated/cli-schema.json, NOT the plan prose. Per that schema,
-//   `add stressor`/`add purpose` require description, attractor-id and
+//   `add stressor`/`add purpose` require description, attractor-shortname and
 //   naive-change/feature — but NOT outcomes (outcomes: required=false in the
 //   schema for both). `isForceValid` therefore does not check outcomes.
 // - `add stressor`/`add purpose` have no `--add-component` flag in the
-//   schema (only `update stressor`/`update purpose` do), and `add stressor`/
-//   `add purpose` have no `--force-id` flag either — the id is assigned
-//   server-side and only ever appears in stdout on success ("Added stressor
-//   S-NN"). So a freshly *added* force's toggled components can never ride
-//   on its own `add` line, AND the follow-up `update <type> --add-component
-//   ...` line can never reference the force's `tempId` as a literal
-//   `--force-id` value (that string will never exist in stressors.csv/
-//   residues.csv, so the generated script would silently fail). Instead,
-//   `toCommandLines` wraps the `add` line in a shell-variable capture
-//   (`NEW_1_ID=$(residual add stressor ... | grep -oE '[A-Z]+-[0-9]+' |
-//   tail -1)`) and has the synthetic `update` line reference `"$NEW_1_ID"`.
-//   This capture-wrapped line is intentionally not `parseImportText`-
-//   round-trippable — it's a shell construct, not a plain CLI invocation.
+//   schema (only `update stressor`/`update purpose` do). Forces are
+//   addressed everywhere — `add residue`, `update stressor`/`update
+//   purpose`, `commit template` — by `--shortname`, which the CLI now
+//   requires on `add stressor`/`add purpose` and which the caller (this UI)
+//   chooses up front. So, unlike the S-nn/P-nn id (still server-assigned and
+//   only ever visible in stdout), the shortname is known before the `add`
+//   line even runs: a freshly *added* force's toggled components ride a
+//   plain follow-up `update <type> --shortname ... --add-component ...`
+//   line, with no shell-variable capture needed.
 // - Personas and terms are tracked as their own add/update buckets even
 //   though the plan's explicit ordering list only names "components,
 //   attractors, personas, forces" (terms are not mentioned). Since terms
@@ -141,12 +137,13 @@ export interface PendingState {
 }
 
 /** Required (non-outcomes) field names for a stressor/purpose, per cli-schema.json. */
-export type RequiredForceField = "description" | "attractorId" | "naiveChangeOrFeature";
+export type RequiredForceField = "description" | "attractorId" | "naiveChangeOrFeature" | "shortname";
 
 export const REQUIRED_FORCE_FIELDS: readonly RequiredForceField[] = [
   "description",
   "attractorId",
   "naiveChangeOrFeature",
+  "shortname",
 ];
 
 /** One resolved item in the fixed add/update, component/attractor/persona/term/force emission order. */
@@ -168,6 +165,7 @@ export function isForceValid(force: {
   description: string;
   attractorId: string;
   naiveChangeOrFeature: string;
+  shortname: string;
   components: string[];
 }): boolean {
   for (const field of REQUIRED_FORCE_FIELDS) {
@@ -198,6 +196,7 @@ export function computeStateValidity(state: PendingState): StateValidity {
       description: string;
       attractorId: string;
       naiveChangeOrFeature: string;
+      shortname: string;
       components: string[];
     },
   ): void => {
@@ -218,6 +217,7 @@ export function computeStateValidity(state: PendingState): StateValidity {
       description: update?.description ?? base.description,
       attractorId: update?.attractorId ?? base.attractorId,
       naiveChangeOrFeature: update?.naiveChangeOrFeature ?? base.naiveChangeOrFeature,
+      shortname: update?.shortname ?? base.shortname,
       components: update?.components ?? base.components,
     });
   }
@@ -228,6 +228,7 @@ export function computeStateValidity(state: PendingState): StateValidity {
       description: update?.description ?? added.description,
       attractorId: update?.attractorId ?? added.attractorId,
       naiveChangeOrFeature: update?.naiveChangeOrFeature ?? added.naiveChangeOrFeature,
+      shortname: update?.shortname ?? added.shortname,
       components: update?.components ?? added.components,
     });
   }
@@ -265,8 +266,8 @@ export function orderedEntries(state: PendingState): OrderedEntry[] {
     ),
     ...Object.keys(state.updatedTerms).map((k): OrderedEntry => ({ bucket: "term", action: "update", key: k })),
     // Synthetic follow-up updates for added forces whose toggled components
-    // can't ride on their own `add` line (no --force-id known yet) — see
-    // module notes and toCommandLines.
+    // can't ride on their own `add` line (`add stressor`/`add purpose` have
+    // no `--add-component` flag) — see module notes and toCommandLines.
     ...state.addedForces
       .filter((f) => f.components.length > 0)
       .map((f): OrderedEntry => ({ bucket: "force", action: "update", key: f.tempId })),
@@ -306,11 +307,6 @@ function flagText(name: string, value: string): string {
   return `--${name} ${quoteValue(value)}`;
 }
 
-/** Sanitizes a tempId into a shell variable name: uppercase, non-alphanumeric runs -> "_", suffixed "_ID". */
-function tempIdToVarName(tempId: string): string {
-  return `${tempId.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_ID`;
-}
-
 export function toCommandLines(state: PendingState): CommandLine[] {
   const validity = computeStateValidity(state);
   const entries = orderedEntries(state);
@@ -321,6 +317,8 @@ export function toCommandLines(state: PendingState): CommandLine[] {
   const addedTermByTerm = new Map(state.addedTerms.map((t) => [t.term, t]));
   const addedForceByTempId = new Map(state.addedForces.map((f) => [f.tempId, f]));
   const baseForceById = new Map(state.baseForces.map((f) => [f.id, f]));
+  const attractorShortname = (id: string): string =>
+    [...state.baseAttractors, ...state.addedAttractors].find((attractor) => attractor.id === id)?.name ?? id;
 
   const forceIsValid = (key: string): boolean => !validity.invalidForceIds.has(key);
 
@@ -415,32 +413,20 @@ export function toCommandLines(state: PendingState): CommandLine[] {
     // on `add stressor`/`add purpose` (see module notes).
     const valid = forceIsValid(tempId);
     const flags = [
-      flagText("attractor-id", f.attractorId),
+      flagText("attractor-shortname", attractorShortname(f.attractorId)),
       flagText("description", f.description),
       flagText("naive-change", f.naiveChangeOrFeature),
+      flagText("shortname", f.shortname),
     ];
     if (f.outcomes !== "") flags.push(flagText("outcomes", f.outcomes));
-    if (f.shortname !== "") flags.push(flagText("shortname", f.shortname));
 
-    if (f.components.length === 0) {
-      return { line: ["residual add", f.kind, ...flags].join(" "), valid };
-    }
-
-    // The id is server-assigned and only known from stdout on success
-    // ("Added stressor S-NN") — capture it into a shell variable so the
-    // synthetic follow-up `update` (below) never has to reference the
-    // tempId as a literal --force-id, which would never exist in the CSVs.
-    const varName = tempIdToVarName(tempId);
-    const inner = ["residual add", f.kind, ...flags].join(" ");
-    const line = `${varName}=$(${inner} | grep -oE '[A-Z]+-[0-9]+' | tail -1)`;
-    return { line, valid };
+    return { line: ["residual add", f.kind, ...flags].join(" "), valid };
   };
 
   const renderForceUpdateSynthetic = (tempId: string): CommandLine => {
     const f = addedForceByTempId.get(tempId)!;
     const valid = forceIsValid(tempId);
-    const varName = tempIdToVarName(tempId);
-    const parts = [`residual update ${f.kind}`, `--force-id ${quoteValue(`$${varName}`)}`];
+    const parts = [`residual update ${f.kind}`, flagText("shortname", f.shortname)];
     for (const component of f.components) {
       parts.push(flagText("add-component", component));
     }
@@ -451,12 +437,14 @@ export function toCommandLines(state: PendingState): CommandLine[] {
     const base = baseForceById.get(id)!;
     const update = state.updatedForces[id]!;
     const valid = forceIsValid(id);
-    const parts = [`residual update ${base.kind}`, `--force-id ${quoteValue(id)}`];
+    const parts = [`residual update ${base.kind}`, flagText("shortname", base.shortname)];
     if (update.description !== undefined) parts.push(flagText("description", update.description));
-    if (update.attractorId !== undefined) parts.push(flagText("attractor-id", update.attractorId));
+    if (update.attractorId !== undefined) {
+      parts.push(flagText("attractor-shortname", attractorShortname(update.attractorId)));
+    }
     if (update.naiveChangeOrFeature !== undefined) parts.push(flagText("naive-change", update.naiveChangeOrFeature));
     if (update.outcomes !== undefined) parts.push(flagText("outcomes", update.outcomes));
-    if (update.shortname !== undefined) parts.push(flagText("shortname", update.shortname));
+    if (update.shortname !== undefined) parts.push(flagText("rename", update.shortname));
     if (update.components !== undefined) {
       const before = new Set(base.components);
       const after = new Set(update.components);

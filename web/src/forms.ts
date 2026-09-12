@@ -104,7 +104,7 @@ export function mountForms(
 
       const fieldMap: Array<[string, "description" | "attractorId" | "naiveChangeOrFeature" | "shortname" | "outcomes"]> = [
         ["description", "description"],
-        ["attractor_id", "attractorId"],
+        ["attractor_shortname", "attractorId"],
         ["naive_change", "naiveChangeOrFeature"],
         ["shortname", "shortname"],
         ["outcomes", "outcomes"],

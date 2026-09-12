@@ -11,9 +11,9 @@ residual skill install <name> --agent claude   # install skill to .claude/comman
 residual skill install all --agent claude      # install all skills
 residual skill check-install <name> --agent claude  # verify installed version is current
 
-residual add stressor --description "..." --attractor-id A-01 --naive-change "..." --outcomes "..."
-residual add residue --force-id S-01 --component-id C1
-residual add purpose  --description "..." --attractor-id A-01 --feature "..." --outcomes "..."
+residual add stressor --description "..." --attractor-shortname A-01 --naive-change "..." --outcomes "..." --shortname "..."
+residual add residue --shortname "..." --component-shortname C1
+residual add purpose  --description "..." --attractor-shortname A-01 --feature "..." --outcomes "..." --shortname "..."
 residual add attractor --name "..." --positive-state "..." --negative-state "..." --description "..."
 residual add term --term "..." --definition "..."
 residual add persona --name "..." --role "..."

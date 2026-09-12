@@ -1,0 +1,74 @@
+<task-notification>
+<task-id>afb8f2eb0cf23e9f8</task-id>
+<tool-use-id>toolu_014emo9kERxyKpKuf7QmusVt</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/afb8f2eb0cf23e9f8.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: TS model validation tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 19 new tests fail solely via the intended "not yet implemented — green phase" throws (all correct-reason failures, no compile errors), and the 40 pre-existing import-parser tests still pass unchanged.
+
+## Files created
+
+- `/home/v0id/Documents/repos/residual/web/src/model.ts`
+- `/home/v0id/Documents/repos/residual/web/src/model.test.ts`
+
+## Types settled on
+
+```ts
+export interface SnapshotAttractor { id: string; name: string; description: string; positiveState: string; negativeState: string }
+export interface SnapshotComponent { name: string; description: string; status: "proposed" | "actual"; architectureSet: string }
+export interface SnapshotForce { id: string; kind: "stressor" | "purpose"; description: string; attractorId: string; naiveChangeOrFeature: string; outcomes: string; shortname: string; components: string[] }
+export interface SnapshotPersona { name: string; role: string; concerns?: string; desires?: string }
+export interface SnapshotTerm { term: string; definition: string; domain?: string; related?: string }
+export type AddedForce = SnapshotForce &amp; { tempId: string };
+export type ForceUpdate = Partial&lt;Omit&lt;SnapshotForce, "id" | "kind"&gt;&gt;;
+export type AttractorUpdate = Partial&lt;Omit&lt;SnapshotAttractor, "id"&gt;&gt;;
+export type ComponentUpdate = Partial&lt;Omit&lt;SnapshotComponent, "name"&gt;&gt;;
+export type PersonaUpdate = Partial&lt;Omit&lt;SnapshotPersona, "name"&gt;&gt;;
+export type TermUpdate = Partial&lt;Omit&lt;SnapshotTerm, "term"&gt;&gt;;
+
+export interface PendingState {
+  baseAttractors: SnapshotAttractor[]; baseComponents: SnapshotComponent[]; baseForces: SnapshotForce[];
+  basePersonas: SnapshotPersona[]; baseTerms: SnapshotTerm[];
+  addedAttractors: SnapshotAttractor[]; addedComponents: SnapshotComponent[]; addedForces: AddedForce[];
+  addedPersonas: SnapshotPersona[]; addedTerms: SnapshotTerm[];
+  updatedAttractors: Record&lt;string, AttractorUpdate&gt;; updatedComponents: Record&lt;string, ComponentUpdate&gt;;
+  updatedForces: Record&lt;string, ForceUpdate&gt;; updatedPersonas: Record&lt;string, PersonaUpdate&gt;;
+  updatedTerms: Record&lt;string, TermUpdate&gt;;
+}
+
+export type RequiredForceField = "description" | "attractorId" | "naiveChangeOrFeature";
+export interface OrderedEntry { bucket: "component"|"attractor"|"persona"|"term"|"force"; action: "add"|"update"; key: string }
+export interface StateValidity { invalidForceIds: Set&lt;string&gt;; invalidReasonsByForce: Record&lt;string, string[]&gt; }
+export interface CommandLine { line: string; valid: boolean }
+```
+
+Functions (all stubbed with `throw new Error("not yet implemented — green phase")`): `isForceValid`, `computeStateValidity`, `orderedEntries`, `toCommandLines`.
+
+## Key design decisions (documented in file-header comments)
+
+- `SnapshotAttractor` gained a `description` field beyond the task's sketch — `add attractor --description` is `required: true` in `web/generated/cli-schema.json`, so it's needed to ever emit a valid line.
+- Required-fields ground truth is `cli-schema.json`, not the plan prose: `add stressor`/`add purpose` require `description`, `attractor-id`, `naive-change`/`feature` but **not** `outcomes` (schema says `required: false`) — `isForceValid` deliberately excludes outcomes.
+- `add stressor`/`add purpose` have no `--add-component` flag in the schema — only `update` does — so a brand-new force's component toggles always surface as a synthetic follow-up `update &lt;type&gt; --force-id &lt;tempId&gt; --add-component ...` entry in the update phase, keyed by the force's `tempId`.
+- Terms are tracked as their own bucket, ordered last in both add and update phases (plan's ordering rule only names components/attractors/personas/forces).
+
+## Tests added (19)
+
+`isForceValid` (6): valid-all-set, invalid-empty-description/attractorId/naiveChangeOrFeature, invalid-zero-components, outcomes-not-checked.
+`computeStateValidity` (3): base-force-update-blanks-field, added-force-missing-attractorId-keyed-by-tempId, valid-force-not-flagged.
+`orderedEntries` (3): full bucket+add/update ordering, added-force-with-components synthetic update entry, terms-ordered-last.
+`toCommandLines` (7): valid-line-rendering, invalid-line-flagged, add-stressor round-trip via `parseImportText`, synthetic update-line round-trip, base-force component-diff (add/remove-component), add-attractor round-trip, add-component round-trip.
+
+## `bun test` tail
+
+```
+19 tests failed: (all via "not yet implemented — green phase" throws, listed by name)
+40 pass
+19 fail
+341 expect() calls
+Ran 59 tests across 3 files. [88.00ms]
+```
+
+The 40 passing tests are the pre-existing `import-parser.test.ts`/`import-parser.parity.test.ts` suites, unchanged.</result>
+<usage><subagent_tokens>71613</subagent_tokens><tool_uses>10</tool_uses><duration_ms>243367</duration_ms></usage>
+</task-notification>

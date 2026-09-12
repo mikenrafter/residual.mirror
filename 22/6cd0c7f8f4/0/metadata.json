@@ -1,0 +1,107 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "226cd0c7f8f4",
+  "session_id": "0377c2d5-06de-4af8-99b6-293e1014da2c",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-12T16:31:35.136576626Z",
+  "branch": "tdd-implement/defense-ledger-proposed-components",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "web/src/forms.test.ts",
+    "web/src/forms.ts"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "5759e6bc3e87",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 388,
+    "cache_creation_tokens": 426930,
+    "cache_read_tokens": 31339397,
+    "output_tokens": 121162,
+    "api_call_count": 195,
+    "subagent_tokens": {
+      "input_tokens": 44,
+      "cache_creation_tokens": 140135,
+      "cache_read_tokens": 1221615,
+      "output_tokens": 40870,
+      "api_call_count": 22
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01JxccPScubXqgthwcm2CVw6",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "residual-tdd-implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "b08d6c4c5d8d",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 65,
+        "end": 66,
+        "entry_ids": [
+          "07b6c601-6068-4934-9ca6-3b1f078aa1ef"
+        ],
+        "tool_use_id": "toolu_01JxccPScubXqgthwcm2CVw6"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01JxccPScubXqgthwcm2CVw6"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: residual-tdd-implement",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 33
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-12T16:31:34.921382566Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1228,
+    "human_modified": 28,
+    "human_removed": 0,
+    "total_committed": 1228,
+    "total_lines_changed": 1256,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 770,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "web/src/forms.test.ts": 693,
+        "web/src/forms.ts": 77
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 243,
+      "user_lines_removed": 14,
+      "agent_lines_added": 770,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "web/src/forms.ts": 243
+      },
+      "user_removed_per_file": {
+        "web/src/forms.ts": 14
+      }
+    }
+  ]
+}

@@ -1,0 +1,177 @@
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=d93500e7, run=92d1b12d-a09d-4355-9636-2b56e55cfbed).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=b2b2e3de, run=5cbc440f-19f5-469b-930b-08e905df3908).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=df21c0d2, run=0d08992f-65e0-43d3-ad2d-464bdb2d8cb6).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=a2297ae8, run=cb7763ec-bba4-4083-9751-bdf4d15da34a).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=08b024b8, run=8c749a1b-85b7-48c3-b6e6-c36c480dbcc5).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=eb01f4ec, run=7b121a54-1f8e-4939-b43a-8741018ed8a0).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=c658b0d2, run=954b9396-4cb2-4041-91f4-0d35bc7f777b).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=53d2d192, run=bc761b76-89ef-4bca-9223-071927f9e838).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=9dab41f4, run=cca6614f-322d-4c80-82a1-a0701ab20273).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=7a017c48, run=d46bc444-ad5a-4276-840a-47254bb5b118).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=55c43328, run=e9eae204-0ab4-404f-a4e5-91fa6284ef5a).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=f8bae50d, run=518935d2-3674-4b0e-9548-c27745c91feb).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<task-notification>
+<task-id>adcbf59461e809fc0</task-id>
+<tool-use-id>toolu_014GGH4GuGBJhCwEJyTwQdXn</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/adcbf59461e809fc0.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: render-decision helper tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 15 new tests fail via the intended stub throw (not compile errors), and the 60 pre-existing tests still pass unchanged.
+
+## Summary
+
+**Files created:**
+- `/home/v0id/Documents/repos/residual/web/src/render-decisions.ts` — stub module
+- `/home/v0id/Documents/repos/residual/web/src/render-decisions.test.ts` — 15 real tests
+
+**Signatures:**
+```ts
+export interface InvalidMarks {
+  invalidForceKeys: Set&lt;string&gt;;
+  invalidComponentColumns: Set&lt;string&gt;;
+}
+export function computeInvalidMarks(state: PendingState): InvalidMarks
+
+export interface VisibilityOptions {
+  showProposed: boolean;
+  showUnrelated: boolean;
+  filteredForceIds: string[] | null;
+}
+export function visibleComponents(state: PendingState, options: VisibilityOptions): string[]
+
+export interface AttractorOption { id: string; name: string }
+export function attractorOptions(state: PendingState): AttractorOption[]
+```
+
+**Tests added** (`describe` blocks / names):
+- `computeInvalidMarks`: marks base-force row invalid on blanked required field; marks added-force row invalid on zero components; leaves valid force unmarked; `invalidComponentColumns` stays empty for zero-components case (with components present); stays empty across multiple simultaneously-invalid forces.
+- `visibleComponents`: all visible with both toggles on/no filter; excludes proposed from `baseComponents`; excludes proposed from `addedComponents`; `showUnrelated:false` + explicit `filteredForceIds` keeps only related; `filteredForceIds: null` checks against all forces; relatedness uses update-merged components, not just base; relatedness also honors `addedForces` via tempId.
+- `attractorOptions`: sorts base attractors by name; merges `addedAttractors` into the sorted list; returns `[]` for an empty state.
+
+**`invalidComponentColumns` scoping reasoning** (documented in-file too): the NKP matrix has no per-cell required/optional concept — a cell is only ever coupled/not-coupled. `computeStateValidity` (model.ts) only flags a row-wide "zero components toggled" failure, which cannot be pinned to one column over another since none are toggled. Rather than force a literal but meaningless per-cell reading, `invalidComponentColumns` is scoped to stay empty for that case (asserted directly in two tests), while `invalidForceKeys` covers both required-text-field failures and the zero-components rule. A future genuine per-cell invalid state (none exists in the domain today) would be the only thing to populate `invalidComponentColumns`.
+
+**`bun test web/src` tail:**
+```
+15 tests failed (all render-decisions.test.ts, all via "not yet implemented — green phase" throws)
+60 pass
+392 expect() calls
+Ran 75 tests across 4 files. [296.00ms]
+```
+The 60 previously-passing tests (import-parser + model) are unchanged and still pass.</result>
+<usage><subagent_tokens>48496</subagent_tokens><tool_uses>9</tool_uses><duration_ms>83086</duration_ms></usage>
+</task-notification>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=307159c1, run=3450ceee-b26f-49b5-a8c8-bd2e1ae429c1).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=313cfb5a, run=b84a2dbc-4ddd-46b6-bc9d-decda5d0645f).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=3399b794, run=9860b931-793a-43cf-8afb-cf15fc88b7fe).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=e27311e3, run=234c65c7-5d2e-4184-8d14-2c89a5147d89).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=fd07ab67, run=14807447-5392-4d11-8495-02fc168e2efc).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>
+
+---
+
+<paseo-system>
+Schedule "smart-session-plan-resume-5059f732-9e3c-419e-9bcf-749aa9411617" fired (id=b0289c81, run=dd15a7e6-eea8-4f54-b7cd-d4464f201da9).
+The provider token allowance should now be renewed. Continue the unfinished work from the previous turn. Review the durable task state (smart-session checkpoint) and the latest conversation before acting. Prefer the checkpoint's Current step over any stale summary.
+</paseo-system>

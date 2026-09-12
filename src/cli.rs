@@ -41,6 +41,19 @@ pub enum Command {
         #[command(subcommand)]
         target: RemoveTarget,
     },
+    /// Update fields on an existing residual record in place.
+    ///
+    /// Process: keyed by the same id/name the record was created with. Every
+    /// other field flag is optional — omitted flags leave the stored value
+    /// unchanged. Stressor/purpose also accept repeatable --add-component /
+    /// --remove-component to fold residues.csv couplings into the same call.
+    Update {
+        /// Overwrite session snapshot when residual files drifted outside this tool.
+        #[arg(long)]
+        force: bool,
+        #[command(subcommand)]
+        target: UpdateTarget,
+    },
     /// Grant short-lived permission for sidecar-backed metadata writes.
     Write {
         #[command(subcommand)]
@@ -439,6 +452,98 @@ pub enum RemoveTarget {
 }
 
 #[derive(Subcommand)]
+pub enum UpdateTarget {
+    /// Update a stressor force in place; also folds residues.csv couplings.
+    Stressor {
+        #[arg(long)]
+        force_id: String,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        attractor_id: Option<String>,
+        #[arg(long)]
+        naive_change: Option<String>,
+        #[arg(long)]
+        shortname: Option<String>,
+        #[arg(long, visible_alias = "traits")]
+        outcomes: Option<String>,
+        /// Component id to couple to this stressor (repeatable).
+        #[arg(long)]
+        add_component: Vec<String>,
+        /// Component id to decouple from this stressor (repeatable).
+        #[arg(long)]
+        remove_component: Vec<String>,
+    },
+    /// Update a purpose force in place; also folds residues.csv couplings.
+    Purpose {
+        #[arg(long)]
+        force_id: String,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        attractor_id: Option<String>,
+        #[arg(long, visible_alias = "feature")]
+        naive_change: Option<String>,
+        #[arg(long)]
+        shortname: Option<String>,
+        #[arg(long, visible_alias = "traits")]
+        outcomes: Option<String>,
+        /// Component id to couple to this purpose (repeatable).
+        #[arg(long)]
+        add_component: Vec<String>,
+        /// Component id to decouple from this purpose (repeatable).
+        #[arg(long)]
+        remove_component: Vec<String>,
+    },
+    /// Update an attractor in place, keyed by its id (e.g. A-01).
+    Attractor {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        positive_state: Option<String>,
+        #[arg(long)]
+        negative_state: Option<String>,
+    },
+    /// Update a component in place, keyed by its name.
+    Component {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        architecture_set: Option<String>,
+    },
+    /// Update a lexicon term in place, keyed by its canonical spelling.
+    Term {
+        #[arg(long)]
+        term: String,
+        #[arg(long)]
+        definition: Option<String>,
+        #[arg(long)]
+        domain: Option<String>,
+        #[arg(long)]
+        related: Option<String>,
+    },
+    /// Update a persona in place, keyed by its name.
+    Persona {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        concerns: Option<String>,
+        #[arg(long)]
+        desires: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum ListTarget {
     Stressors,
     Purposes,
@@ -586,6 +691,7 @@ pub fn run() -> Result<()> {
         Command::Init { force } => crate::storage::init(&cfg, force),
         Command::Add { force, target } => crate::storage::add(&cfg, target, force),
         Command::Remove { force, target } => crate::storage::remove(&cfg, target, force),
+        Command::Update { force, target } => crate::storage::update(&cfg, target, force),
         Command::Write { op } => match op {
             WriteOp::Authorize { minutes } => {
                 let expires_at = crate::storage::write_authorization::authorize(&cfg, minutes)?;
@@ -1114,6 +1220,244 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cli_parses_update_stressor_with_only_identity_flag() {
+        let cli = Cli::try_parse_from(["residual", "update", "stressor", "--force-id", "S-01"]);
+        assert!(
+            cli.is_ok(),
+            "CLI must accept `update stressor` with only --force-id (all other fields optional), got err: {}",
+            cli.err().map(|e| e.to_string()).unwrap_or_default()
+        );
+        match cli.unwrap().command {
+            Command::Update {
+                target:
+                    UpdateTarget::Stressor {
+                        force_id,
+                        description,
+                        attractor_id,
+                        naive_change,
+                        shortname,
+                        outcomes,
+                        add_component,
+                        remove_component,
+                    },
+                ..
+            } => {
+                assert_eq!(force_id, "S-01");
+                assert_eq!(description, None);
+                assert_eq!(attractor_id, None);
+                assert_eq!(naive_change, None);
+                assert_eq!(shortname, None);
+                assert_eq!(outcomes, None);
+                assert!(add_component.is_empty());
+                assert!(remove_component.is_empty());
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Stressor)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_update_stressor_with_repeated_component_flags() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "update",
+            "stressor",
+            "--force-id",
+            "S-01",
+            "--description",
+            "new desc",
+            "--add-component",
+            "auth",
+            "--add-component",
+            "db",
+            "--remove-component",
+            "legacy",
+        ])
+        .expect("CLI must accept repeated --add-component/--remove-component on update stressor");
+        match cli.command {
+            Command::Update {
+                target:
+                    UpdateTarget::Stressor {
+                        description,
+                        add_component,
+                        remove_component,
+                        ..
+                    },
+                ..
+            } => {
+                assert_eq!(description.as_deref(), Some("new desc"));
+                assert_eq!(add_component, vec!["auth".to_string(), "db".to_string()]);
+                assert_eq!(remove_component, vec!["legacy".to_string()]);
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Stressor)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_update_purpose_with_component_flags() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "update",
+            "purpose",
+            "--force-id",
+            "P-01",
+            "--naive-change",
+            "revised feature",
+            "--add-component",
+            "auth",
+        ])
+        .expect("CLI must accept `update purpose` with optional fields + --add-component");
+        match cli.command {
+            Command::Update {
+                target:
+                    UpdateTarget::Purpose {
+                        force_id,
+                        naive_change,
+                        description,
+                        add_component,
+                        ..
+                    },
+                ..
+            } => {
+                assert_eq!(force_id, "P-01");
+                assert_eq!(naive_change.as_deref(), Some("revised feature"));
+                assert_eq!(description, None);
+                assert_eq!(add_component, vec!["auth".to_string()]);
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Purpose)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_update_attractor_keyed_by_id() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "update",
+            "attractor",
+            "--id",
+            "A-01",
+            "--positive-state",
+            "new positive",
+        ])
+        .expect("CLI must accept `update attractor` keyed by --id with optional fields");
+        match cli.command {
+            Command::Update {
+                target:
+                    UpdateTarget::Attractor {
+                        id,
+                        positive_state,
+                        name,
+                        description,
+                        negative_state,
+                    },
+                ..
+            } => {
+                assert_eq!(id, "A-01");
+                assert_eq!(positive_state.as_deref(), Some("new positive"));
+                assert_eq!(name, None);
+                assert_eq!(description, None);
+                assert_eq!(negative_state, None);
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Attractor)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_update_component_keyed_by_name() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "update",
+            "component",
+            "--name",
+            "auth",
+            "--status",
+            "actual",
+        ])
+        .expect("CLI must accept `update component` keyed by --name with optional fields");
+        match cli.command {
+            Command::Update {
+                target:
+                    UpdateTarget::Component {
+                        name,
+                        status,
+                        description,
+                        architecture_set,
+                    },
+                ..
+            } => {
+                assert_eq!(name, "auth");
+                assert_eq!(status.as_deref(), Some("actual"));
+                assert_eq!(description, None);
+                assert_eq!(architecture_set, None);
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Component)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_update_term_keyed_by_term() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "update",
+            "term",
+            "--term",
+            "attractor",
+            "--definition",
+            "new definition",
+        ])
+        .expect("CLI must accept `update term` keyed by --term with optional fields");
+        match cli.command {
+            Command::Update {
+                target:
+                    UpdateTarget::Term {
+                        term,
+                        definition,
+                        domain,
+                        related,
+                    },
+                ..
+            } => {
+                assert_eq!(term, "attractor");
+                assert_eq!(definition.as_deref(), Some("new definition"));
+                assert_eq!(domain, None);
+                assert_eq!(related, None);
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Term)"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_update_persona_keyed_by_name() {
+        let cli = Cli::try_parse_from([
+            "residual",
+            "update",
+            "persona",
+            "--name",
+            "alice",
+            "--role",
+            "lead engineer",
+        ])
+        .expect("CLI must accept `update persona` keyed by --name with optional fields");
+        match cli.command {
+            Command::Update {
+                target:
+                    UpdateTarget::Persona {
+                        name,
+                        role,
+                        concerns,
+                        desires,
+                    },
+                ..
+            } => {
+                assert_eq!(name, "alice");
+                assert_eq!(role.as_deref(), Some("lead engineer"));
+                assert_eq!(concerns, None);
+                assert_eq!(desires, None);
+            }
+            _ => panic!("expected Command::Update(UpdateTarget::Persona)"),
+        }
+    }
+
     mod cli_integration {
         use super::*;
         use crate::config::Config;
@@ -1405,6 +1749,581 @@ mod tests {
                 cells.get(db_idx).copied().unwrap_or(""),
                 "1",
                 "db coupling must be set, row={row}"
+            );
+        }
+
+        fn add_attractor(dir: &tempfile::TempDir) {
+            let status = run(
+                dir,
+                &[
+                    "add",
+                    "attractor",
+                    "--name",
+                    "X",
+                    "--description",
+                    "d",
+                    "--positive-state",
+                    "ok",
+                    "--negative-state",
+                    "bad",
+                ],
+            );
+            assert!(
+                status.status.success(),
+                "add attractor: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
+
+        fn add_stressor(dir: &tempfile::TempDir, description: &str, naive_change: &str) {
+            let status = run(
+                dir,
+                &[
+                    "add",
+                    "stressor",
+                    "--description",
+                    description,
+                    "--attractor-id",
+                    "A-01",
+                    "--naive-change",
+                    naive_change,
+                ],
+            );
+            assert!(
+                status.status.success(),
+                "add stressor: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
+
+        fn add_purpose(dir: &tempfile::TempDir, description: &str, naive_change: &str) {
+            let status = run(
+                dir,
+                &[
+                    "add",
+                    "purpose",
+                    "--description",
+                    description,
+                    "--attractor-id",
+                    "A-01",
+                    "--naive-change",
+                    naive_change,
+                ],
+            );
+            assert!(
+                status.status.success(),
+                "add purpose: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
+
+        // --- residual update <type>: red-phase tests. All storage::*::update()
+        // bodies are `todo!()` stubs (green phase implements them), so every
+        // test below currently fails via panic (non-zero exit / stderr
+        // "not implemented"), not via compile error.
+
+        #[test]
+        fn update_stressor_changes_description_leaves_naive_change() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_attractor(&dir);
+            add_stressor(&dir, "original desc", "original naive change");
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "stressor",
+                    "--force-id",
+                    "S-01",
+                    "--description",
+                    "revised desc",
+                ],
+            );
+            assert!(
+                update.status.success(),
+                "update stressor --description: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let stressors =
+                std::fs::read_to_string(dir.path().join("residual/stressors.csv")).unwrap();
+            let row = stressors
+                .lines()
+                .find(|l| l.starts_with("S-01,"))
+                .expect("S-01 row");
+            assert!(
+                row.contains("revised desc"),
+                "description must be updated, row={row}"
+            );
+            assert!(
+                row.contains("original naive change"),
+                "naive_change must be left unchanged when omitted, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_stressor_unknown_id_errors_with_no_partial_write() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_attractor(&dir);
+            add_stressor(&dir, "original desc", "original naive change");
+            let before =
+                std::fs::read_to_string(dir.path().join("residual/stressors.csv")).unwrap();
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "stressor",
+                    "--force-id",
+                    "S-99",
+                    "--description",
+                    "should not land",
+                ],
+            );
+            assert!(
+                !update.status.success(),
+                "update stressor with unknown --force-id must error"
+            );
+
+            let after =
+                std::fs::read_to_string(dir.path().join("residual/stressors.csv")).unwrap();
+            assert_eq!(
+                before, after,
+                "unknown-id update must not partially write stressors.csv"
+            );
+        }
+
+        #[test]
+        fn update_stressor_add_component_couples_residue() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_component(&dir, "auth", "Auth");
+            add_attractor(&dir);
+            add_stressor(&dir, "load", "cache");
+
+            let update = run(
+                &dir,
+                &["update", "stressor", "--force-id", "S-01", "--add-component", "auth"],
+            );
+            assert!(
+                update.status.success(),
+                "update stressor --add-component: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let residues =
+                std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            let header = residues.lines().next().expect("header");
+            let cols: Vec<&str> = header.split(',').map(str::trim).collect();
+            let row = residues
+                .lines()
+                .find(|l| l.starts_with("S-01,"))
+                .expect("S-01 row");
+            let cells: Vec<&str> = row.split(',').map(str::trim).collect();
+            let auth_idx = cols.iter().position(|c| *c == "auth").expect("auth column");
+            assert_eq!(
+                cells.get(auth_idx).copied().unwrap_or(""),
+                "1",
+                "auth coupling must be set via --add-component, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_stressor_remove_component_decouples_residue() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_component(&dir, "auth", "Auth");
+            // The residues matrix (src/storage/format.rs::residues_to_rows) only
+            // emits a row for a force when it has at least one *coupled* residue
+            // (see remove_residue_clears_matrix_cell for the same pattern). Seed a
+            // second, unrelated component coupling so the S-01 row still exists
+            // after --remove-component clears the "auth" cell — otherwise the row
+            // itself would legitimately disappear, which is not what this test is
+            // exercising.
+            add_component(&dir, "db", "Database");
+            add_attractor(&dir);
+            add_stressor(&dir, "load", "cache");
+            run(
+                &dir,
+                &[
+                    "add",
+                    "residue",
+                    "--force-id",
+                    "S-01",
+                    "--component-id",
+                    "auth",
+                ],
+            );
+            run(
+                &dir,
+                &[
+                    "add",
+                    "residue",
+                    "--force-id",
+                    "S-01",
+                    "--component-id",
+                    "db",
+                ],
+            );
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "stressor",
+                    "--force-id",
+                    "S-01",
+                    "--remove-component",
+                    "auth",
+                ],
+            );
+            assert!(
+                update.status.success(),
+                "update stressor --remove-component: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let residues =
+                std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap();
+            let header = residues.lines().next().expect("header");
+            let cols: Vec<&str> = header.split(',').map(str::trim).collect();
+            let row = residues
+                .lines()
+                .find(|l| l.starts_with("S-01,"))
+                .expect("S-01 row");
+            let cells: Vec<&str> = row.split(',').map(str::trim).collect();
+            let auth_idx = cols.iter().position(|c| *c == "auth").expect("auth column");
+            assert_ne!(
+                cells.get(auth_idx).copied().unwrap_or(""),
+                "1",
+                "auth coupling must be cleared via --remove-component, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_purpose_changes_naive_change_leaves_description() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_attractor(&dir);
+            add_purpose(&dir, "original purpose desc", "original feature");
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "purpose",
+                    "--force-id",
+                    "P-01",
+                    "--naive-change",
+                    "revised feature",
+                ],
+            );
+            assert!(
+                update.status.success(),
+                "update purpose --naive-change: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let purposes =
+                std::fs::read_to_string(dir.path().join("residual/purposes.csv")).unwrap();
+            let row = purposes
+                .lines()
+                .find(|l| l.starts_with("P-01,"))
+                .expect("P-01 row");
+            assert!(
+                row.contains("revised feature"),
+                "naive_change must be updated, row={row}"
+            );
+            assert!(
+                row.contains("original purpose desc"),
+                "description must be left unchanged when omitted, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_purpose_unknown_id_errors() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_attractor(&dir);
+            add_purpose(&dir, "desc", "feature");
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "purpose",
+                    "--force-id",
+                    "P-99",
+                    "--naive-change",
+                    "nope",
+                ],
+            );
+            assert!(
+                !update.status.success(),
+                "update purpose with unknown --force-id must error"
+            );
+        }
+
+        #[test]
+        fn update_attractor_changes_positive_state_leaves_name() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_attractor(&dir);
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "attractor",
+                    "--id",
+                    "A-01",
+                    "--positive-state",
+                    "new positive",
+                ],
+            );
+            assert!(
+                update.status.success(),
+                "update attractor --positive-state: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let attractors =
+                std::fs::read_to_string(dir.path().join("residual/attractors.csv")).unwrap();
+            let row = attractors
+                .lines()
+                .find(|l| l.starts_with("A-01,"))
+                .expect("A-01 row");
+            assert!(
+                row.contains("new positive"),
+                "positive_state must be updated, row={row}"
+            );
+            assert!(
+                row.contains("X"),
+                "name must be left unchanged when omitted, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_attractor_unknown_id_errors() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_attractor(&dir);
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "attractor",
+                    "--id",
+                    "A-99",
+                    "--positive-state",
+                    "nope",
+                ],
+            );
+            assert!(
+                !update.status.success(),
+                "update attractor with unknown --id must error"
+            );
+        }
+
+        #[test]
+        fn update_component_changes_status_leaves_description() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            add_component(&dir, "auth", "Auth module description");
+
+            let update = run(
+                &dir,
+                &["update", "component", "--name", "auth", "--status", "actual"],
+            );
+            assert!(
+                update.status.success(),
+                "update component --status: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let components =
+                std::fs::read_to_string(dir.path().join("residual/components.csv")).unwrap();
+            let row = components
+                .lines()
+                .find(|l| l.starts_with("auth,"))
+                .expect("auth row");
+            assert!(
+                row.contains("actual"),
+                "status must be updated, row={row}"
+            );
+            assert!(
+                row.contains("Auth module description"),
+                "description must be left unchanged when omitted, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_component_unknown_name_errors() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "component",
+                    "--name",
+                    "does-not-exist",
+                    "--status",
+                    "actual",
+                ],
+            );
+            assert!(
+                !update.status.success(),
+                "update component with unknown --name must error"
+            );
+        }
+
+        #[test]
+        fn update_term_changes_definition_leaves_domain() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            let added = run(
+                &dir,
+                &[
+                    "add",
+                    "term",
+                    "--term",
+                    "hyperliminal",
+                    "--definition",
+                    "original definition",
+                    "--domain",
+                    "coupling",
+                ],
+            );
+            assert!(
+                added.status.success(),
+                "add term: {}",
+                String::from_utf8_lossy(&added.stderr)
+            );
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "term",
+                    "--term",
+                    "hyperliminal",
+                    "--definition",
+                    "revised definition",
+                ],
+            );
+            assert!(
+                update.status.success(),
+                "update term --definition: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let lexicon =
+                std::fs::read_to_string(dir.path().join("residual/lexicon.csv")).unwrap();
+            let row = lexicon
+                .lines()
+                .find(|l| l.starts_with("hyperliminal,"))
+                .expect("hyperliminal row");
+            assert!(
+                row.contains("revised definition"),
+                "definition must be updated, row={row}"
+            );
+            assert!(
+                row.contains("coupling"),
+                "domain must be left unchanged when omitted, row={row}"
+            );
+        }
+
+        #[test]
+        fn update_term_unknown_term_errors() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "term",
+                    "--term",
+                    "does-not-exist",
+                    "--definition",
+                    "nope",
+                ],
+            );
+            assert!(
+                !update.status.success(),
+                "update term with unknown --term must error"
+            );
+        }
+
+        #[test]
+        fn update_persona_changes_role_leaves_desires() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+            let added = run(
+                &dir,
+                &[
+                    "add",
+                    "persona",
+                    "--name",
+                    "alice",
+                    "--role",
+                    "original role",
+                    "--desires",
+                    "reliability",
+                ],
+            );
+            assert!(
+                added.status.success(),
+                "add persona: {}",
+                String::from_utf8_lossy(&added.stderr)
+            );
+
+            let update = run(
+                &dir,
+                &[
+                    "update",
+                    "persona",
+                    "--name",
+                    "alice",
+                    "--role",
+                    "revised role",
+                ],
+            );
+            assert!(
+                update.status.success(),
+                "update persona --role: {}",
+                String::from_utf8_lossy(&update.stderr)
+            );
+
+            let persona =
+                std::fs::read_to_string(dir.path().join("residual/personas/alice.md")).unwrap();
+            assert!(
+                persona.contains("revised role"),
+                "role must be updated, got: {persona}"
+            );
+            assert!(
+                persona.contains("reliability"),
+                "desires must be left unchanged when omitted, got: {persona}"
+            );
+        }
+
+        #[test]
+        fn update_persona_unknown_name_errors() {
+            let dir = isolated_tempdir();
+            init_storage(&dir);
+
+            let update = run(
+                &dir,
+                &["update", "persona", "--name", "does-not-exist", "--role", "nope"],
+            );
+            assert!(
+                !update.status.success(),
+                "update persona with unknown --name must error"
             );
         }
     }

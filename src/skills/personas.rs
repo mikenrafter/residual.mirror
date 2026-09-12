@@ -32,6 +32,33 @@ pub fn create(residual_dir: &Path, persona: Persona) -> Result<()> {
     Ok(())
 }
 
+/// Update fields on an existing persona in place, keyed by name; unspecified
+/// fields are unchanged. Errors on unknown name, with no partial writes.
+pub fn update(
+    residual_dir: &Path,
+    name: &str,
+    role: Option<String>,
+    concerns: Option<String>,
+    desires: Option<String>,
+) -> Result<()> {
+    let path = residual_dir.join("personas").join(format!("{name}.md"));
+    if !path.exists() {
+        anyhow::bail!("persona '{name}' does not exist");
+    }
+    let content = std::fs::read_to_string(&path)?;
+    let mut persona = parse_persona(&content, name.to_string());
+    if let Some(v) = role {
+        persona.role = v;
+    }
+    if let Some(v) = concerns {
+        persona.concerns = v;
+    }
+    if let Some(v) = desires {
+        persona.desires = v;
+    }
+    create(residual_dir, persona)
+}
+
 pub fn load_all(residual_dir: &Path) -> Result<Vec<Persona>> {
     let personas_dir = residual_dir.join("personas");
     if !personas_dir.exists() {

@@ -68,6 +68,61 @@ fn write_all(residual_dir: &Path, rows: &[Purpose]) -> Result<()> {
     Ok(())
 }
 
+/// Update fields on an existing purpose in place; unspecified fields are unchanged.
+/// Also folds `add_component`/`remove_component` into residues.csv couplings for
+/// this force id, mirroring `residual add/remove residue`. Errors on unknown id,
+/// with no partial writes.
+#[allow(clippy::too_many_arguments)]
+pub fn update(
+    residual_dir: &Path,
+    id: &str,
+    description: Option<String>,
+    attractor_id: Option<String>,
+    naive_change: Option<String>,
+    shortname: Option<String>,
+    outcomes: Option<String>,
+    add_component: Vec<String>,
+    remove_component: Vec<String>,
+) -> Result<()> {
+    let mut all = load(residual_dir)?;
+    let Some(row) = all.iter_mut().find(|p| p.id == id) else {
+        anyhow::bail!("purpose id '{}' not found", id);
+    };
+    if let Some(v) = description {
+        row.description = v;
+    }
+    if let Some(v) = attractor_id {
+        row.attractor_id = v;
+    }
+    if let Some(v) = naive_change {
+        row.naive_change = v;
+    }
+    if let Some(v) = shortname {
+        row.shortname = v;
+    }
+    if let Some(v) = outcomes {
+        row.outcomes = v;
+    }
+    write_all(residual_dir, &all)?;
+
+    for component_id in &add_component {
+        let existing = crate::storage::residues::load(residual_dir)?;
+        let residue_id = crate::storage::residues::next_id(&existing);
+        crate::storage::residues::append(
+            residual_dir,
+            crate::structure::analysis::residues::Residue::coupling(
+                residue_id,
+                id.to_string(),
+                component_id.clone(),
+            ),
+        )?;
+    }
+    for component_id in &remove_component {
+        crate::storage::residues::remove_coupling(residual_dir, id, component_id)?;
+    }
+    Ok(())
+}
+
 pub fn next_id(purposes: &[Purpose]) -> String {
     let max = purposes
         .iter()

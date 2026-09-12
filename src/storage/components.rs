@@ -133,6 +133,31 @@ pub fn load(residual_dir: &Path) -> Result<Vec<Component>> {
     crate::structure::definition::components::load(residual_dir)
 }
 
+/// Update fields on an existing component in place, keyed by name; unspecified
+/// fields are unchanged. Errors on unknown name, with no partial writes.
+pub fn update(
+    residual_dir: &Path,
+    name: &str,
+    description: Option<String>,
+    status: Option<String>,
+    architecture_set: Option<String>,
+) -> Result<()> {
+    let mut components = load(residual_dir)?;
+    let Some(row) = components.iter_mut().find(|c| c.name == name) else {
+        anyhow::bail!("unknown component: {name} not found");
+    };
+    if let Some(v) = description {
+        row.description = v;
+    }
+    if let Some(v) = status {
+        row.status = v;
+    }
+    if let Some(v) = architecture_set {
+        row.architecture_set = v;
+    }
+    write_all(residual_dir, &components)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

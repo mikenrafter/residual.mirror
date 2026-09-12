@@ -1,4 +1,4 @@
-use crate::cli::{AddTarget, ListTarget, RemoveTarget};
+use crate::cli::{AddTarget, ListTarget, RemoveTarget, UpdateTarget};
 use crate::config::Config;
 use crate::structure::analysis::residues::{tag_naive_change_whole_system, Residue};
 use anyhow::Result;
@@ -140,6 +140,105 @@ pub fn remove(cfg: &Config, target: RemoveTarget, force: bool) -> Result<()> {
     remove_entry(&dir, target)?;
     session.commit()?;
     git_sidecar::persist_if_sidecar(cfg, &dir)?;
+    Ok(())
+}
+
+pub fn update(cfg: &Config, target: UpdateTarget, force: bool) -> Result<()> {
+    write_authorization::require(cfg)?;
+    let dir = metadata_dir_for_mutation(cfg)?;
+    let session = integrity::sessions::begin_mutation(&dir, force)?;
+    update_entry(&dir, target)?;
+    session.commit()?;
+    git_sidecar::persist_if_sidecar(cfg, &dir)?;
+    Ok(())
+}
+
+fn update_entry(dir: &Path, target: UpdateTarget) -> Result<()> {
+    match target {
+        UpdateTarget::Stressor {
+            force_id,
+            description,
+            attractor_id,
+            naive_change,
+            shortname,
+            outcomes,
+            add_component,
+            remove_component,
+        } => {
+            stressors::update(
+                dir,
+                &force_id,
+                description,
+                attractor_id,
+                naive_change,
+                shortname,
+                outcomes,
+                add_component,
+                remove_component,
+            )?;
+            println!("Updated stressor {}", force_id);
+        }
+        UpdateTarget::Purpose {
+            force_id,
+            description,
+            attractor_id,
+            naive_change,
+            shortname,
+            outcomes,
+            add_component,
+            remove_component,
+        } => {
+            purposes::update(
+                dir,
+                &force_id,
+                description,
+                attractor_id,
+                naive_change,
+                shortname,
+                outcomes,
+                add_component,
+                remove_component,
+            )?;
+            println!("Updated purpose {}", force_id);
+        }
+        UpdateTarget::Attractor {
+            id,
+            name,
+            description,
+            positive_state,
+            negative_state,
+        } => {
+            attractors::update(dir, &id, name, description, positive_state, negative_state)?;
+            println!("Updated attractor {}", id);
+        }
+        UpdateTarget::Component {
+            name,
+            description,
+            status,
+            architecture_set,
+        } => {
+            components::update(dir, &name, description, status, architecture_set)?;
+            println!("Updated component '{}'", name);
+        }
+        UpdateTarget::Term {
+            term,
+            definition,
+            domain,
+            related,
+        } => {
+            terminology::update(dir, &term, definition, domain, related)?;
+            println!("Updated term '{}'", term);
+        }
+        UpdateTarget::Persona {
+            name,
+            role,
+            concerns,
+            desires,
+        } => {
+            personas::update(dir, &name, role, concerns, desires)?;
+            println!("Updated persona '{}'", name);
+        }
+    }
     Ok(())
 }
 

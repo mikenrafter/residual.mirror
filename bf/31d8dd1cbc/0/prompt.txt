@@ -945,3 +945,263 @@ Design note documented in the module header: all interactions (filter/accordion/
 **`bun test` tail:** 169 pre-existing tests pass unchanged; all 16 new tests fail via the `throw new Error("not yet implemented — green phase")` in `mountMatrixView` (confirmed via stack trace, not a type/compile error). Total: `169 pass, 16 fail, 704 expect() calls, 185 tests across 12 files`.</result>
 <usage><subagent_tokens>57428</subagent_tokens><tool_uses>14</tool_uses><duration_ms>195879</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a9379c7634f3a6d3f</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/a9379c7634f3a6d3f.output</output-file>
+<status>completed</status>
+<summary>Agent "Green phase: implement matrix-view filter/sort/accordion" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 185 tests pass (0 fail), including the 16 matrix-view tests, with the pre-existing 169 still green.
+
+## Implementation
+
+`/home/v0id/Documents/repos/residual/web/src/matrix-view.ts`:
+
+```ts
+// DOM-wiring layer restoring the matrix-view interactions that used to live
+// in an inline &lt;script&gt; in src/view/shell.html (live text filter, click-to-
+// sort headers, accordion expand/collapse, fusion/fission threshold
+// highlighting). That inline script was deleted wholesale while wiring in
+// the new TS-based live-editing system (Phases 0-8 of
+// residual/iterations/view-live-editing-plan.md) and never reimplemented —
+// this module is the fix for that regression.
+//
+// [... header comment unchanged from stub ...]
+
+export interface MatrixViewOptions {
+  onChange?: () =&gt; void;
+}
+
+export interface MatrixViewHandle {
+  recomputeFusionFission: () =&gt; void;
+}
+
+type SortDir = "asc" | "desc";
+
+function sortMatrixBy(container: HTMLElement, key: string, dir: SortDir): void {
+  const table = container.querySelector("table.matrix");
+  const tbody = table?.querySelector("tbody");
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll&lt;HTMLTableRowElement&gt;("tr.force-row"));
+  const mult = dir === "desc" ? -1 : 1;
+
+  rows.sort((ra, rb) =&gt; {
+    if (key === "force") {
+      return (ra.getAttribute("data-force-id") ?? "").localeCompare(rb.getAttribute("data-force-id") ?? "") * mult;
+    }
+    if (key === "total") {
+      return (Number(ra.getAttribute("data-row-total") ?? 0) - Number(rb.getAttribute("data-row-total") ?? 0)) * mult;
+    }
+    if (key.indexOf("component:") === 0) {
+      const comp = key.slice("component:".length);
+      const ca = ra.querySelector(`td[data-component="${CSS.escape(comp)}"]`);
+      const cb = rb.querySelector(`td[data-component="${CSS.escape(comp)}"]`);
+      const va = ca?.getAttribute("data-coupled") === "1" ? 1 : 0;
+      const vb = cb?.getAttribute("data-coupled") === "1" ? 1 : 0;
+      return (va - vb) * mult;
+    }
+    return 0;
+  });
+
+  for (const row of rows) tbody.appendChild(row);
+}
+
+interface FusionFissionResult {
+  fusion: Set&lt;string&gt;;
+  fission: Set&lt;string&gt;;
+}
+
+function computeMatrixCandidates(container: HTMLElement): FusionFissionResult {
+  const table = container.querySelector("table.matrix");
+  const fusion = new Set&lt;string&gt;();
+  const fission = new Set&lt;string&gt;();
+  if (!table) return { fusion, fission };
+
+  const componentNames = Array.from(table.querySelectorAll("thead th[data-component]")).map(
+    (th) =&gt; th.getAttribute("data-component") ?? "",
+  );
+
+  const vectors: Record&lt;string, Record&lt;string, boolean&gt;&gt; = {};
+  for (const name of componentNames) vectors[name] = {};
+
+  for (const td of Array.from(table.querySelectorAll("tbody td[data-residue-cell]"))) {
+    const comp = td.getAttribute("data-component") ?? "";
+    const force = td.getAttribute("data-force-id") ?? "";
+    if (vectors[comp]) vectors[comp][force] = td.getAttribute("data-coupled") === "1";
+  }
+
+  for (let i = 0; i &lt; componentNames.length; i++) {
+    for (let j = i + 1; j &lt; componentNames.length; j++) {
+      const a = vectors[componentNames[i]];
+      const b = vectors[componentNames[j]];
+      const forceIds = Object.keys(a);
+      const identical = forceIds.length &gt; 0 &amp;&amp; forceIds.every((fid) =&gt; a[fid] === b[fid]);
+      if (identical) {
+        fusion.add(componentNames[i]);
+        fusion.add(componentNames[j]);
+      }
+    }
+  }
+
+  const thresholdInput = container.querySelector("[data-threshold-input]");
+  const threshold = thresholdInput instanceof HTMLInputElement ? Number(thresholdInput.value) : 1;
+
+  for (const td of Array.from(table.querySelectorAll("tfoot td[data-col-total]"))) {
+    const total = Number(td.getAttribute("data-col-total"));
+    if (total &gt; threshold) fission.add(td.getAttribute("data-component") ?? "");
+  }
+
+  return { fusion, fission };
+}
+
+function applyFusionFissionHighlighting(container: HTMLElement): void {
+  const table = container.querySelector("table.matrix");
+  if (!table) return;
+
+  const { fusion, fission } = computeMatrixCandidates(container);
+  const componentNames = Array.from(table.querySelectorAll("thead th[data-component]")).map(
+    (th) =&gt; th.getAttribute("data-component") ?? "",
+  );
+
+  const onlyToggle = container.querySelector("[data-fusion-fission-filter]");
+  const only = onlyToggle instanceof HTMLInputElement &amp;&amp; onlyToggle.checked;
+
+  for (const name of componentNames) {
+    const isFusion = fusion.has(name);
+    const isFission = fission.has(name);
+    const show = !only || isFusion || isFission;
+    for (const el of Array.from(container.querySelectorAll(`[data-component="${CSS.escape(name)}"]`))) {
+      el.setAttribute("data-fusion", isFusion ? "1" : "0");
+      el.setAttribute("data-fission", isFission ? "1" : "0");
+      if (el instanceof HTMLElement) el.hidden = !show;
+    }
+  }
+}
+
+export function mountMatrixView(container: HTMLElement, _options?: MatrixViewOptions): MatrixViewHandle {
+  // --- Filter -----------------------------------------------------------
+  container.addEventListener("input", (event) =&gt; {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const filterInput = target.closest("[data-force-filter]");
+    if (filterInput instanceof HTMLInputElement) {
+      const q = filterInput.value.trim().toLowerCase();
+      for (const row of Array.from(container.querySelectorAll&lt;HTMLTableRowElement&gt;("table.matrix tbody tr.force-row"))) {
+        const hay = (row.getAttribute("data-search") || row.textContent || "").toLowerCase();
+        row.hidden = q !== "" &amp;&amp; hay.indexOf(q) === -1;
+      }
+      return;
+    }
+
+    const thresholdInput = target.closest("[data-threshold-input]");
+    if (thresholdInput instanceof HTMLInputElement) {
+      const thresholdValue = container.querySelector("[data-threshold-value]");
+      if (thresholdValue) thresholdValue.textContent = thresholdInput.value;
+      applyFusionFissionHighlighting(container);
+    }
+  });
+
+  // --- Accordion + sort (click) ------------------------------------------
+  container.addEventListener("click", (event) =&gt; {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const toggle = target.closest("[data-accordion-toggle]");
+    if (toggle instanceof HTMLElement) {
+      const detail = toggle.nextElementSibling;
+      if (!(detail instanceof HTMLElement)) return;
+      const expanded = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", String(!expanded));
+      detail.hidden = expanded;
+      return;
+    }
+
+    const th = target.closest("table.matrix thead th[data-sort-key]");
+    if (th instanceof HTMLElement) {
+      activateSort(container, th);
+    }
+  });
+
+  // --- Sort (keyboard) -----------------------------------------------------
+  container.addEventListener("keydown", (event) =&gt; {
+    if (!(event instanceof KeyboardEvent)) return;
+    if (event.key !== "Enter" &amp;&amp; event.key !== " ") return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const th = target.closest("table.matrix thead th[data-sort-key]");
+    if (th instanceof HTMLElement) {
+      event.preventDefault();
+      activateSort(container, th);
+    }
+  });
+
+  // --- Fusion/fission filter toggle (change) -------------------------------
+  container.addEventListener("change", (event) =&gt; {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const filterToggle = target.closest("[data-fusion-fission-filter]");
+    if (filterToggle instanceof HTMLInputElement) {
+      applyFusionFissionHighlighting(container);
+    }
+  });
+
+  // --- Threshold slider auto-initialization (once, at mount time) ---------
+  const thresholdInput = container.querySelector("[data-threshold-input]");
+  const thresholdValue = container.querySelector("[data-threshold-value]");
+  const numForces = container.querySelectorAll("table.matrix tbody tr.force-row").length;
+  if (thresholdInput instanceof HTMLInputElement) {
+    const max = Math.max(1, numForces);
+    const value = Math.max(1, Math.floor(numForces / 2));
+    thresholdInput.min = "1";
+    thresholdInput.max = String(max);
+    thresholdInput.value = String(value);
+    if (thresholdValue) thresholdValue.textContent = String(value);
+  }
+
+  return {
+    recomputeFusionFission: () =&gt; applyFusionFissionHighlighting(container),
+  };
+}
+
+function activateSort(container: HTMLElement, th: HTMLElement): void {
+  const key = th.getAttribute("data-sort-key");
+  if (!key) return;
+  const current: SortDir | null = th.classList.contains("sort-asc")
+    ? "asc"
+    : th.classList.contains("sort-desc")
+      ? "desc"
+      : null;
+  const next: SortDir = current === "asc" ? "desc" : "asc";
+
+  for (const other of Array.from(container.querySelectorAll("table.matrix thead th[data-sort-key]"))) {
+    other.classList.remove("sort-asc", "sort-desc");
+  }
+  th.classList.add(next === "asc" ? "sort-asc" : "sort-desc");
+  sortMatrixBy(container, key, next);
+}
+```
+
+## Test tail output
+
+```
+ 185 pass
+ 0 fail
+ 839 expect() calls
+Ran 185 tests across 12 files. [479.00ms]
+```
+
+## Deviations from the reference JS (all faithful adaptations per the task brief)
+
+1. All `document.querySelector*` calls scoped to `container` instead of `document`.
+2. Each interaction category (filter, accordion+sort click, keydown, change) uses one delegated listener on `container`, dispatching via `event.target.closest(...)`, so rows/headers/inputs added later by `matrix-interactions.ts`/`forms.ts` work without remounting.
+3. `recomputeFusionFission` on the returned handle is `applyFusionFissionHighlighting` bound to `container`.
+4. Threshold slider min/max/value initialization runs once at mount time based on `tr.force-row` count present then, matching the original inline script's on-load behavior; it is not re-derived inside `recomputeFusionFission`.
+5. No `innerHTML`; only `setAttribute`/`textContent`/`classList`/`hidden` mutations plus `createElement` was unnecessary here since this module only reads/toggles existing DOM.
+
+No modifications were made to `matrix-view.test.ts` or any other stable module.</result>
+<usage><subagent_tokens>43266</subagent_tokens><tool_uses>4</tool_uses><duration_ms>70362</duration_ms></usage>
+</task-notification>

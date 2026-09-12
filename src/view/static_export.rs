@@ -20,6 +20,16 @@ const MATRIX_PLACEHOLDER: &str = "{{MATRIX}}";
 const DEFENSE_FORMS_PLACEHOLDER: &str = "{{DEFENSE_FORMS}}";
 const DEFENSE_RECORDS_PLACEHOLDER: &str = "{{DEFENSE_RECORDS}}";
 
+/// Token in [`TEMPLATE`] replaced by the compiled client-side bundle.
+const APP_JS_PLACEHOLDER: &str = "{{APP_JS}}";
+
+/// Compiled bundle of every `web/src/*.ts` module, rooted at `main.ts`.
+/// Checked into the repo and regenerated via `scripts/gen-view-bundle.sh` —
+/// NOT built during `cargo build`/crane's sandboxed derivation (no bun/
+/// network guaranteed there). See
+/// residual/iterations/view-live-editing-plan.md's "Locked decisions" table.
+const APP_JS: &str = include_str!("../../web/generated/app.js");
+
 /// Render the full landscape page for a snapshot.
 pub fn render_landscape_html(snapshot: &LandscapeSnapshot) -> Result<String> {
     let json = escape_script_json(&snapshot.to_json()?);
@@ -37,7 +47,8 @@ pub fn render_landscape_html(snapshot: &LandscapeSnapshot) -> Result<String> {
         .replace(SNAPSHOT_PLACEHOLDER, &json)
         .replace(MATRIX_PLACEHOLDER, &matrix)
         .replace(DEFENSE_RECORDS_PLACEHOLDER, &defense_records)
-        .replace(DEFENSE_FORMS_PLACEHOLDER, &defense_forms);
+        .replace(DEFENSE_FORMS_PLACEHOLDER, &defense_forms)
+        .replace(APP_JS_PLACEHOLDER, APP_JS);
     Ok(html)
 }
 
@@ -211,68 +222,18 @@ mod tests {
         );
     }
 
-    /// The filter input is not just markup — real JS must wire it to the
-    /// data-search attribute on matrix rows so typing actually hides/shows
-    /// rows in the table (the markup-only test above doesn't cover this).
-    #[test]
-    fn template_wires_working_filter_js_to_matrix_rows() {
-        assert!(
-            TEMPLATE.contains(r#"querySelector("[data-force-filter]")"#),
-            "template must look up the filter input by its data-force-filter hook"
-        );
-        assert!(
-            TEMPLATE.contains(r#".addEventListener("input""#),
-            "filter input must react live as the operator types"
-        );
-        assert!(
-            TEMPLATE.contains(r#"querySelectorAll("table.matrix tbody tr.force-row")"#),
-            "filter must target matrix table rows"
-        );
-        assert!(
-            TEMPLATE.contains(r#"getAttribute("data-search")"#),
-            "filter must read the per-row data-search haystack (which embeds kind and architecture_set)"
-        );
-        assert!(
-            TEMPLATE.contains("row.hidden ="),
-            "filter must actually toggle row visibility, not just compute a match"
-        );
-    }
-
-    /// Click-to-sort JS: header clicks reorder tbody rows by force id,
-    /// row total, or a specific component's coupling.
-    #[test]
-    fn template_wires_click_to_sort_on_matrix_headers() {
-        assert!(
-            TEMPLATE.contains(r#"querySelectorAll("table.matrix thead th[data-sort-key]")"#),
-            "template must attach click handlers to sortable headers"
-        );
-        assert!(
-            TEMPLATE.contains("function sortMatrixBy"),
-            "template must define the sort function"
-        );
-        assert!(
-            TEMPLATE.contains("tbody.appendChild(row)"),
-            "sort must actually reorder DOM rows"
-        );
-    }
-
-    /// Force accordion toggle JS: clicking the S-/P- label expands the
-    /// hidden detail panel in place, no separate list involved.
-    #[test]
-    fn template_wires_force_accordion_toggle() {
-        assert!(
-            TEMPLATE.contains(r#"querySelectorAll("[data-accordion-toggle]")"#),
-            "template must wire up accordion toggles"
-        );
-        assert!(
-            TEMPLATE.contains(r#"detail.hidden = expanded"#),
-            "toggle must flip the detail panel's hidden state"
-        );
-    }
-
-    /// Fusion/fission candidates are recomputed client-side from the
-    /// rendered coupling cells, filterable, and the threshold is a live
-    /// slider (not baked into the server-rendered page).
+    /// Fusion/fission-only filter and live threshold slider markup hooks.
+    /// Prior to Phase 8 this test also asserted the *inline* JS wiring
+    /// (`computeMatrixCandidates`, `thresholdInput.addEventListener`) that
+    /// used to live directly in `shell.html`. That inline script was deleted
+    /// wholesale and replaced by the compiled `web/generated/app.js` bundle
+    /// embedded via `APP_JS`/`APP_JS_PLACEHOLDER`; the same filter/sort/
+    /// accordion-toggle/fusion-fission-threshold behavior is reimplemented in
+    /// `web/src/matrix-view.ts` (restoring the regression, faithfully
+    /// ported) and covered by `matrix-view.test.ts` via `bun test` against a
+    /// real DOM — that's a better home for behavior assertions than grepping
+    /// bundled JS text for function-name substrings, so only the still-true
+    /// markup contract is asserted here.
     #[test]
     fn template_wires_live_fusion_fission_threshold() {
         assert!(
@@ -282,14 +243,6 @@ mod tests {
         assert!(
             TEMPLATE.contains("data-threshold-input"),
             "template must expose a live threshold slider"
-        );
-        assert!(
-            TEMPLATE.contains("function computeMatrixCandidates"),
-            "template must compute fusion/fission candidates client-side"
-        );
-        assert!(
-            TEMPLATE.contains(r#"thresholdInput.addEventListener("input""#),
-            "threshold slider must recompute candidates live as it moves"
         );
     }
 
@@ -342,31 +295,18 @@ mod tests {
             out.contains(r#"id="staged-commands""#),
             "staged command output element is missing"
         );
-        assert!(
-            out.contains("function buildAddCommand"),
-            "JS command builder buildAddCommand is missing"
-        );
-        assert!(
-            out.contains("function shellQuote"),
-            "JS shell quoting helper shellQuote is missing"
-        );
+        // Command building (formerly the inline `buildAddCommand`/
+        // `shellQuote` JS functions) now lives in the compiled
+        // web/generated/app.js bundle (model.ts's `toCommandLines`), built
+        // via `--flag` name/value pairs assembled at runtime rather than as
+        // contiguous string literals in source — so individual `--flag`
+        // substrings are no longer statically greppable in the rendered
+        // output. The still-checkable, still-true invariant is that the
+        // bundle's command-building vocabulary (`residual add `) is present.
         assert!(
             out.contains("residual add "),
             "generated commands must be `residual add …`"
         );
-        for flag in [
-            "--description",
-            "--attractor-id",
-            "--naive-change",
-            "--shortname",
-            "--outcomes",
-            "--positive-state",
-            "--negative-state",
-            "--architecture-set",
-            "--status",
-        ] {
-            assert!(out.contains(flag), "command generator must emit {flag}");
-        }
     }
 
     /// The UI is read-only against the ledger: it stages text, it does not write.
@@ -455,7 +395,12 @@ mod tests {
         );
     }
 
-    /// The template asset itself is the JS home — keep it wired, not empty.
+    /// The template asset carries the snapshot substitution hooks and the
+    /// copy-commands surface; the app-bundle placeholder is asserted
+    /// separately below. Since Phase 8, `buildAddCommand`/`shellQuote` no
+    /// longer exist anywhere (superseded by model.ts's `toCommandLines`
+    /// compiled into `APP_JS`), so those assertions were dropped rather than
+    /// left to assert dead functions.
     #[test]
     fn template_asset_carries_placeholder_and_generator_js() {
         assert!(
@@ -467,16 +412,32 @@ mod tests {
             "template must contain the snapshot script element id"
         );
         assert!(
-            TEMPLATE.contains("function buildAddCommand"),
-            "template must define buildAddCommand"
-        );
-        assert!(
-            TEMPLATE.contains("function shellQuote"),
-            "template must define shellQuote"
-        );
-        assert!(
             TEMPLATE.contains("data-copy-commands"),
             "template must define the copy-commands surface"
+        );
+    }
+
+    /// The compiled client-side bundle (`web/generated/app.js`) is spliced
+    /// into the rendered page as a `<script type="module">`, replacing the
+    /// old inline `<script>` this phase deletes.
+    #[test]
+    fn template_and_html_embed_the_compiled_app_bundle() {
+        assert!(
+            TEMPLATE.contains(APP_JS_PLACEHOLDER),
+            "template must contain the app-bundle substitution token"
+        );
+        assert!(
+            !APP_JS.is_empty(),
+            "the compiled app.js bundle must not be empty"
+        );
+        let out = html(false);
+        assert!(
+            out.contains(r#"<script type="module">"#),
+            "rendered html must embed the compiled bundle as a module script"
+        );
+        assert!(
+            !out.contains(APP_JS_PLACEHOLDER),
+            "the {{APP_JS}} placeholder must be fully substituted in rendered output"
         );
     }
 }

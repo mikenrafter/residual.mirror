@@ -5,7 +5,6 @@
 //! Neither mutates the ledger: the page stages `residual add …` commands that
 //! the operator copies and runs.
 
-pub mod commands;
 pub mod components;
 pub mod snapshot;
 pub mod static_export;
@@ -15,8 +14,6 @@ use std::path::PathBuf;
 
 use crate::config::Config;
 
-#[allow(unused_imports)] // re-exports for green agents / external callers
-pub use commands::{format_add_command, format_add_commands, StagedAdd};
 pub use static_export::render_landscape_html;
 #[allow(unused_imports)] // re-exports for green agents / external callers
 pub use snapshot::{

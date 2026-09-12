@@ -14,6 +14,7 @@
         --accent: #3d9b8f;
         --coupled: #c4a35a;
         --warn: #c45c5c;
+        --danger: #e6453e;
         --mono: "IBM Plex Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
         --sans: "IBM Plex Sans", "Source Sans 3", "Segoe UI", sans-serif;
       }
@@ -235,6 +236,50 @@
         outline: 2px solid var(--coupled);
         outline-offset: -2px;
       }
+      th.sticky-col.row-invalid,
+      tr.force-row.row-invalid,
+      tr.force-row.row-invalid td,
+      th[data-component].row-invalid {
+        background: color-mix(in srgb, var(--danger) 30%, transparent);
+        outline: 2px solid var(--danger);
+        outline-offset: -2px;
+      }
+      [role="menu"] {
+        position: absolute;
+        z-index: 50;
+        list-style: none;
+        margin: 0;
+        padding: 0.25rem;
+        min-width: 10rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+      [role="menuitem"] {
+        padding: 0.4rem 0.6rem;
+        font: 12px/1.3 var(--mono);
+        color: var(--ink);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      [role="menuitem"]:hover {
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+        color: var(--accent);
+      }
+      .import-modal {
+        margin-top: 0.75rem;
+        padding: 1rem 1.1rem 1.15rem;
+        background: color-mix(in srgb, var(--surface) 92%, black);
+        border: 1px solid var(--line);
+      }
+      .import-modal[hidden] { display: none; }
+      .import-modal-hint { color: var(--muted); margin: 0 0 0.5rem; }
+      .import-error-list {
+        margin: 0 0 0.55rem;
+        padding-left: 1.1rem;
+        color: var(--warn);
+        font: 12px/1.4 var(--mono);
+      }
       .generators {
         display: grid;
         gap: 0.85rem;
@@ -293,6 +338,8 @@
         aria-label="Filter forces"
       />
       <label><input type="checkbox" data-fusion-fission-filter /> fusion/fission candidates only</label>
+      <label><input type="checkbox" data-show-proposed-toggle checked /> show proposed</label>
+      <label><input type="checkbox" data-show-unrelated-toggle checked /> show unrelated</label>
       <label>fission threshold
         <input type="range" data-threshold-input min="1" max="1" value="1" />
         <output data-threshold-value>1</output>
@@ -369,6 +416,7 @@
               <button type="submit">stage</button>
             </fieldset>
           </form>
+          <p data-component-form-error></p>
           {{DEFENSE_FORMS}}
         </div>
       </section>
@@ -378,286 +426,30 @@
         <div class="copy-bar">
           <button type="button" id="copy-staged">copy</button>
           <button type="button" id="clear-staged">clear</button>
+          <button type="button" data-generate-script>generate bash script</button>
+          <button type="button" data-import-trigger>import</button>
         </div>
         <textarea id="staged-commands" readonly placeholder="staged residual add … commands appear here"></textarea>
       </section>
+
+      <div class="import-modal" data-import-modal hidden>
+        <h2>Import staged commands</h2>
+        <p class="import-modal-hint">
+          Paste <code>residual add …</code> / <code>residual update …</code> lines below.
+        </p>
+        <label>commands</label>
+        <textarea data-import-primary placeholder="residual add stressor --description …"></textarea>
+        <label>lines that failed to parse</label>
+        <textarea data-import-errors readonly placeholder="unparsed lines appear here"></textarea>
+        <ul data-import-error-list class="import-error-list"></ul>
+        <div class="copy-bar">
+          <button type="button" data-import-run>import</button>
+          <button type="button" data-import-retry>retry</button>
+        </div>
+      </div>
     </main>
 
     <script id="residual-snapshot" type="application/json">{{SNAPSHOT_JSON}}</script>
-    <script>
-      function shellQuote(value) {
-        const s = String(value == null ? "" : value);
-        if (s.indexOf("\n") !== -1 || s.indexOf("\r") !== -1) {
-          let escaped = "";
-          for (const ch of s) {
-            if (ch === "\\") escaped += "\\\\";
-            else if (ch === "'") escaped += "\\'";
-            else if (ch === "\n") escaped += "\\n";
-            else if (ch === "\r") escaped += "\\r";
-            else if (ch === "\t") escaped += "\\t";
-            else escaped += ch;
-          }
-          return "$'" + escaped + "'";
-        }
-        return "'" + s.replace(/'/g, "'\\''") + "'";
-      }
-
-      function pushFlag(parts, flag, value) {
-        parts.push(flag + " " + shellQuote(value));
-      }
-
-      function pushOptionalFlag(parts, flag, value) {
-        if (value != null && String(value) !== "") pushFlag(parts, flag, value);
-      }
-
-      function buildAddCommand(target, fields) {
-        const f = fields || {};
-        const parts = ["residual add " + target];
-        switch (target) {
-          case "stressor":
-          case "purpose":
-          case "meta-purpose":
-            pushFlag(parts, "--description", f.description || "");
-            pushFlag(parts, "--attractor-id", f.attractor_id || "");
-            pushFlag(parts, "--naive-change", f.naive_change || "");
-            pushOptionalFlag(parts, "--shortname", f.shortname || "");
-            pushOptionalFlag(parts, "--outcomes", f.outcomes || "");
-            break;
-          case "attractor":
-          case "meta-attractor":
-            pushFlag(parts, "--name", f.name || "");
-            pushFlag(parts, "--description", f.description || "");
-            pushFlag(parts, "--positive-state", f.positive_state || "");
-            pushFlag(parts, "--negative-state", f.negative_state || "");
-            break;
-          case "component":
-            pushFlag(parts, "--name", f.name || "");
-            pushFlag(parts, "--description", f.description || "");
-            pushFlag(parts, "--status", f.status || "");
-            pushFlag(parts, "--architecture-set", f.architecture_set || "");
-            break;
-          case "meta-stressor":
-            pushFlag(parts, "--description", f.description || "");
-            pushOptionalFlag(parts, "--shortname", f.shortname || "");
-            break;
-          case "defense-persona":
-          case "defense-strategy":
-          case "defense-progress":
-          case "defense-pitch":
-            pushFlag(parts, "--name", f.name || "");
-            pushFlag(parts, "--body", f.body || "");
-            break;
-          default:
-            throw new Error("unknown add target: " + target);
-        }
-        return parts.join(" ");
-      }
-
-      function formFields(form) {
-        const data = {};
-        for (const el of form.querySelectorAll("input, textarea, select")) {
-          if (!el.name) continue;
-          data[el.name] = el.value;
-        }
-        return data;
-      }
-
-      function appendStaged(command) {
-        const box = document.getElementById("staged-commands");
-        box.value = box.value ? box.value + "\n" + command : command;
-      }
-
-      document.querySelectorAll("form[data-command-generator]").forEach((form) => {
-        form.addEventListener("submit", (ev) => {
-          ev.preventDefault();
-          const target = form.getAttribute("data-command-generator");
-          appendStaged(buildAddCommand(target, formFields(form)));
-        });
-      });
-
-      const filterInput = document.querySelector("[data-force-filter]");
-      if (filterInput) {
-        filterInput.addEventListener("input", () => {
-          const q = filterInput.value.trim().toLowerCase();
-          document.querySelectorAll("table.matrix tbody tr.force-row").forEach((row) => {
-            const hay = (row.getAttribute("data-search") || row.textContent || "").toLowerCase();
-            row.hidden = q !== "" && hay.indexOf(q) === -1;
-          });
-        });
-      }
-
-      document.querySelectorAll("[data-accordion-toggle]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const detail = btn.nextElementSibling;
-          if (!detail) return;
-          const expanded = btn.getAttribute("aria-expanded") === "true";
-          btn.setAttribute("aria-expanded", String(!expanded));
-          detail.hidden = expanded;
-        });
-      });
-
-      function sortMatrixBy(key, dir) {
-        const table = document.querySelector("table.matrix");
-        const tbody = table && table.querySelector("tbody");
-        if (!tbody) return;
-        const rows = Array.from(tbody.querySelectorAll("tr.force-row"));
-        const mult = dir === "desc" ? -1 : 1;
-        rows.sort((ra, rb) => {
-          if (key === "force") {
-            const va = ra.getAttribute("data-force-id") || "";
-            const vb = rb.getAttribute("data-force-id") || "";
-            return va.localeCompare(vb) * mult;
-          }
-          if (key === "total") {
-            const va = Number(ra.getAttribute("data-row-total") || 0);
-            const vb = Number(rb.getAttribute("data-row-total") || 0);
-            return (va - vb) * mult;
-          }
-          if (key.indexOf("component:") === 0) {
-            const comp = key.slice("component:".length);
-            const ca = ra.querySelector('td[data-component="' + CSS.escape(comp) + '"]');
-            const cb = rb.querySelector('td[data-component="' + CSS.escape(comp) + '"]');
-            const va = ca && ca.getAttribute("data-coupled") === "1" ? 1 : 0;
-            const vb = cb && cb.getAttribute("data-coupled") === "1" ? 1 : 0;
-            return (va - vb) * mult;
-          }
-          return 0;
-        });
-        rows.forEach((row) => tbody.appendChild(row));
-      }
-
-      document.querySelectorAll("table.matrix thead th[data-sort-key]").forEach((th) => {
-        const activate = () => {
-          const key = th.getAttribute("data-sort-key");
-          const current = th.classList.contains("sort-asc")
-            ? "asc"
-            : th.classList.contains("sort-desc")
-              ? "desc"
-              : null;
-          const next = current === "asc" ? "desc" : "asc";
-          document.querySelectorAll("table.matrix thead th[data-sort-key]").forEach((other) => {
-            other.classList.remove("sort-asc", "sort-desc");
-          });
-          th.classList.add(next === "asc" ? "sort-asc" : "sort-desc");
-          sortMatrixBy(key, next);
-        };
-        th.addEventListener("click", activate);
-        th.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            activate();
-          }
-        });
-      });
-
-      function computeMatrixCandidates() {
-        const table = document.querySelector("table.matrix");
-        const fusion = new Set();
-        const fission = new Set();
-        if (!table) return { fusion, fission };
-
-        const componentNames = Array.from(table.querySelectorAll("thead th[data-component]")).map((th) =>
-          th.getAttribute("data-component")
-        );
-        const vectors = {};
-        componentNames.forEach((name) => {
-          vectors[name] = {};
-        });
-        table.querySelectorAll("tbody td[data-residue-cell]").forEach((td) => {
-          const comp = td.getAttribute("data-component");
-          const force = td.getAttribute("data-force-id");
-          if (vectors[comp]) vectors[comp][force] = td.getAttribute("data-coupled") === "1";
-        });
-        for (let i = 0; i < componentNames.length; i++) {
-          for (let j = i + 1; j < componentNames.length; j++) {
-            const a = vectors[componentNames[i]];
-            const b = vectors[componentNames[j]];
-            const forceIds = Object.keys(a);
-            const identical = forceIds.length > 0 && forceIds.every((fid) => a[fid] === b[fid]);
-            if (identical) {
-              fusion.add(componentNames[i]);
-              fusion.add(componentNames[j]);
-            }
-          }
-        }
-
-        const thresholdInput = document.querySelector("[data-threshold-input]");
-        const threshold = thresholdInput ? Number(thresholdInput.value) : 1;
-        table.querySelectorAll("tfoot td[data-col-total]").forEach((td) => {
-          const total = Number(td.getAttribute("data-col-total"));
-          if (total > threshold) fission.add(td.getAttribute("data-component"));
-        });
-
-        return { fusion, fission };
-      }
-
-      function applyFusionFissionHighlighting() {
-        const table = document.querySelector("table.matrix");
-        if (!table) return;
-        const { fusion, fission } = computeMatrixCandidates();
-        const componentNames = Array.from(table.querySelectorAll("thead th[data-component]")).map((th) =>
-          th.getAttribute("data-component")
-        );
-        const onlyToggle = document.querySelector("[data-fusion-fission-filter]");
-        const only = !!(onlyToggle && onlyToggle.checked);
-
-        componentNames.forEach((name) => {
-          const isFusion = fusion.has(name);
-          const isFission = fission.has(name);
-          const show = !only || isFusion || isFission;
-          table.querySelectorAll('[data-component="' + CSS.escape(name) + '"]').forEach((el) => {
-            el.setAttribute("data-fusion", isFusion ? "1" : "0");
-            el.setAttribute("data-fission", isFission ? "1" : "0");
-            el.hidden = !show;
-          });
-        });
-      }
-
-      const thresholdInput = document.querySelector("[data-threshold-input]");
-      const thresholdOutput = document.querySelector("[data-threshold-value]");
-      const fusionFissionToggle = document.querySelector("[data-fusion-fission-filter]");
-
-      function initThreshold() {
-        if (!thresholdInput) return;
-        const numForces = document.querySelectorAll("table.matrix tbody tr.force-row").length;
-        const max = Math.max(1, numForces);
-        const def = Math.max(1, Math.floor(numForces / 2));
-        thresholdInput.min = "1";
-        thresholdInput.max = String(max);
-        thresholdInput.value = String(def);
-        if (thresholdOutput) thresholdOutput.textContent = String(def);
-      }
-      initThreshold();
-      applyFusionFissionHighlighting();
-
-      if (thresholdInput) {
-        thresholdInput.addEventListener("input", () => {
-          if (thresholdOutput) thresholdOutput.textContent = thresholdInput.value;
-          applyFusionFissionHighlighting();
-        });
-      }
-      if (fusionFissionToggle) {
-        fusionFissionToggle.addEventListener("change", applyFusionFissionHighlighting);
-      }
-
-      const copyBtn = document.getElementById("copy-staged");
-      if (copyBtn) {
-        copyBtn.addEventListener("click", async () => {
-          const box = document.getElementById("staged-commands");
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(box.value);
-          } else {
-            box.select();
-            document.execCommand("copy");
-          }
-        });
-      }
-      const clearBtn = document.getElementById("clear-staged");
-      if (clearBtn) {
-        clearBtn.addEventListener("click", () => {
-          document.getElementById("staged-commands").value = "";
-        });
-      }
-    </script>
+    <script type="module">{{APP_JS}}</script>
   </body>
 </html>

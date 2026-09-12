@@ -1,0 +1,70 @@
+Generate a title that will help the user recognize this T3 Code thread weeks later.
+Return JSON with exactly one key: title.
+
+Before answering, silently reduce the request to:
+- Subject: What system, feature, or problem is this really about?
+- Outcome: What does the user ultimately want to understand or change?
+- Incidental instructions: What only describes how the agent should do the work?
+
+Title the subject and outcome. Discard incidental instructions.
+
+Editorial rules:
+- 3-8 words, fewer than 40 characters.
+- Use a compact noun phrase or clear action phrase.
+- Capture the umbrella goal when the request lists several symptoms or steps.
+- Name the product change, not the mock, plan, report, branch, or PR used to produce it.
+- Models, subagents, tools, output formats, and monitoring instructions do not belong in the title unless they are themselves the topic.
+- For reviews, name what is being reviewed and the relevant concern. Avoid generic titles such as "Review PR 123" when linked or attached context reveals the subject.
+- For research, name the question domain rather than the requested research process.
+- Do not claim the work is complete.
+- Do not copy and truncate the user's message.
+- Avoid project names already visible in the UI, quotes, labels, filler, and trailing punctuation.
+- Use attached images as primary context for UI issues.
+- When a URL or attachment is the only source of the subject, use available tools to inspect it directly.
+- Local git history is not evidence of what a linked PR or issue is about. Never title the thread after branch names, commit messages, or merged commits found in the checkout.
+- If a linked PR or issue cannot be read, fall back to the user's stated action plus its number, such as "Take Over PR 8588". This is the one case where a PR or issue number belongs in the title.
+
+User message:
+The residue matrix needs to be full width. I need to be able to click on different headers and select sort options. When I filter on the filter bar, it should filter in the table. Thus, the filter bar needs to be a sticky header. The table should have sticky headers as well. I need for the force and attractor names in the table to be `S-<shortname>` or `P-<shortname>`, etc. I need a sticky rightmost column that is a row totals column, I need a sticky footer that is the column totals row. I need the proposed items to display in the table. I need for there to be a filter by fusion/fission candidates. I need for the fusion/fission threshold to be adjustable live. I need for the forces to be a accordions that give further details, like the explicit list we have now, the current list of items outside the table needs to go. The different stages for each component (proposed, actual, etc) need to be styled differently, a tooltip on hover should explain why. I also need the leftmost column to be sticky so force names are always legible... Basically, the header/footer are sticky, so too are the leftmost and rightmost columns... The table should take up about calc(100vh - 5em) and calc(100vw - 4em).
+
+⛓️babeltele·handoff⛓️
+
+セッション=residual(Rust CLI,NKP Residuality)@/home/v0id/Documents/repos/residual,branch=tdd-implement/defense-ledger-proposed-components,git-sidecar=residual/metadata(orphan branch,project ledger data)
+
+**R1·bearings**: user→"get bearings w/agentgrep,rtk file-ops,nix devshell residual,work around stale PATH if devshell won't build;draft skill-hooks forces+attractor+component;find skill-install-across-agents dependency;check project state"。agentgrep✓installed(grep/find/outline/trace)。rtk 0.48.0✓,41.6%savings/3336cmds,no global hook installed。PATH residual=stale(/etc/profiles/per-user/v0id/bin/residual→/nix/store/0nizzpwhchzjyq0sp6j5z04gdf6czl1s-residual-0.1.0)。`nix develop -c cargo build --release`✓successful(49.91s),使用./target/release/residual全程代替PATH版。
+
+Discovery: prior session(GPT5.6-terra)claimed added A-21/S-61/P-35+skill-hooks component but NOT YET done — 实际检查显示ALREADY EXISTS under different IDs: S-60(agent-hook-fragmentation)→A-20(Agent hook reliability),P-33(residual-ledger-continuity),P-34(contextual-guru-cadence),component skill-hooks(status=proposed,architecture_set=iter5-agent-hooks,residues.csv col-index5="1"coupling confirmed via header check)。research-study component也proposed(unrelated older set:P-14 longitudinal-study-ri,P-15 communicable-robustness,P-22 research-context-sidecar,S-22 prospect-efficacy-doubt)。
+
+Lexicon工作:user要求re-add"agent"term+augment operator/actor,但"user"term已有冲突定义(architected-system's end-user,explicitly NOT operator)→AskUserQuestion clarify→user选"add human-actor,don't touch user"。Added human-actor term via`residual add term`。Redefined operator/actor/agent definitions directly in lexicon.csv(no update-term CLI cmd exists,CLAUDE.md-sanctioned exception)。
+
+**KEY TECHNICAL DISCOVERY**: `residual verify`ALWAYS reads from git-sidecar branch TIP(`read_sidecar_metadata`→`materialize_branch_tree`fresh每次),NEVER local uncommitted files,即使`branch edit`已materialize到本地供hand-edit。局部edit未经`branch save`对verify不可见。当CLI mutating cmd(add/remove term)运行时,它经`metadata_dir_for_mutation`→独立scratch checkout(`.git/residual-sidecar-checkout`),与手动`branch edit`本地copy分离运作→两条路径易产生drift。Root-caused after false-positive confusion(agent rename commit看似生效但实际sidecar tip仍旧值)。
+
+Fix procedure established: `write authorize`→`branch edit`(re-materialize from TRUE tip)→hand-edit→`write authorize`(refresh,因branch edit会clobber)→`branch save --commit-msg`。
+
+**R2·rename+bugfix+review**: user反馈:actor循环定义错(human-actor↔operator);agent应改名agent-actor(与human-actor对称);human-actor/agent-actor应各自读"An actor backed by [human/digital] intelligence";actor应读"A definable entity whose behavior or properties are relevant to residual analysis"。
+
+执行:`residual remove --force term --term agent`+`residual add --force term --term agent-actor --definition "An actor backed by digital intelligence." --domain tool --related "operator skill hook human-actor"`(注:`--force`flag在`add`/`remove`父命令上,非子命令)。Rename破坏S-60 outcome word-match(原理:旧"agent"row本身即为独立phrase,substring-contains"agents"成立;rename后仅剩"agent-actor"phrase,不再substring-match"agents")→fix stressors.csv S-60 outcome:"agents"→"agent-actors"。全部经branch-edit-reconcile流程后commit到sidecar(f656a76→later ee01af3→20c0e4b→fdc933a→更多)。
+
+发现root-cause of write-authorization marker(`residual/.residual-write-authorized`,expires 30min)被`branch edit`clobber回旧值的bug:`persist_metadata_to_branch`(src/storage/git_sidecar.rs)排除列表`["config.toml", BRANCH_EDIT_MARKER]`未包含write-auth marker filename→每次`branch save`把marker烘焙进sidecar commit,下次`branch edit`还原旧值。Fix:import`write_authorization::MARKER_FILE`,加入exclude list(git_sidecar.rs)。Purge cycle清除已提交的stale copy。Verified:后续branch edit不再clobber。
+
+Code-review skill(medium effort)审查staged write-gate diff(cli.rs/help.rs/git_sidecar.rs/storage/mod.rs/terminology.rs/write_authorization.rs/verification/git_hook.rs)→2 CONFIRMED findings(manually verified via Read,非仅信任agent):
+①`storage::migrate`(src/storage/mod.rs:615-618)调`persist_if_sidecar`但缺`write_authorization::require(cfg)`门控,不同于add/remove/branch-edit/save
+②`Command::Walk::Record`(src/cli.rs:637-663)同样缺gate
+
+研究agent-config(whit3rabbit/agent-config,MIT,v0.4.0,2.7k dl/mo,24+harnesses,pure library无CLI,不含内容/包格式)vs skills-cli(qntx/skill,MIT/Apache-2.0dual,v0.7.0,39 harnesses,Vercel skills.sh生态backing,31k★原TS版,CLI+embeddable SkillManager,自有SKILL.md+YAML frontmatter+lockfile约定)。推荐agent-config(更匹配residual自有skill内容模型),但user最终选skills-cli(harness数量+backing)。
+
+ID-scheme讨论(numeric S-/P-/A-/R- IDs vs shortnames):建议保留前缀但让shortname成primary,quote为"reference-stability migration"非trivial(commit-msg hook,residues.csv attractor_id列,verify-links等touch面广)→建议drafting为force而非直接改schema。User回复:不新建force,加到已有P-26(operator-readable-dialogue,attractor A-14 Shared Framework Comprehension)naive_change。
+
+**R3·commit+skills-cli详情+design-talk**: user:"skills-cli更appealing,现有format需改什么?migrate加write-lock,walk-record明确不加(inline comment说明),commit现有+此fix。确保pre-commit hook防止residual数据直接存working branch。其他flag的defer。skill-hooks需要implementation,谈谈design。P-26 naive_change加:CLI只accept/show shortnames,IDs relegate到storage format。HTML renderer需改进(filter不work,横向滚动,sidebar太挤)"。
+
+Skills-cli format gap分析:①加description字段(trivial)②flat file→per-skill目录(moderate,需改include_str!位置)③invocation model fork——skills-cli/native Skill依description自动触发,residual现用explicit slash-command+Socratic gate("Act only with approval")→建议保留explicit invocation,仅借skills-cli做文件放置,回避该fork。
+
+Fix执行:src/storage/mod.rs`migrate()`加`write_authorization::require(cfg)?;`(在metadata_dir_for_mutation前)。src/cli.rs walk-record加inline comment解释故意不gate("Deliberately not gated...low-blast-radius cadence bookkeeping...")。确认pre-commit hook(src/verification/git_hook.rs)已有hard-block(`LEAKED=$(git diff --cached --name-only|grep '^residual/'|grep -v '^residual/config\.toml$')`→exit 1,no override flag)+测试覆盖,无需新增。
+
+Rebuild+test(320 tests全绿)→commit尝试失败2次:①pre-commit hook用PATH stale binary→"CSV deserialize error: record 1 (line: 2, byte: 60): missing field `components`"→PATH override修复(`export PATH=".../target/release:$PATH"`)②commit-msg hook要求`<component>: S-<nn>: summary`格式或`general - `前缀→无匹配force,用"general - "。**Commit c5c0b72**"general - storage: gate residual writes behind explicit write-authorization"(7 files,710insertions/182deletions)on working branch。
+
+P-26 edit:naive_change→"Skills render attractor names and force shortnames in dialogue, never IDs. The CLI interface accepts and displays only shortnames; numeric/prefixed IDs (S-/P-/A-/R-) are relegated to the storage format alone."(via branch-edit reconcile,saved to sidecar)。
+
+Skill-hooks design讨论:提出event enum(PreCompaction/PostCompaction/PeriodicTurn{turn_count}),重用skills-guru(src/skills/guru/mod.rs)topic registry(TOPIC_ATTRACTORS/STRESSORS/PURPOSES/PERSONAS/WHOLE_SYSTEM_RESIDUE/WALK_REMINDER),keyword-match分
+
+[truncated]

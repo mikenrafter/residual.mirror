@@ -1,0 +1,21 @@
+<task-notification>
+<task-id>a93f7f3730a713df9</task-id>
+<tool-use-id>toolu_01AKKQgjrbgv3rTf36KqMxzZ</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/a93f7f3730a713df9.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: TS import parser tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Red phase complete.
+
+**Files created:**
+- `/home/v0id/Documents/repos/residual/web/src/import-parser.ts` — types + stub (`throw new Error("not yet implemented — green phase")` in `parseImportText`, `tokenizeCommandLine`, `getKnownFlags`)
+- `/home/v0id/Documents/repos/residual/web/src/import-parser.test.ts` — 16 hand-written cases
+- `/home/v0id/Documents/repos/residual/web/src/import-parser.parity.test.ts` — loops over all 19 entries in `web/generated/cli-schema.json`, plus one sanity check on the fixture and one "all subcommands known" check
+
+**Result:** `nix develop -c bun test web/src` → `1 pass, 39 fail, 40 total` (0.076s). The single pass is a schema-fixture sanity check (`cli-schema.json is loaded and non-empty`) that doesn't touch the parser. Every failure traces to the intended `"not yet implemented — green phase"` throw from either `parseImportText` or `getKnownFlags` — no JSON-import-path or module-resolution errors.
+
+**Contract for the green-phase agent:**
+
+`PendingItem` is `{ kind: "add" | "update"; type: string; fields: Record&lt;string, string&gt;; multipleFields: Record&lt;string, string[]&gt;; raw: string }`. Single-value flags (per `cli-schema.json`'s `multiple: false`) go in `fields` keyed by kebab-case flag name; flags marked `multiple: true` (currently only `add-component`/`remove-component` on `update stressor`/`update purpose`) go in `multipleFields` as string arrays in encounter order. Optional flags not supplied are simply absent from `fields` (tests assert `undefined`, not empty string). `ParseError` is `{ line: string; message: string }` — one per unparseable/invalid line, never a thrown exception. `ParseResult` is `{ items: PendingItem[]; errors: ParseError[] }`, computed line-by-line (blank/`#`-comment lines skip silently; each other line yields exactly one item OR one error, accumulated independently across the whole input). `getKnownFlags(subcommand)` (subcommand strings like `"add stressor"`, `"update purpose"`) returns `KnownFlag[] | undefined` — this is the internal table the parity test walks against `cli-schema.json`, so it must have one entry per real subcommand with `{ name, required, multiple }` matching the schema exactly, and must return `undefined` for unrecognized subcommands (used to detect "unrecognized subcommand" lines and to fail the "unknown subcommand" and "gains a flag" parity checks). `tokenizeCommandLine` is exported separately as the shell-style word tokenizer (handles `"quoted text"` and `\"` escapes) so it can be tested and reused independently of full-line semantics.</result>
+<usage><subagent_tokens>37253</subagent_tokens><tool_uses>9</tool_uses><duration_ms>119882</duration_ms></usage>
+</task-notification>

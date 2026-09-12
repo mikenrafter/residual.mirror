@@ -1,0 +1,42 @@
+<task-notification>
+<task-id>ae697a3da1ccac234</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/ae697a3da1ccac234.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: state-mutation action tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 75 pre-existing tests pass unchanged, and the 17 new failing tests fail via the intended stub `Error("not yet implemented — green phase")` throws (verified in the tail output above), not compile errors. 3 duplicate-rejection tests (`addComponentColumn`/`addAttractorOption` throw tests) pass coincidentally since the stub already throws — that's expected and correct for red phase.
+
+## Summary
+
+Files created:
+- `/home/v0id/Documents/repos/residual/web/src/actions.ts` — stub reducer module
+- `/home/v0id/Documents/repos/residual/web/src/actions.test.ts` — 20 tests (17 red/fail-on-stub, 3 already-pass duplicate-throw tests)
+
+Function signatures:
+```ts
+function toggleComponent(state: PendingState, forceKey: string, componentName: string): PendingState
+function addForceRow(state: PendingState, kind: "stressor" | "purpose"): { state: PendingState; tempId: string }
+function updateForceField(
+  state: PendingState, forceKey: string,
+  field: "description" | "attractorId" | "naiveChangeOrFeature" | "outcomes" | "shortname",
+  value: string,
+): PendingState
+function addComponentColumn(state: PendingState, component: SnapshotComponent): PendingState
+function addAttractorOption(state: PendingState, attractor: SnapshotAttractor): PendingState
+```
+
+Pinned behavior for the base-force toggle-back question: toggling a component OFF that restores a base force's `updatedForces[id].components` to exactly match the base force's original `components` list **prunes the `components` key out of the update entry** (or deletes the whole entry if `components` was the only key set) rather than leaving a no-op array sitting in state. This keeps state minimal and avoids a spurious update line downstream in `model.ts`'s `toCommandLines`. If other fields (e.g. `description`) are already set on that update entry, only `components` is pruned — the entry itself survives. This is documented as a code comment at the top of `actions.ts` and pinned by three tests: "toggling a component OFF for a base force that restores the original list prunes the updatedForces entry entirely", "toggling OFF a restoring component preserves other already-set fields on the update entry, pruning only components", and the seed/add-on-first-toggle and remove-from-original-list cases.
+
+`addForceRow` returns `{ state, tempId }` (not just `state`) so the DOM layer can open the new row in edit mode immediately; tempIds are generated as `"NEW-&lt;n&gt;"` with `n` derived from the max existing `NEW-&lt;number&gt;` tempId + 1 (collision-proof even after a hypothetical future row-removal action).
+
+Test tail output:
+```
+ 79 pass
+ 17 fail
+ 413 expect() calls
+Ran 96 tests across 5 files. [175.00ms]
+```
+Pre-existing suite run in isolation confirmed unchanged: `75 pass, 0 fail` across import-parser.test.ts, import-parser.parity.test.ts, model.test.ts, render-decisions.test.ts.</result>
+<usage><subagent_tokens>41028</subagent_tokens><tool_uses>6</tool_uses><duration_ms>75551</duration_ms></usage>
+</task-notification>

@@ -1,0 +1,7 @@
+Let's adjust the CLI and the UI. The CLI still allows/operates on `--force-id`s. IT SHOULD OPERATE ON ******ONLY ONLY ONLY****** SHORTNAMES. That means no wrapping command executions to get IDs is necessary. Generation should be simple. Additionally, it seems the fusion/fission slider is broken in the UI and there is no save button for new forces. I can't select whether it's a purpose or stressor and fields are unlabeled... The fields should line wrap, not scroll super far to the right. The totals column on the right isn't updating when I change an NKP cell, presumably neither are the totals on the bottom.
+
+Use `agentgrep`, use `rtk`, use `nix develop -c residual` for all residual commands. What is it I want here? Tell it to me so I know we're on the same page prior to execution.
+
+---
+
+It should be renamed to `--shortname`. If there are similar cases in the CLI to this, bring them to my attention. Begin implementation.

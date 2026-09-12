@@ -1,0 +1,39 @@
+<task-notification>
+<task-id>ac9d7723767b6b273</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/ac9d7723767b6b273.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: CLI schema introspection tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>No regressions elsewhere — completions_coverage (hidden command doesn't leak into `--help`) and all other integration binaries pass unchanged.
+
+## Report
+
+**Files touched:**
+- `/home/v0id/Documents/repos/residual/src/cli_schema.rs` (new) — `FlagSchema` and `SubcommandSchema` structs (derive `Serialize`) and stub `pub fn cli_schema() -&gt; Vec&lt;SubcommandSchema&gt;` with `todo!("implemented in the green phase")` body.
+- `/home/v0id/Documents/repos/residual/src/main.rs` — added `mod cli_schema;`.
+- `/home/v0id/Documents/repos/residual/src/cli.rs`:
+  - Added hidden `Command::Internal { op: InternalOp }` variant (`#[command(hide = true)]`) and `InternalOp::CliSchema` (also hidden).
+  - Wired dispatch in `run()`: `InternalOp::CliSchema` calls `crate::cli_schema::cli_schema()` and prints `serde_json::to_string_pretty`.
+  - Added unit test `cli::tests::cli_schema_covers_add_and_update_only` calling `cli_schema()` directly, asserting `add stressor.description` required/non-multiple, `update stressor.description` optional, `update stressor.add-component` multiple, and no `list *`/`matrix` entries.
+  - Added integration test `cli::tests::cli_integration::internal_cli_schema_prints_json_with_add_and_update_entries` (reuses the existing `isolated_tempdir`/`bin`/`run` helpers) invoking `residual internal cli-schema`, asserting exit success, valid JSON, and presence of `"add stressor"`/`"update stressor"` subcommand entries.
+
+**Verification** (`nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#gcc -c cargo test --no-fail-fast`):
+
+```
+Running unittests src/main.rs
+test cli::tests::cli_integration::internal_cli_schema_prints_json_with_add_and_update_entries ... FAILED
+test cli::tests::cli_schema_covers_add_and_update_only ... FAILED
+thread '...internal_cli_schema...' panicked at src/cli.rs:2411:13: internal cli-schema must exit successfully:
+thread 'main' panicked at src/cli_schema.rs:32:5: not yet implemented: implemented in the green phase
+thread 'cli::tests::cli_schema_covers_add_and_update_only' panicked at src/cli_schema.rs:32:5: not yet implemented: implemented in the green phase
+test result: FAILED. 322 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
+
+Running tests/a02_terminology_drift.rs: ok. 4 passed
+Running tests/completions_coverage.rs: ok. 5 passed
+Running tests/integration.rs: ok. 30 passed
+```
+
+Both new tests fail solely via the `todo!()` panic (not compile errors, not for the wrong reason); the pre-existing 322 unit tests plus all three integration binaries (`a02_terminology_drift`, `completions_coverage`, `integration`) remain fully green — the hidden `internal` command doesn't leak into `--help`/completions coverage checks.</result>
+<usage><subagent_tokens>56496</subagent_tokens><tool_uses>24</tool_uses><duration_ms>126539</duration_ms></usage>
+</task-notification>

@@ -685,3 +685,86 @@ Ran 167 tests across 11 files. [452.00ms]
 Verified all 9 failures are the intended `not yet implemented — green phase` throw (spot-checked via direct run), not type/import errors. All 158 pre-existing tests pass unchanged.</result>
 <usage><subagent_tokens>52393</subagent_tokens><tool_uses>11</tool_uses><duration_ms>71489</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>acafe4a865906a114</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/acafe4a865906a114.output</output-file>
+<status>completed</status>
+<summary>Agent "Green phase: implement snapshot bridge" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 167 tests pass (0 fail), confirming the previously-green 158 plus the 9 newly-green `snapshot-bridge.test.ts` tests.
+
+Implementation (`/home/v0id/Documents/repos/residual/web/src/snapshot-bridge.ts`):
+
+```ts
+function mapForce(raw: RawSnapshotForce, kind: "stressor" | "purpose", residues: RawSnapshotResidue[]): SnapshotForce {
+  return {
+    id: raw.id,
+    kind,
+    description: raw.description,
+    attractorId: raw.attractor_id,
+    naiveChangeOrFeature: raw.naive_change,
+    outcomes: raw.outcomes,
+    shortname: raw.shortname,
+    components: residues
+      .filter((r) =&gt; r.force_id === raw.id &amp;&amp; r.coupled === true)
+      .map((r) =&gt; r.component_id),
+  };
+}
+
+export function snapshotToPendingState(raw: RawLandscapeSnapshot): PendingState {
+  const baseAttractors: SnapshotAttractor[] = raw.attractors.map((a) =&gt; ({
+    id: a.id,
+    name: a.name,
+    description: a.description,
+    positiveState: a.positive_state,
+    negativeState: a.negative_state,
+  }));
+
+  const baseComponents: SnapshotComponent[] = raw.components.map((c) =&gt; ({
+    name: c.name,
+    description: c.description,
+    status: c.status as SnapshotComponent["status"],
+    architectureSet: c.architecture_set,
+  }));
+
+  const mappedStressors = raw.stressors.map((s) =&gt; mapForce(s, "stressor", raw.residues));
+  const mappedPurposes = raw.purposes.map((p) =&gt; mapForce(p, "purpose", raw.residues));
+
+  return {
+    baseAttractors,
+    baseComponents,
+    baseForces: [...mappedStressors, ...mappedPurposes],
+    basePersonas: [],
+    baseTerms: [],
+
+    addedAttractors: [],
+    addedComponents: [],
+    addedForces: [],
+    addedPersonas: [],
+    addedTerms: [],
+
+    updatedAttractors: {},
+    updatedComponents: {},
+    updatedForces: {},
+    updatedPersonas: {},
+    updatedTerms: {},
+  };
+}
+```
+
+Test tail output:
+
+```
+ 167 pass
+ 0 fail
+ 700 expect() calls
+Ran 167 tests across 11 files. [368.00ms]
+```
+
+Deviations: none. Neither the test file nor `model.ts` was modified — no bugs found in either. The one non-obvious cast is `status: c.status as SnapshotComponent["status"]`, needed because raw's `status: string` narrows to the `"proposed" | "actual"` union per the task instructions ("kept as the same string").</result>
+<usage><subagent_tokens>30965</subagent_tokens><tool_uses>6</tool_uses><duration_ms>30143</duration_ms></usage>
+</task-notification>

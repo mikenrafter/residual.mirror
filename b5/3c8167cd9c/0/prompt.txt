@@ -336,3 +336,181 @@ export function mergeImportedItems(state: PendingState, items: PendingItem[]): M
 **Verification:** `cd web &amp;&amp; nix develop .. -c bun test` → `128 pass`, `19 fail`, all 19 failures are the intended `Error: not yet implemented — green phase` throws (no assertion-shape or type errors), confirming pre-existing suite is untouched and new tests are correctly red.</result>
 <usage><subagent_tokens>79619</subagent_tokens><tool_uses>19</tool_uses><duration_ms>201586</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a488bcc01510c032c</task-id>
+<tool-use-id>toolu_01Ntgxhp5G1QGfq4H4Yo3xcL</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/a488bcc01510c032c.output</output-file>
+<status>completed</status>
+<summary>Agent "Green phase: implement import merge and modal" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 147 tests pass (0 fail), the pre-existing 128 remain green plus the 19 new ones (13 in import-merge.test.ts, 6 in import-modal.test.ts).
+
+## import-merge.ts (full new logic, appended after the existing helpers)
+
+```ts
+function applyAddForce(state: PendingState, kind: "stressor" | "purpose", item: PendingItem): PendingState {
+  const { state: withRow, tempId } = addForceRow(state, kind);
+  let next = withRow;
+  for (const [flagName, value] of Object.entries(item.fields)) {
+    const field = FORCE_FIELD_MAP[flagName];
+    if (field === undefined) continue;
+    next = updateForceField(next, tempId, field, value);
+  }
+  next = applyComponentToggles(next, tempId, item);
+  return next;
+}
+
+function applyAddComponent(state: PendingState, item: PendingItem): PendingState {
+  return addComponentColumn(state, {
+    name: item.fields.name ?? "",
+    description: item.fields.description ?? "",
+    status: (item.fields.status as "proposed" | "actual") ?? "proposed",
+    architectureSet: item.fields["architecture-set"] ?? "",
+  });
+}
+
+function applyAddAttractor(state: PendingState, item: PendingItem): PendingState {
+  const id = nextAttractorId(state);
+  return addAttractorOption(state, {
+    id,
+    name: item.fields.name ?? "",
+    description: item.fields.description ?? "",
+    positiveState: item.fields["positive-state"] ?? "",
+    negativeState: item.fields["negative-state"] ?? "",
+  });
+}
+
+function applyUpdateForce(state: PendingState, item: PendingItem): PendingState {
+  const forceKey = item.fields["force-id"];
+  if (forceKey === undefined) return state;
+  let next = state;
+  for (const [flagName, value] of Object.entries(item.fields)) {
+    if (flagName === "force-id") continue;
+    const field = FORCE_FIELD_MAP[flagName];
+    if (field === undefined) continue;
+    next = updateForceField(next, forceKey, field, value);
+  }
+  next = applyComponentToggles(next, forceKey, item);
+  return next;
+}
+
+function isMergeable(item: PendingItem): boolean {
+  if (item.kind === "add") {
+    return item.type === "stressor" || item.type === "purpose" || item.type === "component" || item.type === "attractor";
+  }
+  return item.type === "stressor" || item.type === "purpose";
+}
+
+function applyItem(state: PendingState, item: PendingItem): PendingState {
+  if (item.kind === "add") {
+    if (item.type === "stressor" || item.type === "purpose") return applyAddForce(state, item.type, item);
+    if (item.type === "component") return applyAddComponent(state, item);
+    if (item.type === "attractor") return applyAddAttractor(state, item);
+  }
+  return applyUpdateForce(state, item);
+}
+
+export function mergeImportedItems(state: PendingState, items: PendingItem[]): MergeResult {
+  let next = state;
+  const unmergeable: PendingItem[] = [];
+  for (const item of items) {
+    if (!isMergeable(item)) { unmergeable.push(item); continue; }
+    next = applyItem(next, item);
+  }
+  return { state: next, unmergeable };
+}
+```
+
+## import-modal.ts (full mountImportModal + helpers)
+
+```ts
+interface ImportErrorEntry { line: string; message: string; }
+
+function requireElement&lt;T extends Element&gt;(container: HTMLElement, selector: string): T {
+  const el = container.querySelector(selector);
+  if (el === null) throw new Error(`mountImportModal: missing required element ${selector}`);
+  return el as T;
+}
+
+export function mountImportModal(
+  container: HTMLElement,
+  getState: () =&gt; PendingState,
+  setState: (next: PendingState) =&gt; void,
+  options?: MountImportModalOptions,
+): void {
+  const trigger = requireElement&lt;HTMLElement&gt;(container, "[data-import-trigger]");
+  const modal = requireElement&lt;HTMLElement&gt;(container, "[data-import-modal]");
+  const primary = requireElement&lt;HTMLTextAreaElement&gt;(container, "[data-import-primary]");
+  const errorsBox = requireElement&lt;HTMLTextAreaElement&gt;(container, "[data-import-errors]");
+  const errorList = requireElement&lt;HTMLElement&gt;(container, "[data-import-error-list]");
+  const runButton = requireElement&lt;HTMLElement&gt;(container, "[data-import-run]");
+  const retryButton = requireElement&lt;HTMLElement&gt;(container, "[data-import-retry]");
+
+  const renderErrors = (entries: ImportErrorEntry[]): void =&gt; {
+    errorsBox.value = entries.map((e) =&gt; e.line).join("\n");
+    while (errorList.firstChild) errorList.removeChild(errorList.firstChild);
+    for (const entry of entries) {
+      const li = document.createElement("li");
+      li.textContent = `${entry.line}: ${entry.message}`;
+      errorList.appendChild(li);
+    }
+  };
+
+  const processImportText = (text: string): ImportErrorEntry[] =&gt; {
+    const parsed = parseImportText(text);
+    const mergeResult = mergeImportedItems(getState(), parsed.items);
+    setState(mergeResult.state);
+    return [
+      ...parsed.errors.map((e): ImportErrorEntry =&gt; ({ line: e.line, message: e.message })),
+      ...mergeResult.unmergeable.map((item): ImportErrorEntry =&gt; ({
+        line: item.raw,
+        message: `no support yet for "${item.kind} ${item.type}" updates`,
+      })),
+    ];
+  };
+
+  trigger.addEventListener("click", () =&gt; modal.removeAttribute("hidden"));
+
+  runButton.addEventListener("click", () =&gt; {
+    renderErrors(processImportText(primary.value));
+    primary.value = "";
+    options?.onChange?.();
+  });
+
+  retryButton.addEventListener("click", () =&gt; {
+    renderErrors(processImportText(`${primary.value}\n${errorsBox.value}`));
+    primary.value = "";
+    options?.onChange?.();
+  });
+}
+```
+
+## Test tail
+
+```
+src/import-modal.test.ts:
+(pass) mountImportModal — opening &gt; clicking the trigger button reveals the modal
+(pass) mountImportModal — successful import &gt; an all-valid paste merges into state and clears the primary textarea
+(pass) mountImportModal — successful import &gt; import is additive
+(pass) mountImportModal — mixed valid/invalid import &gt; splits valid and invalid lines
+(pass) mountImportModal — retry &gt; fixing a previously-bad line ... merges it and clears it from the errors box
+(pass) mountImportModal — retry &gt; retry leaves a still-invalid line in the errors box while merging a fixed one
+
+ 147 pass
+ 0 fail
+ 642 expect() calls
+Ran 147 tests across 9 files. [352.00ms]
+```
+
+## Deviations / judgment calls (none forced by ambiguity in stubs, all consistent with documented design)
+
+- `unmergeable` items (`update attractor/component/term/persona`) are surfaced through the same errors textarea + error-list as parse errors, using their `item.raw` text and a synthetic message — the stub comment said "re-show as an error," and no test exercises this path, so this is the simplest reading consistent with the design notes.
+- Primary textarea is unconditionally cleared after both Run and Retry (not conditioned on "at least one success") — simplest reading of "clears on fully- or partially-successful import" that stays internally consistent (failed lines already relocated to the errors box, so clearing primary never loses data).
+- Retry recombines `primary.value + "\n" + errorsBox.value` and reprocesses via the same `processImportText` path as Run — matches both retry tests' before/after assertions exactly (fixed line merges and clears from errors; still-bad line remains in errors, no duplicate merge).
+
+No stable module (`import-parser.ts`, `actions.ts`, `model.ts`) needed changes — no bugs found there.</result>
+<usage><subagent_tokens>60769</subagent_tokens><tool_uses>11</tool_uses><duration_ms>86763</duration_ms></usage>
+</task-notification>

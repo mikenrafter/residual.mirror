@@ -99,6 +99,7 @@
             cargo-watch
             cargo-audit
             cargo-edit
+            bun
           ];
 
           shellHook = ''

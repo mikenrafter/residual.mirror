@@ -160,12 +160,21 @@ function createResidueCell(forceKey: string, componentName: string): HTMLTableCe
  * caller-owned `PendingState` without owning it directly, mirroring the
  * reducer signatures in ./actions.
  */
+/** Returned by `mount()` so callers driving state changes from outside this
+ * module (e.g. the below-table stage-stressor/purpose forms in forms.ts) can
+ * ask it to catch up: insert a `<tr>` for any `addedForces` entry that
+ * doesn't have one yet, so every pending force stays reachable for NKP
+ * toggling regardless of which UI surface created it. */
+export interface MountResult {
+  syncNewRows: () => void;
+}
+
 export function mount(
   table: HTMLTableElement,
   getState: () => PendingState,
   setState: (next: PendingState) => void,
   options?: MountOptions,
-): void {
+): MountResult {
   function applyInvalidMarks(): void {
     const { invalidForceKeys } = computeInvalidMarks(getState());
     const rows = table.querySelectorAll<HTMLTableRowElement>("tr.force-row[data-force-id]");
@@ -392,5 +401,18 @@ export function mount(
     appendEditButton(detail, forceKey);
   }
 
+  function syncNewRows(): void {
+    const tbody = table.querySelector("tbody");
+    if (tbody === null) return;
+    for (const force of getState().addedForces) {
+      const selector = `tr.force-row[data-force-id="${CSS.escape(force.tempId)}"]`;
+      if (table.querySelector(selector) !== null) continue;
+      tbody.appendChild(buildNewForceRow(force.tempId, force.kind));
+    }
+    applyInvalidMarks();
+  }
+
   applyInvalidMarks();
+
+  return { syncNewRows };
 }

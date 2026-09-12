@@ -167,6 +167,7 @@ function mountFixture(state: PendingState): {
   getState: () => PendingState;
   setState: (next: PendingState) => void;
   changeCount: () => number;
+  syncNewRows: () => void;
 } {
   document.body.innerHTML = fixtureTableHtml(state);
   const table = document.querySelector("table.matrix");
@@ -181,13 +182,13 @@ function mountFixture(state: PendingState): {
     current = next;
   };
 
-  mount(table, getState, setState, {
+  const { syncNewRows } = mount(table, getState, setState, {
     onChange: () => {
       changes += 1;
     },
   });
 
-  return { table, getState, setState, changeCount: () => changes };
+  return { table, getState, setState, changeCount: () => changes, syncNewRows };
 }
 
 beforeEach(() => {
@@ -485,5 +486,37 @@ describe("mount — sanity: addForceRow reducer stays untouched by this module",
     expect(next.addedForces).toHaveLength(1);
     expect(next.addedForces[0]?.tempId).toBe(tempId);
     expect(next.addedForces[0]?.kind).toBe("purpose");
+  });
+});
+
+describe("mount — syncNewRows (rows added by external callers, e.g. below-table forms)", () => {
+  test("inserts a tr for an addedForces entry that has no row yet, so it becomes toggleable", () => {
+    const state = baseState();
+    const { table, getState, setState, syncNewRows } = mountFixture(state);
+
+    // Simulate an external caller (forms.ts) adding a force directly via the
+    // reducer, bypassing mount()'s own context-menu row-insertion path.
+    const { state: next, tempId } = addForceRow(getState(), "stressor");
+    setState(next);
+    expect(table.querySelector(`tr.force-row[data-force-id="${tempId}"]`)).toBeNull();
+
+    syncNewRows();
+
+    const row = table.querySelector(`tr.force-row[data-force-id="${tempId}"]`);
+    expect(row).not.toBeNull();
+    const cell = row?.querySelector(`td[data-residue-cell][data-component="cli"]`);
+    expect(cell).not.toBeNull();
+  });
+
+  test("is idempotent — calling it again does not insert a duplicate row", () => {
+    const state = baseState();
+    const { table, getState, setState, syncNewRows } = mountFixture(state);
+    const { state: next, tempId } = addForceRow(getState(), "stressor");
+    setState(next);
+
+    syncNewRows();
+    syncNewRows();
+
+    expect(table.querySelectorAll(`tr.force-row[data-force-id="${tempId}"]`)).toHaveLength(1);
   });
 });

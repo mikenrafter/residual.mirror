@@ -1,0 +1,214 @@
+<task-notification>
+<task-id>ae697a3da1ccac234</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/ae697a3da1ccac234.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: state-mutation action tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 75 pre-existing tests pass unchanged, and the 17 new failing tests fail via the intended stub `Error("not yet implemented — green phase")` throws (verified in the tail output above), not compile errors. 3 duplicate-rejection tests (`addComponentColumn`/`addAttractorOption` throw tests) pass coincidentally since the stub already throws — that's expected and correct for red phase.
+
+## Summary
+
+Files created:
+- `/home/v0id/Documents/repos/residual/web/src/actions.ts` — stub reducer module
+- `/home/v0id/Documents/repos/residual/web/src/actions.test.ts` — 20 tests (17 red/fail-on-stub, 3 already-pass duplicate-throw tests)
+
+Function signatures:
+```ts
+function toggleComponent(state: PendingState, forceKey: string, componentName: string): PendingState
+function addForceRow(state: PendingState, kind: "stressor" | "purpose"): { state: PendingState; tempId: string }
+function updateForceField(
+  state: PendingState, forceKey: string,
+  field: "description" | "attractorId" | "naiveChangeOrFeature" | "outcomes" | "shortname",
+  value: string,
+): PendingState
+function addComponentColumn(state: PendingState, component: SnapshotComponent): PendingState
+function addAttractorOption(state: PendingState, attractor: SnapshotAttractor): PendingState
+```
+
+Pinned behavior for the base-force toggle-back question: toggling a component OFF that restores a base force's `updatedForces[id].components` to exactly match the base force's original `components` list **prunes the `components` key out of the update entry** (or deletes the whole entry if `components` was the only key set) rather than leaving a no-op array sitting in state. This keeps state minimal and avoids a spurious update line downstream in `model.ts`'s `toCommandLines`. If other fields (e.g. `description`) are already set on that update entry, only `components` is pruned — the entry itself survives. This is documented as a code comment at the top of `actions.ts` and pinned by three tests: "toggling a component OFF for a base force that restores the original list prunes the updatedForces entry entirely", "toggling OFF a restoring component preserves other already-set fields on the update entry, pruning only components", and the seed/add-on-first-toggle and remove-from-original-list cases.
+
+`addForceRow` returns `{ state, tempId }` (not just `state`) so the DOM layer can open the new row in edit mode immediately; tempIds are generated as `"NEW-&lt;n&gt;"` with `n` derived from the max existing `NEW-&lt;number&gt;` tempId + 1 (collision-proof even after a hypothetical future row-removal action).
+
+Test tail output:
+```
+ 79 pass
+ 17 fail
+ 413 expect() calls
+Ran 96 tests across 5 files. [175.00ms]
+```
+Pre-existing suite run in isolation confirmed unchanged: `75 pass, 0 fail` across import-parser.test.ts, import-parser.parity.test.ts, model.test.ts, render-decisions.test.ts.</result>
+<usage><subagent_tokens>41028</subagent_tokens><tool_uses>6</tool_uses><duration_ms>75551</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>aff16ee99ca016c2b</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/aff16ee99ca016c2b.output</output-file>
+<status>completed</status>
+<summary>Agent "Green phase: implement state-mutation actions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All 96 tests pass, 0 failures — the pre-existing 79 (import-parser, model, render-decisions) are still green alongside the 17 newly-passing actions tests.
+
+## Implementation (`/home/v0id/Documents/repos/residual/web/src/actions.ts`)
+
+```ts
+// Pure reducer layer for the live-editing DOM to call into: takes a
+// PendingState (see model.ts) and a user action's arguments, returns a NEW
+// PendingState. No DOM, no mutation of the input state.
+// ... (doc comments unchanged from stub) ...
+
+import type { AddedForce, PendingState, SnapshotAttractor, SnapshotComponent } from "./model";
+
+function sameElements(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((value, index) =&gt; value === sortedB[index]);
+}
+
+function toggled(components: readonly string[], name: string): string[] {
+  return components.includes(name) ? components.filter((c) =&gt; c !== name) : [...components, name];
+}
+
+export function toggleComponent(state: PendingState, forceKey: string, componentName: string): PendingState {
+  const addedIndex = state.addedForces.findIndex((f) =&gt; f.tempId === forceKey);
+  if (addedIndex !== -1) {
+    const target = state.addedForces[addedIndex]!;
+    const nextForce: AddedForce = { ...target, components: toggled(target.components, componentName) };
+    const nextAddedForces = [...state.addedForces];
+    nextAddedForces[addedIndex] = nextForce;
+    return { ...state, addedForces: nextAddedForces };
+  }
+
+  const base = state.baseForces.find((f) =&gt; f.id === forceKey);
+  if (base === undefined) return state;
+
+  const existingUpdate = state.updatedForces[forceKey];
+  const effective = existingUpdate?.components ?? base.components;
+  const nextComponents = toggled(effective, componentName);
+
+  const nextUpdatedForces = { ...state.updatedForces };
+
+  if (sameElements(nextComponents, base.components)) {
+    if (existingUpdate === undefined) return state;
+    const { components: _components, ...rest } = existingUpdate;
+    if (Object.keys(rest).length === 0) {
+      delete nextUpdatedForces[forceKey];
+    } else {
+      nextUpdatedForces[forceKey] = rest;
+    }
+  } else {
+    nextUpdatedForces[forceKey] = { ...existingUpdate, components: nextComponents };
+  }
+
+  return { ...state, updatedForces: nextUpdatedForces };
+}
+
+export function addForceRow(
+  state: PendingState,
+  kind: "stressor" | "purpose",
+): { state: PendingState; tempId: string } {
+  let maxN = 0;
+  for (const f of state.addedForces) {
+    const match = /^NEW-(\d+)$/.exec(f.tempId);
+    if (match) {
+      const n = Number(match[1]);
+      if (n &gt; maxN) maxN = n;
+    }
+  }
+  const tempId = `NEW-${maxN + 1}`;
+  const newForce: AddedForce = {
+    tempId, kind, description: "", attractorId: "", naiveChangeOrFeature: "",
+    outcomes: "", shortname: "", components: [],
+  };
+  return { state: { ...state, addedForces: [...state.addedForces, newForce] }, tempId };
+}
+
+export function updateForceField(
+  state: PendingState,
+  forceKey: string,
+  field: "description" | "attractorId" | "naiveChangeOrFeature" | "outcomes" | "shortname",
+  value: string,
+): PendingState {
+  const addedIndex = state.addedForces.findIndex((f) =&gt; f.tempId === forceKey);
+  if (addedIndex !== -1) {
+    const target = state.addedForces[addedIndex]!;
+    const nextForce: AddedForce = { ...target, [field]: value };
+    const nextAddedForces = [...state.addedForces];
+    nextAddedForces[addedIndex] = nextForce;
+    return { ...state, addedForces: nextAddedForces };
+  }
+  const existingUpdate = state.updatedForces[forceKey];
+  return { ...state, updatedForces: { ...state.updatedForces, [forceKey]: { ...existingUpdate, [field]: value } } };
+}
+
+export function addComponentColumn(state: PendingState, component: SnapshotComponent): PendingState {
+  const exists = state.baseComponents.some((c) =&gt; c.name === component.name) ||
+    state.addedComponents.some((c) =&gt; c.name === component.name);
+  if (exists) throw new Error(`component "${component.name}" already exists`);
+  return { ...state, addedComponents: [...state.addedComponents, component] };
+}
+
+export function addAttractorOption(state: PendingState, attractor: SnapshotAttractor): PendingState {
+  const exists = state.baseAttractors.some((a) =&gt; a.id === attractor.id) ||
+    state.addedAttractors.some((a) =&gt; a.id === attractor.id);
+  if (exists) throw new Error(`attractor "${attractor.id}" already exists`);
+  return { ...state, addedAttractors: [...state.addedAttractors, attractor] };
+}
+```
+
+## Test tail output
+
+```
+src/actions.test.ts:
+(pass) toggleComponent &gt; ... (7 tests)
+(pass) addForceRow &gt; ... (3 tests)
+(pass) updateForceField &gt; ... (5 tests)
+(pass) addComponentColumn &gt; ... (3 tests)
+(pass) addAttractorOption &gt; ... (3 tests)
+
+ 96 pass
+ 0 fail
+ 451 expect() calls
+Ran 96 tests across 5 files. [153.00ms]
+```
+
+## Deviations
+
+None. Test file, `model.ts`, and other files were not touched. `toggleComponent`'s base-force branch compares the pruning condition via set equality (`sameElements`) rather than strict order equality, since `toggled()` naturally reconstructs the original order for the pinned test cases anyway — this is a conservative choice that satisfies "restores its effective list to exactly the base force's original components" semantically without being fragile to incidental ordering.</result>
+<usage><subagent_tokens>44023</subagent_tokens><tool_uses>5</tool_uses><duration_ms>57604</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a8317c0f57e4d6c4f</task-id>
+<tool-use-id>toolu_01XPfEJkp72CWH1VWJCF1mmU</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/a8317c0f57e4d6c4f.output</output-file>
+<status>completed</status>
+<summary>Agent "Red phase: matrix DOM interaction tests" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Confirmed: exactly 96 pre-existing tests pass unchanged, and the new suite adds 14 tests (13 failing on the intended stub throw + 1 sanity test that passes since it only exercises the already-stable `addForceRow` reducer directly).
+
+## Summary
+
+**Files created:**
+- `/home/v0id/Documents/repos/residual/web/src/matrix-interactions.ts` — stub module exporting `MountOptions` and `mount(table, getState, setState, options?)`, which throws `new Error("not yet implemented — green phase")`. Header comment documents every design decision pinned by the tests.
+- `/home/v0id/Documents/repos/residual/web/src/matrix-interactions.test.ts` — 14 tests (13 exercising `mount`, 1 sanity check of `addForceRow` alone) plus fully-implemented fixture helpers (`baseState`, `forceRowHtml`, `fixtureTableHtml`, `mountFixture`).
+
+**`mount` signature:** `mount(table: HTMLTableElement, getState: () =&gt; PendingState, setState: (next: PendingState) =&gt; void, options?: MountOptions): void`, where `MountOptions.onChange?: () =&gt; void` fires after every state-mutating interaction, after `setState` has already run.
+
+**Context-menu markup:** `&lt;ul role="menu"&gt;` with two `&lt;li role="menuitem" data-action="add-above|add-below"&gt;Add row above|Add row below&lt;/li&gt;` items, appended to `document.body` on `contextmenu` against a `tr.force-row`.
+
+**New-row-starts-editing behavior pinned:** the inserted row's `.force-detail` starts *not* `hidden` and renders `&lt;input&gt;`/`&lt;select&gt;` fields directly — no `&lt;dl&gt;`, no Edit-button step — since a brand new row has nothing to view yet. New row inherits the `kind` (stressor/purpose) of the anchor row it was inserted relative to.
+
+**Existing-row edit behavior pinned:** edits are Edit-button-only (never double-click). Edit swaps `description`/`naive change`/`outcomes` `&lt;dd&gt;`s for pre-filled `&lt;input&gt;`s and `attractor` for a `&lt;select&gt;` built from `attractorOptions(state)` (current id pre-selected), shows OK/Cancel, hides Edit. **OK** unconditionally calls `updateForceField` for all four fields (no per-field diffing — documented as intentional, since redundant same-value calls are harmless) and swaps back to a read-only `&lt;dl&gt;` with new values. **Cancel** discards input values without calling any reducer, restoring the original `&lt;dl&gt;`; state is asserted unchanged via `getState()`.
+
+**Invalid marking:** `"row-invalid"` class applied to both `th.sticky-col[data-force-id]` and the `tr.force-row` for any key in `computeInvalidMarks(state).invalidForceKeys`; `invalidComponentColumns` is walked generically but is always empty today per `render-decisions.ts`.
+
+**Verification:** `cd web &amp;&amp; nix develop .. -c bun test` → 96 pre-existing tests (import-parser ×2, model, render-decisions, actions) pass unchanged; all 13 new interactive tests fail cleanly via the `mount` stub's thrown Error (no unrelated compile errors); the 1 sanity test (direct `addForceRow` call, no `mount`) passes. Final tail: `97 pass / 13 fail / 456 expect() calls — Ran 110 tests across 6 files`.</result>
+<usage><subagent_tokens>76969</subagent_tokens><tool_uses>14</tool_uses><duration_ms>201456</duration_ms></usage>
+</task-notification>

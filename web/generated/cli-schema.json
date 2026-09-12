@@ -1,0 +1,542 @@
+[
+  {
+    "subcommand": "add attractor",
+    "flags": [
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "negative-state",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "positive-state",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add component",
+    "flags": [
+      {
+        "name": "architecture-set",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "status",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add defense-persona",
+    "flags": [
+      {
+        "name": "body",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add defense-pitch",
+    "flags": [
+      {
+        "name": "body",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add defense-progress",
+    "flags": [
+      {
+        "name": "body",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add defense-strategy",
+    "flags": [
+      {
+        "name": "body",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add iteration",
+    "flags": [
+      {
+        "name": "notes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "ri-score",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add meta-attractor",
+    "flags": [
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "negative-state",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "positive-state",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add meta-purpose",
+    "flags": [
+      {
+        "name": "attractor-id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "naive-change",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "outcomes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add meta-stressor",
+    "flags": [
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add persona",
+    "flags": [
+      {
+        "name": "concerns",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "desires",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "role",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add purpose",
+    "flags": [
+      {
+        "name": "attractor-id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "naive-change",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "outcomes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add residue",
+    "flags": [
+      {
+        "name": "component-id",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "force-id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "move-to",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "notes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "whole-system",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add stressor",
+    "flags": [
+      {
+        "name": "attractor-id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "naive-change",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "notes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "outcomes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "whole-system",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "add term",
+    "flags": [
+      {
+        "name": "definition",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "domain",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "related",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "term",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "update attractor",
+    "flags": [
+      {
+        "name": "description",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "negative-state",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "positive-state",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "update component",
+    "flags": [
+      {
+        "name": "architecture-set",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "status",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "update persona",
+    "flags": [
+      {
+        "name": "concerns",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "desires",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "name",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "role",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "update purpose",
+    "flags": [
+      {
+        "name": "add-component",
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "attractor-id",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "force-id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "naive-change",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "outcomes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "remove-component",
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "shortname",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "update stressor",
+    "flags": [
+      {
+        "name": "add-component",
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "attractor-id",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "description",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "force-id",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "naive-change",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "outcomes",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "remove-component",
+        "required": false,
+        "multiple": true
+      },
+      {
+        "name": "shortname",
+        "required": false,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "update term",
+    "flags": [
+      {
+        "name": "definition",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "domain",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "related",
+        "required": false,
+        "multiple": false
+      },
+      {
+        "name": "term",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  }
+]

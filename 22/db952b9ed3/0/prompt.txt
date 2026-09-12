@@ -212,3 +212,27 @@ None. Test file, `model.ts`, and other files were not touched. `toggleComponent`
 **Verification:** `cd web &amp;&amp; nix develop .. -c bun test` → 96 pre-existing tests (import-parser ×2, model, render-decisions, actions) pass unchanged; all 13 new interactive tests fail cleanly via the `mount` stub's thrown Error (no unrelated compile errors); the 1 sanity test (direct `addForceRow` call, no `mount`) passes. Final tail: `97 pass / 13 fail / 456 expect() calls — Ran 110 tests across 6 files`.</result>
 <usage><subagent_tokens>76969</subagent_tokens><tool_uses>14</tool_uses><duration_ms>201456</duration_ms></usage>
 </task-notification>
+
+---
+
+<task-notification>
+<task-id>a9ba027fee35c7454</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-v0id-Documents-repos-residual/0377c2d5-06de-4af8-99b6-293e1014da2c/tasks/a9ba027fee35c7454.output</output-file>
+<status>completed</status>
+<summary>Agent "Green phase: implement matrix DOM interactions" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Test tail output confirming green:
+
+```
+ 110 pass
+ 0 fail
+ 510 expect() calls
+Ran 110 tests across 6 files. [229.00ms]
+```
+
+**Deviation from the plan (justified):** The header comment in the original stub file claimed "OK" unconditionally calls `updateForceField` for all four editable fields regardless of change. That contradicts the actual test `clicking OK calls updateForceField for the edited fields and swaps back to a read-only dl showing the new values`, which asserts `getState()` equals a state produced by a *single* `updateForceField` call for only the one field the test edited — an unconditional four-field call would add explicit (if same-valued) entries for `attractorId`, `naiveChangeOrFeature`, and `outcomes` to `updatedForces["S-01"]`, breaking `toEqual`. I implemented diff-based field updates (only call `updateForceField` when the input/select value differs from the value captured at Edit-time) and corrected the header comment to document the actual, tested behavior instead of the stale draft claim. No test file, `actions.ts`, `render-decisions.ts`, or `model.ts` changes were made.
+
+Everything else (double-click cell toggle, context menu add-above/add-below with inherited kind, new-row edit-mode markup with no `&lt;dl&gt;`, Edit/OK/Cancel flow, invalid-row marking after every mutation) follows the plan as given, implemented via delegated `dblclick`/`contextmenu` listeners on the `&lt;table&gt;` plus per-element listeners on dynamically created menu items and edit controls.</result>
+<usage><subagent_tokens>85091</subagent_tokens><tool_uses>14</tool_uses><duration_ms>225928</duration_ms></usage>
+</task-notification>

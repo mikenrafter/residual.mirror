@@ -1,0 +1,89 @@
+No dedicated `babeltele` skill exists in my tool list — BabelTele is defined as a global compaction rule (not a Skill-tool entry), so I'm applying that rule directly. Commit landed as `9ad1ff3`. Producing the compaction now.
+
+---
+
+usr∈residual(NKP Residuality CLI,/home/v0id/Documents/repos/residual,branch=tdd-implement/defense-ledger-proposed-components)⇒4段:①view提交+框架調査②Dioxus意思決定③plan-mode設計④tdd-implement実行
+
+①**Commit+tooling**: usr→"commit view work, use nix develop -c residual + agentgrep + rtk". rtk=0.48.0✓ agentgrep=0.x✓(subcmds:grep/find/outline/trace). git status→M src/view/html.rs,template.html + ??residual/.residual-write-authorized(expires_at token,session-ephemeral→左置,非commit対象). Diff=matrix-list統合(force-list+component-chips→単一matrix
+
+,sticky行列,accordion,totals行/footer,status-dot). residual verify all✓via`nix develop -c`(注意:bare`residual`@/etc/profiles/…=stale build→pre-commit hookのresidual verify all失敗"CSV deserialize error: record 1(line:2,byte:60): missing field `components`"→回避策=`nix develop -c bash -c 'git commit…'`). commit-msg hook強制形式`<component>: S-<nn>: summary`(super_strict). S-27=residue-matrix-shape(A-19), S-26=matrix-viewport-blind(A-06). →commit **25a24a7** "cli: S-26: merge force list and component chips into unified matrix table".
+
+②**Framework選定**: agentgrep grep確認Cargo.toml=templating皆無(tiny_http0.12のみ,no tokio/axum/dioxus). usr問→"popular non-Rust choices? leaning Dioxus(static+multiplayer両用)". 提示:Next.js/SvelteKit/Astro(island)vs **Dioxus**(dioxus-ssr→静的String,dioxus-liveview→websocket diff-push=Phoenix LiveView型). AskUserQuestion①"multiplayer scope?"→usr:"concurrent edits, operator resolves conflicts manually, netcode徐々に, static版は該当コード一切含まぬ".
+
+③**Plan mode**: EnterPlanMode→2×Explore並行:
+
+- Agent-A(view/serve): render_landscape_html@src/view/html.rs:26,呼出元=write_landscape_html/build_serve_document@src/view/mod.rs. run_serve=tiny_http単発render(port8787=DEFAULT_PORT,SERVE_HOST=127.0.0.1),no polling. template.html=no fetch/WS/EventSource(test`html_command_generator_does_not_mutate_the_ledger`が保証). LandscapeSnapshot@src/view/snapshot.rs:110{attractors,stressors,purposes,components,residues,defense:Option}. Cargo=async runtime皆無確定.
+- Agent-B(storage): write_authorization.rs=`authorize(cfg,minutes)`(30分既定=DEFAULT_MINUTES,marker=.residual-write-authorized,expires_at RFC3339),`require(cfg)`=sidecar-mode時のみ強制,"short-lived single-operator"設計と明記. sessions.rs=SessionLock 30秒TTL,stale即steal(advisory only). git_sidecar.rs=mutation毎に同期git commit@residual/metadata branch. →長時間live server不適合と結論.
+
+AskUserQuestion②"live persistence?"→usr:"in-memory authoritative state,save button(idempotent),command-generator併存(both useful),save毎にtry→fail→reauth→try write-auth flow".
+
+Plan-agent(design)起動→詳細ファイル別計画生成. Read検証(commands.rs/mod.rs/write_authorization.rs実物確認)→**StagedAdd enum**@src/view/commands.rs:11(既存,variants≡crate::cli::AddTarget鏡像),`shell_quote`/`format_add_command`/`format_add_commands`既存実装確認済み→live-mode流用可.
+
+Plan file書込: **/home/v0id/.claude/plans/fluttering-sparking-sedgewick.md**
+内容=milestone(a)詳細実装(static Dioxus化,このセッションで完遂済み↓)+milestone(b)-(f)未着手概要:
+(b)liveスケルトン(axum+tokio+dioxus-liveview,cargo feature`live`default-off,src/view/live/{mod,server,liveview}.rs)
+(c)LiveState{snapshot:LandscapeSnapshot,pending:Vec}+broadcast
+(d)browser-originated mutation→pending append+broadcast
+(e)save.rs::flush_pending=空pending→Ok早期return(idempotent),StagedAdd→AddTarget変換,storage::add呼出,write_authorization失敗時1回reauth+retry
+(f)commands_panel.rs=format_add_commands(&pending)server-side版,save/copy両方同一state参照
+ExitPlanMode→承認待ち.
+
+④**tdd-implement実行**(/residual-tdd-implement "Looks fine, begin"):
+`residual skill show/data tdd-implement`(nix develop -c必須)→verify status:super_strict✓,ledger passed. Baseline=25a24a7で既にclean(step0満足). AskUserQuestion③"record stressor/purpose for this init?"→usr:"within ergodic boundary,skip metadata,just implement".
+
+**Red phase**(subagent1,general-purpose): 新規src/view/components/{mod.rs,matrix.rs(純関数esc/force_label/status_bucket/status_tooltip/row_total/col_total/architecture_sets_for_force verbatim移動+render_matrix=todo!()stub@matrix.rs:93),defense.rs(4関数全てtodo!()stub)}+src/view/static_export.rs(escape_script_json/extract_snapshot_json/consts verbatim,render_landscape_html新componentsへ配線,18-test module html.rsよりverbatim複製,TEMPLATE一時的に`use super::html::TEMPLATE;`)+mod.rs+2行(pub mod components/static_export,html系unchanged). html.rs/template.html完全不可侵確認(git diff empty).
+
+並行WebFetch(docs.rs/dioxus-ssr)→**dioxus-ssr確認**:同期的,`VirtualDom::new(app).rebuild_in_place()`+`dioxus_ssr::render(&vdom)`,tokio不要.
+
+**環境問題発見**: flake.nixのdevShells.default⊃craneLib.buildPackage(residual)⊃cargo test as check phase→**red状態でnix develop自体が起動不可**(鶏卵問題). 回避策=`nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#gcc -c cargo test/build`(cargo1.95.0,別途linker`cc`必要=`error: linker cc not found`→gcc追加で解決).
+
+親検証(独立実行): 306passed/13failed,全13件が`src/view/components/matrix.rs:93:5`の`not yet implemented: dioxus-based matrix rendering — implemented in the green phase`panicで一致確認(subagent報告と合致). clippy試行→nixpkgs#clippyは版ズレ(pinned toolchain≠unstable)で無関係な既存78件警告noise→放棄,手動grep(.unwrap()/.expect()はtest内のみ4箇所@static_export.rs:76,90,92,458)で代替確認,production code clean.
+
+**Green phase**(subagent2): `cargo add dioxus dioxus-ssr`→**dioxus=0.7.10,dioxus-ssr=0.7.10**確定(async runtime非混入確認). matrix.rs::render_matrix実装=rsx!{}+事前計算struct群(HeaderCol/MatrixCell/ForceRow/FooterCol,rsx for-loop制約=関数呼出不可のため)+`dioxus_ssr::render_element`. defense.rs4関数実装=render_meta_force_item/render_meta_attractor_item/render_labeled_item各`<li>`をdioxus_ssr::render_elementで個別escape済render→render_defense_recordsがそれら文字列を`dangerous_inner_html`で`<ul>`へ結合(安全=入力が既にDioxus自己escape済,生ledgerテキストでない). 旧`esc()`呼出中止(Dioxus自動escape@askama_escape採用のため二重escape回避). markup相違点:bool属性(hidden/required等)がbare→`hidden="true"`等の明示値化(browser挙動同一,test全てsubstring-match故通過). 結果=**319passed/0failed**(ad-hoc toolchain+`nix develop -c cargo test`双方). html.rs/template.html/mod.rs該当行=不可侵確認済.
+
+親再検証: nix develop -c cargo test→319/0(4binary集計:301+4+5+9?→実際run内訳300s台+小口binary). Cargo.toml diff=+2行のみ(dioxus,dioxus-ssr 0.7.10,WebFetch調査と一致). defense.rs/matrix.rs実装レビュー(Read)→escape安全性確認OK.
+
+**Cutover**(親自ら実行,委任せず): `git mv template.html shell.html`. static_export.rs: `pub(crate) use super::html::TEMPLATE;`→`pub(crate) const TEMPLATE: &str = include_str!("shell.html");`,冒頭doc comment更新(red-phase言及削除). `git rm src/view/html.rs`. mod.rs: `pub mod html;`削除,`pub use html::render_landscape_html;`→`pub use static_export::render_landscape_html;`. 再test→**301+4+5+30 passed,0 failed**(319-18=301,html.rs重複test削除で期待通り,regression無).
+
+Full clippy(`nix develop -c cargo clippy --all-targets -- --deny warnings`,rust1.97.0)→78件既存無関係エラー(config.rs::residual_dir,storage/purposes.rs::make_purpose,structure/analysis/force.rs::stressor,skills/mod.rs manual_range_contains,storage/format.rs cloned_ref_to_slice_refs)=pre-existing,対象外確認. **1件のみ新規実issue**:matrix.rs::esc()=dead code(呼出元消失)→削除. 再test→301/4/5/30維持.
+
+**Smoke test**: `nix develop -c residual verify all`→OK(flake fresh build成功=crane test-gate通過実証). `nix develop -c residual view`→`/tmp/nix-shell.F4e0Fm/landscape.html`生成,grep確認:class="matrix"×1,data-force-id×4,hidden="true"×3+,residual-snapshot script×1. 一時ファイル削除.
+
+diff集計: 8 files changed,+1849/-344(Cargo.lock+1387大半). usr報告→承認求める(commit? milestone(b)着手?).
+
+**usr最終指示**: "Commit and compact with babeltele. Note the path of the plan." → commit試行1回目失敗(同じstale-residual-hook問題,"missing field `components`")→`nix develop -c bash -c 'git commit…'`で再試行→成功**9ad1ff3** "cli: S-27: rebuild landscape view rendering on Dioxus SSR"(8 files,+1849/-344).
+
+**現状態**: HEAD=9ad1ff3@tdd-implement/defense-ledger-proposed-components(origin比+16). untracked=residual/.residual-write-authorized(意図的非commit). Plan file=**/home/v0id/.claude/plans/fluttering-sparking-sedgewick.md**(milestone(a)=完遂済み記述部分+milestone(b)-(f)=未着手詳細,次action候補). babeltele skill非存在確認済(グローバルrule運用のみ).
+
+---
+
+`residual view`'s addition forms need to be simplified. The user should be able to double click on any cell, or right click any cell to add a row above/below (purely visual) to both add a row in-memory and to begin editing its cells. If any required cell is empty, or if any required cell is modified to be empty. Then comment out the modifications in the CLI command output textbox (sh comments: #) and highlight the invalid cells red (a different shade than the fusion/fission candidates) and mark the columns in the sticky rows red as well. For things that need adding that aren't purposes, stressors or components, those should remain below the table. The cells need toggling, but so too do the expandable rows' editability. I suppose that when I say a row should be mutable, I really mean that double clicking on an NKP cell toggles its value, and there should be an (edit)/(OK | cancel) set of buttons in the expanded area. Again, make the empty boxes red, and the invalid rows red too (no components selected is invalid). Adding a component below the table should add a column in-memory and update the table. There should be a toggle to show/hide proposed components and another to show/hide components that the filtered forces don't effect. When editing a force's non NKP data, attractors should have a dropdown. All of this client data should be bidirectional. A user should be able to copy/paste their CLI output in/out of the UI. Right now it's unidirectional. It should be bidirectional. A button that brings up a modal that imports the values should be present. This parser should be relatively simple, but it should be well tested and the tests should ensure parity between CLI surface and UI import surface. Ideally such a parity test would be automatic from a framework perspective (perhaps a rust build step could output some metadata the ts/js tests could consume). The errors the UI gives for invalid entries should be helpful. It should move the erroneous lines into a second textbox. The user could then press retry on the import and it would attempt to parse both the error textbox and the primary one again. Once a successful import happens, it should append to the set of additions already made, if there were any. The clear button makes a fresh import easy, but the merge case is one we should support. In addition to the copy commands button there should also be a generate bash script button that adds the requisite write lock header (omit this from the visible / copyable version), adds a shebang (`#!/bin/env bash`) and lets the user download that as a `.sh` file.
+
+Do you get all of that? I know there's a lot. Let's double check we're on the same page prior to implementation.
+
+---
+
+> Double-click on a row's _non-NKP_ area (or an "add row" placeholder) is ...
+
+^ close, not quite. When expanded, the non-NKP section should have an edit button. No double click. the rest you stated there is correct.
+
+> ... uses a dropdown of existing attractors (not free text).
+
+^ yes, notably including any the user added in-memory after generating the static version of the site
+
+I should also note that so far we don't have update/delete command generation. We'll be adding update command generation since preexisting things should be mutable. No deletion in the UI for the time being.
+
+
+> ... A "Retry" button re-parses both boxes together.
+
+^ yes, and moves the now non-erroneous lines to the textbox with valid entries. Entries in all cases, in imports and in exports should be sorted: components, attractors, personas, forces. With updates happening after additions.
+
+---
+
+I believe there are update commands... If not, yes, go ahead and add them. Rest looks correct.
+
+/residual-tdd-implement . Save your plan to the repo, commit and begin.
+
+---
+
+Since we're working on residual, I need for you to run all residual commands through `nix develop -c residual`. Really you'll only need them this session for the skill details.

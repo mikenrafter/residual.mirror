@@ -1,0 +1,6 @@
+{
+  "dependencies": {},
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.14.5"
+  }
+}

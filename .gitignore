@@ -22,3 +22,5 @@ residual/defense-personas/
 
 # tea — transparent pipeline logs
 logs.csv
+
+web/node_modules/

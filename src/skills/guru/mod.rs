@@ -8,6 +8,7 @@ pub const TOPIC_PURPOSES: &str = "purposes";
 pub const TOPIC_PERSONAS: &str = "personas";
 pub const TOPIC_WHOLE_SYSTEM_RESIDUE: &str = "whole-system-residue";
 pub const TOPIC_WALK_REMINDER: &str = "walk-reminder";
+pub const TOPIC_ERGODIC_BOUNDARY: &str = "ergodic-boundary";
 
 const SNIPPET_ATTRACTORS: &str = include_str!("snippets/attractors.md");
 const SNIPPET_STRESSORS: &str = include_str!("snippets/stressors.md");
@@ -15,6 +16,7 @@ const SNIPPET_PURPOSES: &str = include_str!("snippets/purposes.md");
 const SNIPPET_PERSONAS: &str = include_str!("snippets/personas.md");
 const SNIPPET_WHOLE_SYSTEM_RESIDUE: &str = include_str!("snippets/whole-system-residue.md");
 const SNIPPET_WALK_REMINDER: &str = include_str!("snippets/walk-reminder.md");
+const SNIPPET_ERGODIC_BOUNDARY: &str = include_str!("snippets/ergodic-boundary.md");
 
 /// Guru block for a topic, if any.
 pub fn block_for_topic(topic: &str) -> Option<&'static str> {
@@ -25,6 +27,7 @@ pub fn block_for_topic(topic: &str) -> Option<&'static str> {
         TOPIC_PERSONAS => Some(SNIPPET_PERSONAS),
         TOPIC_WHOLE_SYSTEM_RESIDUE => Some(SNIPPET_WHOLE_SYSTEM_RESIDUE),
         TOPIC_WALK_REMINDER => Some(SNIPPET_WALK_REMINDER),
+        TOPIC_ERGODIC_BOUNDARY => Some(SNIPPET_ERGODIC_BOUNDARY),
         _ => None,
     }
 }
@@ -32,20 +35,22 @@ pub fn block_for_topic(topic: &str) -> Option<&'static str> {
 /// Topics whose guru blocks attach to a skill's skill-data output.
 pub fn topics_for_skill(skill_name: &str) -> &'static [&'static str] {
     match skill_name {
-        "purpose-walk" => &[TOPIC_ATTRACTORS, TOPIC_PURPOSES],
+        "purpose-walk" => &[TOPIC_ATTRACTORS, TOPIC_PURPOSES, TOPIC_ERGODIC_BOUNDARY],
         "stressor-walk" => &[
             TOPIC_ATTRACTORS,
             TOPIC_STRESSORS,
             TOPIC_PURPOSES,
             TOPIC_PERSONAS,
             TOPIC_WHOLE_SYSTEM_RESIDUE,
+            TOPIC_ERGODIC_BOUNDARY,
         ],
-        "naive-draft" => &[TOPIC_PURPOSES],
+        "naive-draft" => &[TOPIC_PURPOSES, TOPIC_ERGODIC_BOUNDARY],
         "integrate" => &[
             TOPIC_ATTRACTORS,
             TOPIC_STRESSORS,
             TOPIC_PURPOSES,
             TOPIC_WHOLE_SYSTEM_RESIDUE,
+            TOPIC_ERGODIC_BOUNDARY,
         ],
         "fmea" | "atam" => &[
             TOPIC_ATTRACTORS,
@@ -53,6 +58,7 @@ pub fn topics_for_skill(skill_name: &str) -> &'static [&'static str] {
             TOPIC_PURPOSES,
             TOPIC_PERSONAS,
             TOPIC_WHOLE_SYSTEM_RESIDUE,
+            TOPIC_ERGODIC_BOUNDARY,
         ],
         _ => &[
             TOPIC_ATTRACTORS,
@@ -60,6 +66,7 @@ pub fn topics_for_skill(skill_name: &str) -> &'static [&'static str] {
             TOPIC_PURPOSES,
             TOPIC_PERSONAS,
             TOPIC_WHOLE_SYSTEM_RESIDUE,
+            TOPIC_ERGODIC_BOUNDARY,
         ],
     }
 }
@@ -118,7 +125,10 @@ mod tests {
             "stressor-walk skill-data must include guru block for whole-system-residue topic"
         );
         let block = block_for_topic(TOPIC_WHOLE_SYSTEM_RESIDUE);
-        assert!(block.is_some(), "guru registry must define whole-system-residue topic");
+        assert!(
+            block.is_some(),
+            "guru registry must define whole-system-residue topic"
+        );
     }
 
     #[test]
@@ -136,6 +146,23 @@ mod tests {
                 "naive-draft context must not contain stressors guru snippet"
             );
         }
+    }
+
+    #[test]
+    fn stressor_walk_skill_data_contains_ergodic_boundary_block() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        let out = context::build(&cfg, "stressor-walk").unwrap();
+        assert!(
+            out.contains("ergodic-boundary"),
+            "stressor-walk skill-data must include the ergodic-boundary guru topic"
+        );
+        let block = block_for_topic(TOPIC_ERGODIC_BOUNDARY);
+        assert!(
+            block.is_some(),
+            "guru registry must define ergodic-boundary topic"
+        );
+        assert!(block.unwrap().contains("component dynamic"));
     }
 
     #[test]

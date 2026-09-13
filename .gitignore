@@ -13,6 +13,7 @@ residual/*.csv
 residual/.storage-hashes
 residual/.walk-review.toml
 residual/.session.lock
+residual/.residual-write-authorized
 residual/personas/
 residual/iterations/
 residual/research/

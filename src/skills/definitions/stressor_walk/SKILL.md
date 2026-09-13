@@ -1,6 +1,6 @@
 ---
 name: stressor-walk
-version: 4
+version: 5
 description: Socratically discovers stressors and attractors by simulating the business environment, without probabilities.
 ---
 
@@ -37,6 +37,8 @@ Check `residual skill data stressor-walk` for a **Bootstrap Required** section. 
 - **Early or quick persona voicing inline is still fine** for initial discovery when depth is not the goal. Reserve isolated subagents for later phases and any walk where fresh perspective matters — shared session context produces shallow, redundant concerns.
 - Watch for hyperliminal coupling: when a stressor affects two components that were not expected to be related.
 - Examine **whole-system-residue** before defaulting to a software-only patch (hardware, process, organization, or policy zig).
+- **A stressor is not a bug, and a purpose is not a feature.** A bug is a defect in behavior already decided; a feature is a unit of shipped functionality. Stressors and purposes are the *architectural* framing — the recurring state a force pushes toward or protects — not a restatement of a ticket. They can overlap, but do not record bug tickets as stressors or feature tickets as purposes by default.
+- **Mind the ergodic boundary.** Before recording a stressor, check whether it is fully explained by known components interacting (a component dynamic — code-review territory) or originates beyond the current architecture iteration's boundary (an architectural force). The boundary moves as the iteration matures; re-check it rather than assuming last iteration's line still holds.
 
 ## Before Starting
 Run: `residual skill data stressor-walk`

@@ -39,7 +39,7 @@
         residual = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
           pname = "residual";
-          version = "0.1.0";
+          version = "0.2.0";
           cargoExtraArgs = "--locked";
           nativeBuildInputs = [ pkgs.git ];
 
@@ -104,8 +104,17 @@
 
           shellHook = ''
             echo "residual dev — \$(command -v residual) on PATH (flake package); use cargo for local rebuilds"
+            for tool in agentgrep rtk entire; do
+              if ! command -v "$tool" >/dev/null 2>&1; then
+                echo "warning: '$tool' not found on PATH — this project's agent conventions expect it (see .claude/CLAUDE.md)" >&2
+              fi
+            done
           '';
         };
+
+        # Alias so `nix develop .#residual` (as well as the bare `nix develop`)
+        # resolves to this project's own pinned build.
+        devShells.residual = self.devShells.${system}.default;
       })
     // {
       overlays.default = final: prev: {

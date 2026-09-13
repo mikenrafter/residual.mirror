@@ -1,1 +1,3 @@
-**Attractor** — a recurring *system state*, not a mission statement. Describe healthy (`positive_state`) and broken (`negative_state`) sides of the same coin. One attractor per stable behavioral mode; split compound "and" goals into separate attractors.
+**Attractor** — a recurring *system state*, not a mission statement or a goal. Every attractor pairs a `positive_state` (what keeps the system in its healthy mode) and a `negative_state` (what it degrades into under pressure) — never classify an attractor as solely good or solely bad. One attractor per stable behavioral mode; split compound "and" goals into separate attractors rather than cramming two modes into one row.
+
+A stressor or purpose without a coherent attractor to push toward or away from is not yet an architectural force — it is a wish or a complaint. If you cannot name the recurring state a force moves the system toward, the force is under-specified; go find or add the attractor first.

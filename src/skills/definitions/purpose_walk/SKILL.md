@@ -1,6 +1,6 @@
 ---
 name: purpose-walk
-version: 3
+version: 4
 description: Socratically defines the project's purposes until each has feature-level precision and a verifiable outcome.
 ---
 
@@ -30,6 +30,8 @@ Check `residual skill data purpose-walk` for a **Bootstrap Required** section. I
 - Every purpose must produce at least one outcome: `<subject> <verb> <predicate>` using terms from the project lexicon.
 - Push back until vagueness is resolved. A purpose like "the system should be fast" is not a purpose — it is an aspiration. Demand specifics.
 - Every 3 turns, step into a critic role and adversarially challenge all stated purposes for hidden assumptions, missing actors, or unmeasurable outcomes.
+- **A purpose is not a feature.** A feature is shipped functionality; a purpose is the attractor-preserving contract that feature exists to hold — name the negative state that results if it silently broke. Do not promote every feature ticket to a purpose by default; a feature with no attractor to protect is plumbing, not a purpose.
+- **Mind the ergodic boundary.** A purpose describes an architecture-level contract, not a component dynamic. If the "purpose" is fully satisfied by one component's internal correctness with nothing beyond the current iteration's boundary at stake, it may just be a feature requirement, not a purpose.
 
 ## Before Starting
 Run: `residual skill data purpose-walk`

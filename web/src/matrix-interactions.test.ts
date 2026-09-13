@@ -408,15 +408,15 @@ describe("mount — editing an existing row's fields via the Edit button", () =>
     editButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     const th = table.querySelector('th[data-force-id="S-01"]');
-    const descriptionInput = th?.querySelector('input[name="description"]');
-    const naiveChangeInput = th?.querySelector('input[name="naiveChangeOrFeature"]');
-    const outcomesInput = th?.querySelector('input[name="outcomes"]');
+    const descriptionInput = th?.querySelector('textarea[name="description"]');
+    const naiveChangeInput = th?.querySelector('textarea[name="naiveChangeOrFeature"]');
+    const outcomesInput = th?.querySelector('textarea[name="outcomes"]');
     const attractorSelect = th?.querySelector("select");
 
-    expect(descriptionInput).toBeInstanceOf(HTMLInputElement);
-    expect((descriptionInput as HTMLInputElement | undefined)?.value).toBe(forceS01.description);
-    expect((naiveChangeInput as HTMLInputElement | undefined)?.value).toBe(forceS01.naiveChangeOrFeature);
-    expect((outcomesInput as HTMLInputElement | undefined)?.value).toBe(forceS01.outcomes);
+    expect(descriptionInput).toBeInstanceOf(HTMLTextAreaElement);
+    expect((descriptionInput as HTMLTextAreaElement | undefined)?.value).toBe(forceS01.description);
+    expect((naiveChangeInput as HTMLTextAreaElement | undefined)?.value).toBe(forceS01.naiveChangeOrFeature);
+    expect((outcomesInput as HTMLTextAreaElement | undefined)?.value).toBe(forceS01.outcomes);
     expect(attractorSelect).toBeInstanceOf(HTMLSelectElement);
     expect((attractorSelect as HTMLSelectElement).value).toBe("A-01");
 
@@ -439,8 +439,8 @@ describe("mount — editing an existing row's fields via the Edit button", () =>
     if (!(editButton instanceof HTMLElement)) throw new Error("edit button not found");
     editButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    const descriptionInput = th.querySelector('input[name="description"]');
-    if (!(descriptionInput instanceof HTMLInputElement)) throw new Error("description input not found");
+    const descriptionInput = th.querySelector('textarea[name="description"]');
+    if (!(descriptionInput instanceof HTMLTextAreaElement)) throw new Error("description input not found");
     descriptionInput.value = "queue backs up even under moderate load";
     descriptionInput.dispatchEvent(new Event("input", { bubbles: true }));
 
@@ -469,8 +469,8 @@ describe("mount — editing an existing row's fields via the Edit button", () =>
     if (!(editButton instanceof HTMLElement)) throw new Error("edit button not found");
     editButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    const descriptionInput = th.querySelector('input[name="description"]');
-    if (!(descriptionInput instanceof HTMLInputElement)) throw new Error("description input not found");
+    const descriptionInput = th.querySelector('textarea[name="description"]');
+    if (!(descriptionInput instanceof HTMLTextAreaElement)) throw new Error("description input not found");
     descriptionInput.value = "this edit should be discarded";
     descriptionInput.dispatchEvent(new Event("input", { bubbles: true }));
 

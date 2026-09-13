@@ -72,7 +72,7 @@ Coming from an older `residual/` layout? Run `residual migrate` to normalize lex
 **A-la-carte by design.** Skills are optional analytical lenses — invoke only what the moment needs. There is no mandatory skill sequence; `verify` cares about residual structure, not which ceremony you ran.
 
 ```
-purpose-walk · naive-draft · stressor-walk · integrate · FMEA · ATAM
+purpose-walk · naive-draft · stressor-walk · integrate · FMEA · ATAM · defense-walk · tdd-implement
 ```
 
 A common early pass is still *purpose → naïve draft → stressor walk → integrate*, then FMEA/ATAM when you want structured critique — but that path is a suggestion, not a gate. Record a force or residue whenever it appears.
@@ -106,7 +106,32 @@ residual skill check-install purpose-walk \
 residual skill data purpose-walk             # print current project context for this skill
 ```
 
-Supported agents: `claude`, `cursor`, `copilot`, `agnostic`
+Supported agents: `claude`, `cursor`, `copilot`, `agnostic`. Installed skills are **passthrough stubs** (a few lines pointing at `residual skill show <name>`) — methodology lives in the binary, so a stub never drifts out of date; `residual skill check-install` just confirms the stub is in that shape.
+
+Every skill session's `residual skill data <name>` output is stitched together with a **guru** block: short, embedded guidance snippets (definitions of attractor/stressor/purpose/persona, the ergodic boundary, whole-system-residue, walk cadence) auto-attached per skill so the operator and agent share the same primitives without re-deriving them each session. `residual skill list` shows the token cost each skill's guru block adds.
+
+## Live-Editing View
+
+```bash
+residual view                 # render a self-contained HTML snapshot of the force landscape, print its path
+residual view --defense       # include the defense ledger (meta forces + defense artifacts)
+residual serve                # serve the same view on loopback (default port 8787) for live browsing
+```
+
+The view is **read-only and ephemeral**: it never mutates `residual/` directly. Instead it lets you edit forces, components, and couplings in the browser and stages the equivalent `residual add`/`update`/`remove` commands (or a ready-to-run bash script) for you to copy and execute — the CLI remains the sole write path. It also accepts pasting CLI output back in (bidirectional import) to merge external edits into the same staged-command view.
+
+## Editing Existing Records
+
+```bash
+residual update stressor --shortname my-stressor --description "..."
+residual update purpose --shortname my-purpose --outcomes "..."
+residual update attractor A-01 --positive-state "..."
+residual update component my-component --status actual
+residual update term my-term --definition "..."
+residual update persona my-persona --concerns "..."
+```
+
+`add`/`update`/`remove` all guard against **concurrent drift**: each records a snapshot hash of `residual/` at the start of a mutating session, and refuses to write if the files changed outside that session (pass `--force` to overwrite after inspecting the diff yourself).
 
 ## NKP Matrix
 
@@ -145,6 +170,27 @@ residual add term --term "..." --definition "..."
 
 residual list stressors / purposes / attractors / terminology / residues / personas / iterations
 ```
+
+Metadata writes require a short-lived authorization when the git sidecar is enabled: `residual write authorize` (default 30 minutes) before your first `add`/`update`/`remove` of a session. This is a deliberate friction point, not a bug — it keeps agents from mutating the ledger outside an intentional working session.
+
+## Defense Ledger
+
+A parallel, isolated ledger for **meta forces** — pressure on the *practice* of residuality itself (management skepticism, org friction, prospect objections) rather than on the project under architecture. It never mixes with the main stressors/purposes/attractors:
+
+```bash
+residual add meta-attractor --name "..." --positive-state "..." --negative-state "..." --description "..."
+residual add meta-stressor  --description "..." --shortname "..."
+residual add meta-purpose   --description "..." --attractor-id MA-01 --naive-change "..." --outcomes "..." --shortname "..."
+
+residual add defense-persona   --name "..." --body "..."   # a simulated outside audience, not a project stakeholder
+residual add defense-strategy  --name "..." --body "..."   # brainstorming an argument for a specific audience
+residual add defense-progress  --name "..." --body "..."   # history of how a pitch landed
+residual add defense-pitch     --name "..." --body "..."   # the refined, reusable communication artifact
+
+residual view --defense       # include defense/* alongside the main landscape
+```
+
+Use the `defense-walk` skill to rehearse how residuality artifacts and pitches will land with a specific outside audience, distinguishing `defense-persona` (simulated outsider) from the walk-time `persona` (project stakeholder).
 
 ## Verification + Git Hook
 

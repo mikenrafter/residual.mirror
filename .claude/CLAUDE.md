@@ -53,6 +53,15 @@ Direct CSV edits are only acceptable for operations the CLI does not support (e.
 
 When referring to forces, attractors, or components in conversation or commit messages, prefer shortnames (`skill-stub-burden`, `fluent-metadata-capture`, `architecture-clarity`) over numeric IDs (`S-07`, `P-07`, `A-01`). IDs are brittle pointers; shortnames carry intent and stay readable in git log. This is a residue of **lexicon-project-wide** (P-18).
 
+## Local tooling conventions (this project only)
+
+These are conventions for agents working in *this* repo's checkout, not part of the residuality method itself:
+
+- **Invoke this project's own build, never a PATH-installed `residual`.** Run `nix develop --command residual <args>` (or `nix develop .#residual --command residual <args>`) so you get the exact version this branch built, not whatever `residual` happens to be on the ambient PATH (`/etc/profiles/...` or similar can lag behind). The devshell also runs a presence check for the tools below and warns on stderr if any are missing.
+- **Use `agentgrep` for code search**, not raw `grep`/`rg`, when searching this codebase — it understands code structure (`agentgrep grep|find|outline|trace`).
+- **Use `rtk`** (Rust Token Killer) as the token-optimized proxy for routine dev/git operations in this repo. Check `rtk gain` if you want to see savings; most other commands are hook-rewritten transparently.
+- The repo has **Entire** (`entire`) session/checkpoint hooks installed for Claude Code, Codex, and Cursor (`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`). Don't remove or bypass these; if `entire status` reports hooks out of date, run `entire enable --force` (and `entire agent add <name> --force` per-agent if that alone doesn't clear it).
+
 ## Engineering standards
 
 These are craft concerns, not residuality forces — they belong here, not in forces.csv:

@@ -6,14 +6,16 @@
 
 use anyhow::{bail, Result};
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::cli::VerifyCheck;
 use crate::config::Config;
 use crate::storage::config::{self as storage_config, StorageConfig};
+use crate::storage::git_sidecar::{self, SidecarConfig};
 
 pub mod commit_msg;
 pub mod git_hook;
+pub mod walk_reminder;
 
 #[allow(unused_imports)]
 pub use crate::verify::{
@@ -22,16 +24,67 @@ pub use crate::verify::{
 };
 
 pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
+    if let VerifyCheck::WalkReminder { staged } = &check {
+        return run_walk_reminder(cfg, *staged);
+    }
+    if let Some(warning) = sidecar_working_tree_warning()? {
+        eprintln!(
+            "warning: staged residual/ paths on working branch ({}) — policy={:?}",
+            warning.staged_paths.join(", "),
+            warning.policy
+        );
+    }
     crate::verify::run(cfg, check)
 }
 
-/// Load verification policy from storage-config (v3 TOML on disk, or defaults).
+/// Residual metadata directory for verify reads — sidecar branch tip when enabled.
+pub fn metadata_dir_for_verify(cfg: &Config) -> Result<PathBuf> {
+    crate::storage::metadata_dir(cfg)
+}
+
+fn sidecar_working_tree_warning() -> Result<Option<git_sidecar::WorkingTreeWarning>> {
+    let cwd = std::env::current_dir()?;
+    let discovery = git_sidecar::discover_config(&cwd)?;
+    let sidecar = SidecarConfig::from_config_file(&discovery.config_path)?;
+    git_sidecar::check_working_tree_policy(&cwd, &sidecar)
+}
+
+const DEFAULT_WALK_REMINDER_INTERVAL_DAYS: u32 = 30;
+
+/// Non-blocking walk cadence check — always exits OK, prints reminders to stderr.
+pub fn run_walk_reminder(cfg: &Config, _staged: bool) -> Result<()> {
+    let policy = policy_from_config(cfg).unwrap_or_default();
+    if !policy.walk_reminder_enabled {
+        return Ok(());
+    }
+    let interval = if policy.walk_reminder_interval_days == 0 {
+        DEFAULT_WALK_REMINDER_INTERVAL_DAYS
+    } else {
+        policy.walk_reminder_interval_days
+    };
+    let meta_dir = metadata_dir_for_verify(cfg)?;
+    let report = walk_reminder::verify_reminder(&meta_dir, interval)?;
+    for msg in &report.messages {
+        eprintln!("{msg}");
+    }
+    Ok(())
+}
+
+/// Load verification policy from storage-config (config.toml on disk, or defaults).
 pub fn policy_from_storage_config(residual_dir: &Path) -> Result<StorageConfig> {
-    let path = residual_dir.join("config.toml");
+    policy_from_config_path(&residual_dir.join("config.toml"))
+}
+
+pub fn policy_from_config(cfg: &Config) -> Result<StorageConfig> {
+    policy_from_config_path(&cfg.config_path)
+}
+
+pub fn policy_from_config_path(config_path: &Path) -> Result<StorageConfig> {
+    let path = config_path;
     if !path.exists() {
         return Ok(StorageConfig::default());
     }
-    let raw = std::fs::read_to_string(&path)?;
+    let raw = std::fs::read_to_string(path)?;
     if raw.contains("format_version") || raw.contains("[verification]") || raw.contains("[storage]")
     {
         storage_config::parse_v3(&raw)

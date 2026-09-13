@@ -1,0 +1,1 @@
+Examine **whole-system-residue** (hardware, process, organization, policy zig) before defaulting to a software-only patch. Use `--whole-system --notes` when the surviving change leaves the software boundary.

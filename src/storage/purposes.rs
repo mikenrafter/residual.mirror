@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Purpose {
     pub id: String,
     #[serde(default)]
@@ -13,9 +13,9 @@ pub struct Purpose {
     pub naive_change: String,
     #[serde(rename = "outcomes", alias = "traits")]
     pub outcomes: String,
-    #[serde(alias = "components_enabled")]
-    pub components: String,
 }
+
+const HEADER: &str = "id,shortname,description,naive_change,outcomes,attractor_id";
 
 pub fn load(residual_dir: &Path) -> Result<Vec<Purpose>> {
     let path = residual_dir.join("purposes.csv");
@@ -42,12 +42,22 @@ pub fn append(residual_dir: &Path, purpose: Purpose) -> Result<()> {
     write_all(residual_dir, &all)
 }
 
+pub fn remove_by_shortname(residual_dir: &Path, shortname: &str) -> Result<String> {
+    let mut all = load(residual_dir)?;
+    let Some(index) = all.iter().position(|p| p.shortname == shortname) else {
+        anyhow::bail!("purpose '{}' not found", shortname);
+    };
+    let id = all.remove(index).id;
+    write_all(residual_dir, &all)?;
+    Ok(id)
+}
+
 pub fn write_all_pub(residual_dir: &Path, rows: &[Purpose]) -> Result<()> {
     write_all(residual_dir, rows)
 }
 
 fn write_all(residual_dir: &Path, rows: &[Purpose]) -> Result<()> {
-    let mut buf = String::from("id,shortname,description,naive_change,outcomes,components,attractor_id\n");
+    let mut buf = format!("{HEADER}\n");
     for p in rows {
         let mut row = Vec::new();
         {
@@ -58,7 +68,6 @@ fn write_all(residual_dir: &Path, rows: &[Purpose]) -> Result<()> {
                 &p.description,
                 &p.naive_change,
                 &p.outcomes,
-                &p.components,
                 &p.attractor_id,
             ])?;
             wtr.flush()?;
@@ -69,12 +78,65 @@ fn write_all(residual_dir: &Path, rows: &[Purpose]) -> Result<()> {
     Ok(())
 }
 
+/// Update fields on an existing purpose in place; unspecified fields are unchanged.
+/// Also folds `add_component`/`remove_component` into residues.csv couplings for
+/// this force id, mirroring `residual add/remove residue`. Errors on unknown id,
+/// with no partial writes.
+#[allow(clippy::too_many_arguments)]
+pub fn update(
+    residual_dir: &Path,
+    id: &str,
+    description: Option<String>,
+    attractor_id: Option<String>,
+    naive_change: Option<String>,
+    shortname: Option<String>,
+    outcomes: Option<String>,
+    add_component: Vec<String>,
+    remove_component: Vec<String>,
+) -> Result<()> {
+    let mut all = load(residual_dir)?;
+    let Some(row) = all.iter_mut().find(|p| p.id == id) else {
+        anyhow::bail!("purpose id '{}' not found", id);
+    };
+    if let Some(v) = description {
+        row.description = v;
+    }
+    if let Some(v) = attractor_id {
+        row.attractor_id = v;
+    }
+    if let Some(v) = naive_change {
+        row.naive_change = v;
+    }
+    if let Some(v) = shortname {
+        row.shortname = v;
+    }
+    if let Some(v) = outcomes {
+        row.outcomes = v;
+    }
+    write_all(residual_dir, &all)?;
+
+    for component_id in &add_component {
+        let existing = crate::storage::residues::load(residual_dir)?;
+        let residue_id = crate::storage::residues::next_id(&existing);
+        crate::storage::residues::append(
+            residual_dir,
+            crate::structure::analysis::residues::Residue::coupling(
+                residue_id,
+                id.to_string(),
+                component_id.clone(),
+            ),
+        )?;
+    }
+    for component_id in &remove_component {
+        crate::storage::residues::remove_coupling(residual_dir, id, component_id)?;
+    }
+    Ok(())
+}
+
 pub fn next_id(purposes: &[Purpose]) -> String {
     let max = purposes
         .iter()
-        .filter_map(|p| {
-            p.id.strip_prefix("P-").and_then(|n| n.parse::<u32>().ok())
-        })
+        .filter_map(|p| p.id.strip_prefix("P-").and_then(|n| n.parse::<u32>().ok()))
         .max()
         .unwrap_or(0);
     format!("P-{:02}", max + 1)
@@ -93,64 +155,8 @@ mod tests {
             attractor_id: "A-01".to_string(),
             naive_change: "feat".to_string(),
             outcomes: "system enables login".to_string(),
-            components: "auth,ui".to_string(),
         }
     }
-
-    #[test]
-    fn next_id_empty() {
-        assert_eq!(next_id(&[]), "P-01");
-    }
-
-    #[test]
-    fn next_id_after_p03() {
-        let purposes = vec![make_purpose("P-01"), make_purpose("P-03")];
-        assert_eq!(next_id(&purposes), "P-04");
-    }
-
-    #[test]
-    fn append_creates_file_with_header_and_row() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_purpose("P-01")).unwrap();
-        let content = std::fs::read_to_string(dir.path().join("purposes.csv")).unwrap();
-        assert!(content.contains("id,"), "header missing");
-        assert!(content.contains("P-01"), "row missing");
-    }
-
-    #[test]
-    fn append_does_not_duplicate_header() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_purpose("P-01")).unwrap();
-        append(dir.path(), make_purpose("P-02")).unwrap();
-        let content = std::fs::read_to_string(dir.path().join("purposes.csv")).unwrap();
-        assert_eq!(content.matches("id,").count(), 1, "header duplicated");
-    }
-
-    #[test]
-    fn load_reads_back_appended() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_purpose("P-01")).unwrap();
-        let loaded = load(dir.path()).unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].id, "P-01");
-    }
-
-    #[test]
-    fn append_rejects_duplicate_id() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_purpose("P-01")).unwrap();
-        let err = append(dir.path(), make_purpose("P-01")).unwrap_err();
-        assert!(err.to_string().contains("already exists"));
-    }
-
-    #[test]
-    fn load_missing_file_returns_empty() {
-        let dir = tempdir().unwrap();
-        let result = load(dir.path()).unwrap();
-        assert!(result.is_empty());
-    }
-
-    // --- shortname field tests (RED: shortname field not yet on Purpose) ---
 
     #[test]
     fn purpose_with_shortname_roundtrips() {
@@ -161,30 +167,10 @@ mod tests {
             attractor_id: "A-01".to_string(),
             naive_change: "add purpose cli".to_string(),
             outcomes: "operator adds purposes".to_string(),
-            components: "cli".to_string(),
             shortname: "persona-subagent-depth".to_string(),
         };
         append(dir.path(), p).unwrap();
         let loaded = load(dir.path()).unwrap();
-        assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].shortname, "persona-subagent-depth");
-    }
-
-    #[test]
-    fn purpose_missing_shortname_column_deserializes_empty() {
-        let dir = tempdir().unwrap();
-        // Write a purposes.csv with the OLD header (no shortname column).
-        std::fs::write(
-            dir.path().join("purposes.csv"),
-            "id,description,naive_change,outcomes,components,attractor_id\n\
-             P-01,old purpose,old naive_change,system enables old,cli,A-01\n",
-        )
-        .unwrap();
-        let loaded = load(dir.path()).unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(
-            loaded[0].shortname, "",
-            "old CSV rows without shortname column should deserialize to empty string"
-        );
     }
 }

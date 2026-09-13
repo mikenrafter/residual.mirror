@@ -1,0 +1,1 @@
+**Attractor** — a recurring *system state*, not a mission statement. Describe healthy (`positive_state`) and broken (`negative_state`) sides of the same coin. One attractor per stable behavioral mode; split compound "and" goals into separate attractors.

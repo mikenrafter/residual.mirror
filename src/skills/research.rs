@@ -1,4 +1,4 @@
-// @residue: R-01
+// @component: skills-research
 use anyhow::{Context, Result};
 use std::path::Path;
 

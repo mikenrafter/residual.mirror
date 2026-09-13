@@ -1,15 +1,17 @@
 //! NKP matrix build + show (filter / sort / attractor grouping / separators).
 
 use anyhow::Result;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{self, Write};
+use std::path::Path;
 
 use crate::cli::MatrixSortBy;
-use crate::storage::stressors::Stressor;
+use crate::structure::analysis::residues::Residue;
+use super::forces::ForceMeta;
 
 pub struct NkpMatrix {
-    pub stressor_ids: Vec<String>,
-    /// Attractor id per force row (parallel to `stressor_ids`).
+    pub force_ids: Vec<String>,
+    /// Attractor id per force row (parallel to `force_ids`).
     pub attractor_ids: Vec<String>,
     pub components: Vec<String>,
     /// row-major: cells[stressor_idx][component_idx] = 0 or 1
@@ -25,48 +27,76 @@ enum EmitRow {
 }
 
 impl NkpMatrix {
-    pub fn build(stressors: &[Stressor]) -> Self {
-        let mut components: Vec<String> = Vec::new();
-        for s in stressors {
-            for comp in s.components.split(',') {
-                let comp = comp.trim().to_string();
-                if !comp.is_empty() && !components.contains(&comp) {
-                    components.push(comp);
-                }
+    /// Build the NKP matrix from `residues.csv` coupling marks (v4 canonical source).
+    pub fn build_from_residues(
+        residues: &[Residue],
+        attractor_by_force: &HashMap<String, String>,
+    ) -> Self {
+        let mut components_set = BTreeSet::new();
+        let mut force_cells: BTreeMap<String, BTreeMap<String, u8>> = BTreeMap::new();
+        for r in residues {
+            if r.force_id.is_empty() || r.component_id.is_empty() || !r.is_coupled() {
+                continue;
             }
+            components_set.insert(r.component_id.clone());
+            force_cells
+                .entry(r.force_id.clone())
+                .or_default()
+                .insert(r.component_id.clone(), 1);
         }
-
-        let stressor_ids: Vec<String> = stressors.iter().map(|s| s.id.clone()).collect();
-        let attractor_ids: Vec<String> = stressors.iter().map(|s| s.attractor_id.clone()).collect();
-
-        let cells: Vec<Vec<u8>> = stressors
+        let components: Vec<String> = components_set.into_iter().collect();
+        let force_ids: Vec<String> = force_cells.keys().cloned().collect();
+        let attractor_ids: Vec<String> = force_ids
             .iter()
-            .map(|s| {
-                let affected: Vec<&str> =
-                    s.components.split(',').map(|c| c.trim()).collect();
+            .map(|id| {
+                attractor_by_force
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .collect();
+        let cells: Vec<Vec<u8>> = force_ids
+            .iter()
+            .map(|fid| {
                 components
                     .iter()
-                    .map(|comp| {
-                        if affected.contains(&comp.as_str()) {
-                            1
-                        } else {
-                            0
-                        }
-                    })
+                    .map(|c| force_cells[fid].get(c).copied().unwrap_or(0))
                     .collect()
             })
             .collect();
-
         NkpMatrix {
-            stressor_ids,
+            force_ids,
             attractor_ids,
             components,
             cells,
         }
     }
 
+    pub fn build_from_dir(residual_dir: &Path) -> Result<Self> {
+        let residues = crate::storage::format::read_residues(residual_dir)?;
+        let attractor_by_force = super::forces::attractor_map(residual_dir)?;
+        Ok(Self::build_from_residues(&residues, &attractor_by_force))
+    }
+
+    /// Reorder matrix rows to match `force_order` (forces missing from the matrix are skipped).
+    pub fn reorder_rows(&mut self, force_order: &[ForceMeta]) {
+        let mut new_force_ids = Vec::new();
+        let mut new_attractor_ids = Vec::new();
+        let mut new_cells = Vec::new();
+        for f in force_order {
+            if let Some(idx) = self.force_ids.iter().position(|id| id == &f.id) {
+                new_force_ids.push(f.id.clone());
+                new_attractor_ids.push(self.attractor_ids[idx].clone());
+                new_cells.push(self.cells[idx].clone());
+            }
+        }
+        self.force_ids = new_force_ids;
+        self.attractor_ids = new_attractor_ids;
+        self.cells = new_cells;
+    }
+
     pub fn n(&self) -> usize {
-        self.stressor_ids.len() + self.components.len()
+        self.force_ids.len() + self.components.len()
     }
 
     pub fn k(&self) -> usize {
@@ -148,7 +178,7 @@ impl NkpMatrix {
         }
         let col_totals = self.col_totals();
         let fusions = self.fusion_candidates();
-        let threshold = (self.stressor_ids.len() / 2).max(1);
+        let threshold = (self.force_ids.len() / 2).max(1);
         let fission: HashSet<String> = self.fission_candidates(threshold).into_iter().collect();
 
         let mut parent: HashMap<String, String> = self
@@ -203,7 +233,7 @@ impl NkpMatrix {
     }
 
     fn row_label(&self, row_idx: usize, shortnames: &HashMap<String, String>) -> String {
-        let id = &self.stressor_ids[row_idx];
+        let id = &self.force_ids[row_idx];
         shortnames
             .get(id)
             .cloned()
@@ -217,7 +247,7 @@ impl NkpMatrix {
     ) -> Vec<EmitRow> {
         let mut plan = Vec::new();
         let mut last_attractor = String::new();
-        for idx in 0..self.stressor_ids.len() {
+        for idx in 0..self.force_ids.len() {
             let aid = &self.attractor_ids[idx];
             if aid != &last_attractor {
                 let name = attractor_names
@@ -233,7 +263,7 @@ impl NkpMatrix {
         // Fusion / fission annotation separators (always shown when present).
         let _ = sort_by; // fusion-fission already reordered columns before emit
         let fusions = self.fusion_candidates();
-        let threshold = (self.stressor_ids.len() / 2).max(1);
+        let threshold = (self.force_ids.len() / 2).max(1);
         let fissions = self.fission_candidates(threshold);
         if !fusions.is_empty() || !fissions.is_empty() {
             plan.push(EmitRow::Separator("── fusion / fission ──".into()));
@@ -395,13 +425,13 @@ impl NkpMatrix {
 }
 
 /// Filter stressors by attractor id, force id, or shortname (case-insensitive contains for shortname).
-pub fn filter_stressors(
-    stressors: &[Stressor],
+pub fn filter_forces(
+    forces: &[ForceMeta],
     filters: &[String],
     shortnames: &HashMap<String, String>,
-) -> Vec<Stressor> {
+) -> Vec<ForceMeta> {
     if filters.is_empty() {
-        return stressors.to_vec();
+        return forces.to_vec();
     }
     let needles: Vec<String> = filters
         .iter()
@@ -410,48 +440,46 @@ pub fn filter_stressors(
         .filter(|s| !s.is_empty())
         .collect();
     if needles.is_empty() {
-        return stressors.to_vec();
+        return forces.to_vec();
     }
-    stressors
+    forces
         .iter()
-        .filter(|s| {
+        .filter(|f| {
             needles.iter().any(|n| {
                 let n_lower = n.to_lowercase();
-                s.attractor_id.eq_ignore_ascii_case(n)
-                    || s.id.eq_ignore_ascii_case(n)
+                f.attractor_id.eq_ignore_ascii_case(n)
+                    || f.id.eq_ignore_ascii_case(n)
                     || shortnames
-                        .get(&s.id)
+                        .get(&f.id)
                         .map(|sn| sn.to_lowercase().contains(&n_lower))
                         .unwrap_or(false)
-                    || s.description.to_lowercase().contains(&n_lower)
+                    || f.description.to_lowercase().contains(&n_lower)
             })
         })
         .cloned()
         .collect()
 }
 
-/// Sort stressors for matrix show. Always stable within key; attractor grouping
+/// Sort forces for matrix show. Always stable within key; attractor grouping
 /// sorts by attractor then secondary key.
-pub fn sort_stressors(
-    mut stressors: Vec<Stressor>,
+pub fn sort_forces(
+    mut forces: Vec<ForceMeta>,
     sort_by: MatrixSortBy,
     shortnames: &HashMap<String, String>,
-) -> Vec<Stressor> {
+) -> Vec<ForceMeta> {
     match sort_by {
         MatrixSortBy::Attractor | MatrixSortBy::FusionFission => {
-            // Group by attractor; within group keep id order. Fusion-fission
-            // additionally reorders columns after build.
-            stressors.sort_by(|a, b| {
+            forces.sort_by(|a, b| {
                 a.attractor_id
                     .cmp(&b.attractor_id)
                     .then_with(|| a.id.cmp(&b.id))
             });
         }
         MatrixSortBy::Id => {
-            stressors.sort_by(|a, b| a.id.cmp(&b.id));
+            forces.sort_by(|a, b| a.id.cmp(&b.id));
         }
         MatrixSortBy::Alphabetical => {
-            stressors.sort_by(|a, b| {
+            forces.sort_by(|a, b| {
                 let sa = shortnames
                     .get(&a.id)
                     .cloned()
@@ -466,7 +494,7 @@ pub fn sort_stressors(
             });
         }
     }
-    stressors
+    forces
 }
 
 /// Binary coupling heatmap cell: background fill, not just green digit text.
@@ -495,30 +523,31 @@ fn total_heat_cell(value: usize, max: usize) -> comfy_table::Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::structure::analysis::residues::Residue;
 
-    fn make_stressor(id: &str, attractor: &str, components: &str) -> Stressor {
-        Stressor {
-            id: id.to_string(),
-            shortname: String::new(),
-            description: "desc".to_string(),
-            attractor_id: attractor.to_string(),
-            naive_change: "change".to_string(),
-            outcomes: "system handles auth".to_string(),
-            components: components.to_string(),
-        }
+    fn coupling(force_id: &str, component_id: &str) -> Residue {
+        Residue::coupling(format!("R-{}", force_id), force_id, component_id)
     }
 
-    fn two_by_three() -> Vec<Stressor> {
+    fn two_by_three_residues() -> Vec<Residue> {
         vec![
-            make_stressor("S-01", "A-01", "auth,db"),
-            make_stressor("S-02", "A-02", "db,cache"),
+            coupling("S-01", "auth"),
+            coupling("S-01", "db"),
+            coupling("S-02", "db"),
+            coupling("S-02", "cache"),
         ]
+    }
+
+    fn attractors_two() -> HashMap<String, String> {
+        HashMap::from([
+            ("S-01".into(), "A-01".into()),
+            ("S-02".into(), "A-02".into()),
+        ])
     }
 
     #[test]
     fn build_correct_cells() {
-        let stressors = two_by_three();
-        let m = NkpMatrix::build(&stressors);
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
         let auth_idx = m.components.iter().position(|c| c == "auth").unwrap();
         let db_idx = m.components.iter().position(|c| c == "db").unwrap();
         let cache_idx = m.components.iter().position(|c| c == "cache").unwrap();
@@ -532,60 +561,72 @@ mod tests {
     }
 
     #[test]
-    fn n_equals_stressors_plus_components() {
-        let m = NkpMatrix::build(&two_by_three());
+    fn n_equals_forces_plus_components() {
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
         assert_eq!(m.n(), 5);
     }
 
     #[test]
     fn k_equals_count_of_ones() {
-        let m = NkpMatrix::build(&two_by_three());
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
         assert_eq!(m.k(), 4);
     }
 
     #[test]
     fn row_totals() {
-        let m = NkpMatrix::build(&two_by_three());
-        let rt = m.row_totals();
-        assert_eq!(rt, vec![2, 2]);
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
+        assert_eq!(m.row_totals(), vec![2, 2]);
     }
 
     #[test]
     fn col_totals() {
-        let m = NkpMatrix::build(&two_by_three());
-        let ct = m.col_totals();
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
         let db_idx = m.components.iter().position(|c| c == "db").unwrap();
-        assert_eq!(ct[db_idx], 2);
+        assert_eq!(m.col_totals()[db_idx], 2);
     }
 
     #[test]
     fn hyperliminal_pairs_finds_shared_stressors() {
-        let stressors = vec![
-            make_stressor("S-01", "A-01", "auth,db"),
-            make_stressor("S-02", "A-01", "auth,db"),
-            make_stressor("S-03", "A-01", "auth,db"),
+        let residues = vec![
+            coupling("S-01", "auth"),
+            coupling("S-01", "db"),
+            coupling("S-02", "auth"),
+            coupling("S-02", "db"),
+            coupling("S-03", "auth"),
+            coupling("S-03", "db"),
         ];
-        let m = NkpMatrix::build(&stressors);
+        let mut att = HashMap::new();
+        for id in ["S-01", "S-02", "S-03"] {
+            att.insert(id.into(), "A-01".into());
+        }
+        let m = NkpMatrix::build_from_residues(&residues, &att);
         assert!(!m.hyperliminal_pairs().is_empty());
     }
 
     #[test]
     fn hyperliminal_pairs_empty_when_no_shared() {
-        let stressors = vec![
-            make_stressor("S-01", "A-01", "auth"),
-            make_stressor("S-02", "A-01", "db"),
-        ];
-        let m = NkpMatrix::build(&stressors);
+        let residues = vec![coupling("S-01", "auth"), coupling("S-02", "db")];
+        let att = HashMap::from([
+            ("S-01".into(), "A-01".into()),
+            ("S-02".into(), "A-01".into()),
+        ]);
+        let m = NkpMatrix::build_from_residues(&residues, &att);
         assert!(m.hyperliminal_pairs().is_empty());
     }
 
     #[test]
     fn fusion_candidates_identical_column_vectors() {
-        let stressors = vec![
-            make_stressor("S-01", "A-01", "auth,twin"),
-            make_stressor("S-02", "A-01", "auth,twin"),
+        let residues = vec![
+            coupling("S-01", "auth"),
+            coupling("S-01", "twin"),
+            coupling("S-02", "auth"),
+            coupling("S-02", "twin"),
         ];
-        let m = NkpMatrix::build(&stressors);
+        let att = HashMap::from([
+            ("S-01".into(), "A-01".into()),
+            ("S-02".into(), "A-01".into()),
+        ]);
+        let m = NkpMatrix::build_from_residues(&residues, &att);
         let fusions = m.fusion_candidates();
         assert!(fusions.iter().any(|(a, b)| {
             (a == "auth" && b == "twin") || (a == "twin" && b == "auth")
@@ -594,51 +635,83 @@ mod tests {
 
     #[test]
     fn fission_candidates_above_threshold() {
-        let stressors = vec![
-            make_stressor("S-01", "A-01", "db"),
-            make_stressor("S-02", "A-01", "db"),
-            make_stressor("S-03", "A-01", "db"),
+        let residues = vec![
+            coupling("S-01", "db"),
+            coupling("S-02", "db"),
+            coupling("S-03", "db"),
         ];
-        let m = NkpMatrix::build(&stressors);
+        let att = HashMap::from([
+            ("S-01".into(), "A-01".into()),
+            ("S-02".into(), "A-01".into()),
+            ("S-03".into(), "A-01".into()),
+        ]);
+        let m = NkpMatrix::build_from_residues(&residues, &att);
         assert!(m.fission_candidates(2).contains(&"db".to_string()));
+    }
+
+    fn two_forces() -> Vec<ForceMeta> {
+        vec![
+            ForceMeta {
+                id: "S-01".into(),
+                attractor_id: "A-01".into(),
+                description: "desc".into(),
+            },
+            ForceMeta {
+                id: "S-02".into(),
+                attractor_id: "A-02".into(),
+                description: "desc".into(),
+            },
+        ]
     }
 
     #[test]
     fn filter_by_attractor_id() {
-        let out = filter_stressors(&two_by_three(), &["A-02".into()], &HashMap::new());
+        let out = filter_forces(&two_forces(), &["A-02".into()], &HashMap::new());
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].id, "S-02");
     }
 
     #[test]
     fn sort_by_attractor_groups() {
-        let stressors = vec![
-            make_stressor("S-02", "A-02", "db"),
-            make_stressor("S-01", "A-01", "auth"),
-            make_stressor("S-03", "A-01", "cache"),
+        let forces = vec![
+            ForceMeta {
+                id: "S-02".into(),
+                attractor_id: "A-02".into(),
+                description: String::new(),
+            },
+            ForceMeta {
+                id: "S-01".into(),
+                attractor_id: "A-01".into(),
+                description: String::new(),
+            },
+            ForceMeta {
+                id: "S-03".into(),
+                attractor_id: "A-01".into(),
+                description: String::new(),
+            },
         ];
-        let sorted = sort_stressors(stressors, MatrixSortBy::Attractor, &HashMap::new());
+        let sorted = sort_forces(forces, MatrixSortBy::Attractor, &HashMap::new());
         assert_eq!(
-            sorted.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(),
+            sorted.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(),
             vec!["S-01", "S-03", "S-02"]
         );
     }
 
     #[test]
     fn sort_alphabetical_by_shortname() {
-        let stressors = two_by_three();
         let mut sn = HashMap::new();
         sn.insert("S-01".into(), "zeta".into());
         sn.insert("S-02".into(), "alpha".into());
-        let sorted = sort_stressors(stressors, MatrixSortBy::Alphabetical, &sn);
+        let sorted = sort_forces(two_forces(), MatrixSortBy::Alphabetical, &sn);
         assert_eq!(sorted[0].id, "S-02");
         assert_eq!(sorted[1].id, "S-01");
     }
 
     #[test]
     fn csv_includes_attractor_separators_and_totals() {
-        let stressors = sort_stressors(two_by_three(), MatrixSortBy::Attractor, &HashMap::new());
-        let m = NkpMatrix::build(&stressors);
+        let ordered = sort_forces(two_forces(), MatrixSortBy::Attractor, &HashMap::new());
+        let mut m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
+        m.reorder_rows(&ordered);
         let mut names = HashMap::new();
         names.insert("A-01".into(), "Clarity".into());
         names.insert("A-02".into(), "Drift".into());
@@ -653,39 +726,26 @@ mod tests {
 
     #[test]
     fn csv_includes_row_and_column_totals() {
-        let m = NkpMatrix::build(&two_by_three());
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
         let mut buf = Vec::new();
-        m.write_csv(
-            &mut buf,
-            &HashMap::new(),
-            &HashMap::new(),
-            MatrixSortBy::Id,
-        )
-        .unwrap();
+        m.write_csv(&mut buf, &HashMap::new(), &HashMap::new(), MatrixSortBy::Id)
+            .unwrap();
         let csv = String::from_utf8(buf).unwrap();
         let lines: Vec<&str> = csv.lines().collect();
         assert!(lines[0].ends_with(",total"), "header={}", lines[0]);
         let totals = *lines.last().unwrap();
-        assert!(
-            totals == "total,1,2,1,4",
-            "col totals + grand: {totals}"
-        );
+        assert!(totals == "total,1,1,2,4", "col totals + grand: {totals}");
     }
 
     #[test]
     fn csv_uses_force_shortnames_as_row_labels() {
-        let m = NkpMatrix::build(&two_by_three());
+        let m = NkpMatrix::build_from_residues(&two_by_three_residues(), &attractors_two());
         let mut shortnames = HashMap::new();
         shortnames.insert("S-01".into(), "skill-version-drift".into());
         shortnames.insert("S-02".into(), "lexicon-scale-lag".into());
         let mut buf = Vec::new();
-        m.write_csv(
-            &mut buf,
-            &shortnames,
-            &HashMap::new(),
-            MatrixSortBy::Id,
-        )
-        .unwrap();
+        m.write_csv(&mut buf, &shortnames, &HashMap::new(), MatrixSortBy::Id)
+            .unwrap();
         let csv = String::from_utf8(buf).unwrap();
         assert!(csv.contains("skill-version-drift"), "csv={csv}");
         assert!(csv.contains("lexicon-scale-lag"), "csv={csv}");

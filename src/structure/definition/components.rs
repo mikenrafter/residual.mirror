@@ -36,3 +36,31 @@ pub fn filter_architecture_set<'a>(
         .filter(|c| c.architecture_set == set)
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn load_parses_name_description_status_architecture_set_columns() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("components.csv"),
+            "name,description,status,architecture_set\ncli,Thin hub,actual,iter4-cli-hub\n",
+        )
+        .unwrap();
+        let components = load(dir.path()).unwrap();
+        assert_eq!(components.len(), 1);
+        assert_eq!(components[0].name, "cli");
+        assert_eq!(components[0].description, "Thin hub");
+        assert_eq!(components[0].status, "actual");
+        assert_eq!(components[0].architecture_set, "iter4-cli-hub");
+    }
+
+    #[test]
+    fn load_returns_empty_when_file_missing() {
+        let dir = TempDir::new().unwrap();
+        assert!(load(dir.path()).unwrap().is_empty());
+    }
+}

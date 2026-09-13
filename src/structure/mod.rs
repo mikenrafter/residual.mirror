@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 pub mod analysis;
+pub mod defense;
 pub mod definition;
 
 pub trait AttractorKeyed {

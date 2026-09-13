@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use crate::config::Config;
 
 pub mod context;
+pub mod guru;
+pub mod hooks;
 pub mod install;
 pub mod installer;
 pub mod personas;
@@ -9,13 +11,15 @@ pub mod phases;
 pub mod research;
 
 pub const SKILLS: &[(&str, &str, u32)] = &[
-    ("purpose-walk",    include_str!("definitions/purpose_walk.md"),    0),
-    ("naive-draft",     include_str!("definitions/naive_draft.md"),     0),
-    ("stressor-walk",   include_str!("definitions/stressor_walk.md"),   0),
-    ("integrate",       include_str!("definitions/integrate.md"),       0),
-    ("fmea",            include_str!("definitions/fmea.md"),            0),
-    ("atam",            include_str!("definitions/atam.md"),            0),
-    ("tdd-implement",   include_str!("definitions/tdd_implement.md"),   0),
+    ("framework",       include_str!("definitions/framework/SKILL.md"),       0),
+    ("purpose-walk",    include_str!("definitions/purpose_walk/SKILL.md"),    0),
+    ("naive-draft",     include_str!("definitions/naive_draft/SKILL.md"),     0),
+    ("stressor-walk",   include_str!("definitions/stressor_walk/SKILL.md"),   0),
+    ("integrate",       include_str!("definitions/integrate/SKILL.md"),       0),
+    ("fmea",            include_str!("definitions/fmea/SKILL.md"),            0),
+    ("atam",            include_str!("definitions/atam/SKILL.md"),            0),
+    ("tdd-implement",   include_str!("definitions/tdd_implement/SKILL.md"),   0),
+    ("defense-walk",    include_str!("definitions/defense_walk/SKILL.md"),    0),
 ];
 
 pub fn find(name: &str) -> Option<(&'static str, u32)> {
@@ -83,16 +87,33 @@ pub fn data(cfg: &Config, name: &str) -> Result<()> {
 }
 
 pub fn list_all() -> Result<()> {
-    println!(
-        "Skills are selectable analytical lenses (a-la-carte) — invoke only the steps your workflow needs.\n"
+    print!("{}", list_all_text());
+    Ok(())
+}
+
+pub(crate) fn list_all_text() -> String {
+    let mut out = String::new();
+    out.push_str(
+        "Skills are selectable analytical lenses (a-la-carte) — invoke only the steps your workflow needs.\n\n"
     );
-    println!("{:<20} {:>7}  {:>12}", "SKILL", "VERSION", "TOKENS (~)");
-    println!("{}", "-".repeat(44));
+    out.push_str(&format!(
+        "{:<20} {:>7}  {:>12}  {:>10}\n",
+        "SKILL", "VERSION", "TOKENS (~)", "GURU (~)"
+    ));
+    out.push_str(&format!("{}\n", "-".repeat(58)));
     for (name, content, version) in SKILLS {
         let tokens = estimate_tokens(content);
-        println!("{:<20} {:>7}  {:>12}", name, version, tokens);
+        let guru = guru::token_estimate_for_skill(name);
+        if guru > 0 {
+            out.push_str(&format!(
+                "{:<20} {:>7}  {:>12}  +guru {:>4}\n",
+                name, version, tokens, guru
+            ));
+        } else {
+            out.push_str(&format!("{:<20} {:>7}  {:>12}  {:>10}\n", name, version, tokens, guru));
+        }
     }
-    Ok(())
+    out
 }
 
 pub fn check(name: &str, agent: &str) -> Result<()> {
@@ -191,9 +212,54 @@ mod tests {
     #[test]
     fn all_skills_present() {
         let names: Vec<&str> = SKILLS.iter().map(|(n, _, _)| *n).collect();
-        for expected in &["purpose-walk", "naive-draft", "stressor-walk", "integrate", "fmea", "atam", "tdd-implement"] {
+        for expected in &["framework", "purpose-walk", "naive-draft", "stressor-walk", "integrate", "fmea", "atam", "tdd-implement", "defense-walk"] {
             assert!(names.contains(expected), "missing skill: {}", expected);
         }
-        assert_eq!(SKILLS.len(), 7, "expected exactly 7 skills");
+        assert_eq!(SKILLS.len(), 9, "expected exactly 9 skills");
+    }
+
+    // @stressor: ceremony-lockout
+    #[test]
+    fn list_all_text_marks_skills_as_selectable_steps() {
+        let text = list_all_text().to_lowercase();
+        assert!(
+            text.contains("selectable") || text.contains("a-la-carte") || text.contains("lens"),
+            "skill list should communicate a-la-carte / selectable-lens nature, got: {}",
+            &text[..text.len().min(200)]
+        );
+    }
+
+    // @stressor: phase-rigidity-assumption
+    #[test]
+    fn purpose_walk_content_describes_analytical_lens() {
+        let (content, _version) = find("purpose-walk").unwrap();
+        let lower = content.to_lowercase();
+        assert!(
+            lower.contains("a-la-carte") || lower.contains("analytical lens") || lower.contains("optional"),
+            "purpose-walk content should describe itself as an optional analytical lens"
+        );
+    }
+
+    #[test]
+    fn purpose_walk_content_uses_outcome_not_trait_terminology() {
+        let (content, _version) = find("purpose-walk").unwrap();
+        let lower = content.to_lowercase();
+        assert!(lower.contains("outcome"), "expected 'outcome' terminology in purpose-walk content");
+        assert!(
+            !lower.contains(" trait") && !lower.contains("traits"),
+            "purpose-walk content must not use legacy 'trait' terminology"
+        );
+    }
+
+    // @stressor: software-only-zag
+    #[test]
+    fn skill_content_reminds_whole_system_for_relevant_skills() {
+        for name in ["stressor-walk", "fmea", "integrate"] {
+            let (content, _version) = find(name).unwrap();
+            assert!(
+                content.to_lowercase().contains("whole-system"),
+                "{name} skill content should remind whole-system-residue"
+            );
+        }
     }
 }

@@ -65,7 +65,7 @@ residual skill install purpose-walk --agent claude
 claude
 ```
 
-Coming from an older `residual/` layout? Run `residual migrate` to move to the v3 shape (forces, residues, lexicon, attractor ± states).
+Coming from an older `residual/` layout? Run `residual migrate` to normalize lexicon, attractor ± states, and v4 shape (coupling in `residues.csv`, not on force rows).
 
 ## Workflow
 
@@ -81,13 +81,11 @@ Each step writes into `residual/`:
 
 | File | Contents |
 |---|---|
-| `forces.csv` | Unified forces (purposes and stressors): shortname, naïve change, outcomes, attractor |
-| `residues.csv` | Force × component matrix (the coupling the NKP view uses) |
+| `stressors.csv` / `purposes.csv` | Forces: shortname, naïve change, outcomes, attractor (no component lists) |
+| `residues.csv` | NKP coupling matrix (force × component, `1`/empty) |
+| `components.csv` | Fully-qualified component registry (proposed/actual status) |
 | `attractors.csv` | Attractors with positive and negative states |
-| `components.csv` | Fully-qualified component registry for the architecture set |
 | `lexicon.csv` | Domain terms (with aliases) used by outcome validation |
-| `purposes.csv` / `stressors.csv` | Legacy force views kept during transition |
-| `terminology.csv` | Legacy term store; prefer `lexicon.csv` |
 | `iterations/<n>.md` | Architecture snapshots (N, K, notes, Ri when recorded) |
 | `personas/<name>.md` | Stakeholder voices for walks and ATAM |
 | `research/<source>.md` | Research notes from external documents |
@@ -132,16 +130,16 @@ Prefer **force then residue**: record the purpose or stressor, then map which co
 residual add attractor --name "..." --description "..." \
   --positive-state "..." --negative-state "..."
 
-residual add stressor --description "..." --attractor-id A-01 \
-  --naive-change "..." --outcomes "..."
-residual add residue --force-id S-01 --component-id my-component
+residual add stressor --description "..." --attractor-shortname A-01 \
+  --naive-change "..." --outcomes "..." --shortname "..."
+residual add residue --shortname "..." --component-shortname my-component
 
 # When the surviving change is not software
-residual add stressor --description "..." --attractor-id A-01 \
+residual add stressor --description "..." --attractor-shortname A-01 \
   --naive-change "..." --outcomes "..." \
   --whole-system --notes "policy zig: ..."
 
-residual add purpose --description "..." --attractor-id A-01 \
+residual add purpose --description "..." --attractor-shortname A-01 \
   --feature "..." --outcomes "..."
 residual add term --term "..." --definition "..."
 
@@ -160,16 +158,19 @@ The pre-commit hook runs `residual verify all` before commits that touch `residu
 ## Codebase Tagging
 
 ```rust
-// @residue: R-03
-// @stressor: S-07, S-12
+// @component: skills-phases
+// @stressor: skill-stub-burden, lexicon-alias-gap
+// @purpose: fluent-metadata-capture
 ```
 
+Tags are shortname-only (not IDs — `S-07` won't match, `skill-stub-burden` will). Comment syntax is detected per file type via [tokei](https://github.com/XAMPPRocky/tokei)'s language database, not a hand-maintained list — any language tokei recognizes works out of the box. Attractors aren't taggable; they describe system states, not code-adjacent detail.
+
 ```bash
-residual tag scan     # find dangling tags + untagged stressors
+residual tag scan     # find dangling tags + untagged forces
 residual tag report   # map each tag to its file:line
 ```
 
-Metadata-only tags are fine. Tags in code must exist in metadata; verification enforces that one-way rule.
+Metadata-only tags are fine; tags in code without matching metadata are the case verification cares about. `residual verify all` warns (non-fatally) on any tag-shaped comment that doesn't resolve to a real stressor, purpose, or component.
 
 ## Nix / NixOS
 
@@ -226,7 +227,7 @@ Programmatic and process pieces integrated so the method sticks in a real repo:
 
 - **Lexicon** — shared vocabulary with alias-aware validation of outcomes
 - **Git integration** — verify hooks and commit-message checks in [Scoped Commits](https://scopedcommits.com/) form: scope-first subjects tied to lexicon and components, with Conventional Commit type prefixes rejected
-- **Code tagging** — `@residue` / `@stressor` markers linked to metadata
+- **Code tagging** — `@stressor` / `@purpose` / `@component` markers linked to metadata, shortname-only, comment syntax detected per language via tokei
 - **Naïve-draft phase** — agent skill that drafts a naïve architecture using **deep modules** ([APOSD](#sources-of-inspiration)) and **vertical slices**, then TDD-first scaffolding
 
 ## Sources of inspiration

@@ -61,6 +61,8 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
             for v in &link_violations {
                 println!("LINK VIOLATION [{}] {}: {}", v.source, v.id, v.message);
             }
+            print_tag_warnings(cfg);
+            crate::storage::defense::verify_meta_isolation(&cfg.residual_dir)?;
             if total == 0 {
                 println!("OK: all checks passed.");
             } else {
@@ -70,14 +72,33 @@ pub fn run(cfg: &Config, check: VerifyCheck) -> Result<()> {
         VerifyCheck::CommitMsg { .. } => {
             anyhow::bail!("verify commit-msg is handled by the CLI dispatcher; call residual verify commit-msg directly");
         }
+        VerifyCheck::WalkReminder { .. } => {
+            anyhow::bail!("verify walk-reminder is handled by verification::run_walk_reminder");
+        }
     }
     Ok(())
 }
 
+/// Non-fatal: warn on tag-shaped comments (`@stressor:`/`@purpose:`/`@component:`)
+/// that don't resolve to a known force shortname or component — dangling tags
+/// are suggestions gone stale, not a reason to block a commit (S-06).
+fn print_tag_warnings(cfg: &Config) {
+    let root = &cfg.repo_root;
+    let Ok(tags) = crate::tags::scan_dir(&root.to_string_lossy()) else { return };
+    let Ok(report) = crate::tags::scan_report(cfg, &tags) else { return };
+    for d in &report.dangling {
+        println!(
+            "WARNING: {}:{} {} '{}' does not match any known stressor, purpose, or component",
+            d.file, d.line, d.kind.marker(), d.id
+        );
+    }
+}
+
 pub fn check_outcomes(cfg: &Config) -> Result<Vec<OutcomeViolation>> {
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir)?;
-    let term_index = crate::storage::terminology::term_index(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let stressors = crate::storage::stressors::load(&dir)?;
+    let purposes = crate::storage::purposes::load(&dir)?;
+    let term_index = crate::storage::terminology::term_index(&dir)?;
 
     let mut violations = Vec::new();
 
@@ -143,9 +164,10 @@ pub fn check_outcomes(cfg: &Config) -> Result<Vec<OutcomeViolation>> {
 }
 
 pub fn check_links(cfg: &Config) -> Result<Vec<LinkViolation>> {
-    let stressors = crate::storage::stressors::load(&cfg.residual_dir)?;
-    let purposes = crate::storage::purposes::load(&cfg.residual_dir)?;
-    let attractors = crate::storage::attractors::load(&cfg.residual_dir)?;
+    let dir = crate::storage::metadata_dir(cfg)?;
+    let stressors = crate::storage::stressors::load(&dir)?;
+    let purposes = crate::storage::purposes::load(&dir)?;
+    let attractors = crate::storage::attractors::load(&dir)?;
     let attractor_ids: std::collections::HashSet<String> =
         attractors.iter().map(|a| a.id.clone()).collect();
 
@@ -185,8 +207,8 @@ pub fn check_links(cfg: &Config) -> Result<Vec<LinkViolation>> {
         }
     }
 
-    let residues = crate::storage::format::read_residues(&cfg.residual_dir)?;
-    let registry = crate::structure::definition::components::load(&cfg.residual_dir)?;
+    let residues = crate::storage::format::read_residues(&dir)?;
+    let registry = crate::structure::definition::components::load(&dir)?;
     let mut force_ids = std::collections::HashSet::new();
     for s in &stressors {
         force_ids.insert(s.id.clone());
@@ -299,11 +321,91 @@ mod tests {
     use crate::structure::definition::lexicon::Term as LexTerm;
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
+    }
+
+    /// Phase 2: `verify all` must call `storage::defense::verify_meta_isolation`.
+    /// Fixture is otherwise clean so outcomes/links would pass without that check.
+    #[test]
+    fn verify_all_fails_when_ms_id_contaminates_main_stressors() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path();
+        let cfg = cfg_for(residual);
+
+        attractors::append(
+            residual,
+            crate::structure::analysis::attractors::Attractor::new(
+                "A-01",
+                "X",
+                "ok",
+                "bad",
+            ),
+        )
+        .unwrap();
+        format::append_lexicon(
+            residual,
+            LexTerm {
+                term: "operator".into(),
+                definition: "human".into(),
+                domain: "".into(),
+                aliases: "".into(),
+            },
+        )
+        .unwrap();
+        std::fs::write(
+            residual.join("stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n\
+MS-01,contamination,meta bleed into main,none,operator records meta force wrongly,A-01\n",
+        )
+        .unwrap();
+        std::fs::write(
+            residual.join("purposes.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n",
+        )
+        .unwrap();
+
+        // Sanity: isolation helper alone already detects contamination.
+        let iso = crate::storage::defense::verify_meta_isolation(residual);
+        assert!(iso.is_err(), "fixture must trip verify_meta_isolation");
+
+        let err = run(&cfg, VerifyCheck::All).expect_err(
+            "verify all must fail when main stressors.csv contains MS-* (meta isolation)",
+        );
+        let msg = err.to_string();
+        assert!(
+            msg.contains("meta") || msg.contains("MS-") || msg.contains("contamination"),
+            "verify all must surface a meta-contamination message, got: {msg}"
+        );
+    }
+
+    // @stressor: ceremony-lockout
+    #[test]
+    fn verify_all_passes_after_direct_ledger_writes_without_running_any_skill() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        attractors::append(
+            &cfg.residual_dir,
+            crate::structure::analysis::attractors::Attractor::new("A-01", "X", "ok", "bad"),
+        )
+        .unwrap();
+        format::append_lexicon(
+            &cfg.residual_dir,
+            LexTerm { term: "operator".into(), definition: "human".into(), domain: "".into(), aliases: "".into() },
+        )
+        .unwrap();
+        stressors::append(
+            &cfg.residual_dir,
+            stressors::Stressor {
+                id: "S-01".into(),
+                shortname: "mid-session-capture".into(),
+                description: "p".into(),
+                attractor_id: "A-01".into(),
+                naive_change: "none".into(),
+                outcomes: "operator records stressor mid-session".into(),
+            },
+        )
+        .unwrap();
+        assert!(run(&cfg, VerifyCheck::All).is_ok());
     }
 
     #[test]
@@ -412,7 +514,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system handles auth".to_string(),
-                components: "auth".to_string(),
             },
         )
         .unwrap();
@@ -438,7 +539,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system handles auth".to_string(),
-                components: "auth".to_string(),
             },
         )
         .unwrap();
@@ -464,7 +564,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "widget".to_string(),
             },
         )
         .unwrap();
@@ -488,7 +587,6 @@ mod tests {
                 attractor_id: "A-99".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
             },
         )
         .unwrap();
@@ -521,7 +619,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
             },
         )
         .unwrap();
@@ -571,7 +668,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "x".to_string(),
             },
         )
         .unwrap();
@@ -607,7 +703,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
                 shortname: "".to_string(),
             },
         )
@@ -646,7 +741,6 @@ mod tests {
                 attractor_id: "A-01".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system does x".to_string(),
-                components: "x".to_string(),
                 shortname: "cli-bypass".to_string(),
             },
         )

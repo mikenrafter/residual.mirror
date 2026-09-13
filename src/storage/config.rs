@@ -1,4 +1,4 @@
-//! Storage.Config — THE config (v3 TOML): app + verify policy keys.
+//! Storage.Config — THE config TOML (format_version v4; v3 on disk migrated): app + verify policy keys.
 //!
 //! Owns format_version, change_detection, AND verification policy
 //! (super_strict, token_warn). There is no verification-config module.
@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 fn default_format_version() -> String {
-    "v3".to_string()
+    "v4".to_string()
 }
 fn default_change_detection() -> bool {
     true
@@ -20,6 +20,12 @@ fn default_token_warn() -> usize {
 }
 fn default_commit_msg_enforce() -> bool {
     false
+}
+fn default_walk_reminder_enabled() -> bool {
+    true
+}
+fn default_walk_reminder_interval_days() -> u32 {
+    30
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +41,10 @@ pub struct StorageConfig {
     /// When false, commit-msg hook prints violations but exits 0 (warn-only).
     #[serde(default = "default_commit_msg_enforce")]
     pub commit_msg_enforce: bool,
+    #[serde(default = "default_walk_reminder_enabled")]
+    pub walk_reminder_enabled: bool,
+    #[serde(default = "default_walk_reminder_interval_days")]
+    pub walk_reminder_interval_days: u32,
 }
 
 impl Default for StorageConfig {
@@ -45,6 +55,8 @@ impl Default for StorageConfig {
             super_strict: default_super_strict(),
             token_warn: default_token_warn(),
             commit_msg_enforce: default_commit_msg_enforce(),
+            walk_reminder_enabled: default_walk_reminder_enabled(),
+            walk_reminder_interval_days: default_walk_reminder_interval_days(),
         }
     }
 }
@@ -59,10 +71,47 @@ struct V3Document {
     verification: VerificationSection,
 }
 
+fn default_git_sidecar_branch() -> String {
+    "residual/metadata".to_string()
+}
+fn default_git_sidecar_remote() -> String {
+    "origin".to_string()
+}
+fn default_config_host() -> String {
+    "repo".to_string()
+}
+fn default_working_tree_policy() -> String {
+    "warn".to_string()
+}
+fn default_branch_pattern() -> String {
+    "residual/branch-{prefix}{suffix}".to_string()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct StorageSection {
     #[serde(default = "default_change_detection")]
     change_detection: bool,
+    #[serde(default)]
+    git_sidecar_enabled: bool,
+    #[serde(default = "default_git_sidecar_branch")]
+    git_sidecar_branch: String,
+    #[serde(default = "default_git_sidecar_remote")]
+    git_sidecar_remote: String,
+    #[serde(default = "default_config_host")]
+    config_host: String,
+    #[serde(default)]
+    git_sidecar: GitSidecarNested,
+    /// Route reads/writes through a per-code-branch metadata branch instead of the trunk alone.
+    #[serde(default)]
+    branch_mode: bool,
+    #[serde(default = "default_branch_pattern")]
+    branch_pattern: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct GitSidecarNested {
+    #[serde(default = "default_working_tree_policy")]
+    working_tree_policy: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +122,10 @@ struct VerificationSection {
     token_warn: usize,
     #[serde(default = "default_commit_msg_enforce")]
     commit_msg_enforce: bool,
+    #[serde(default = "default_walk_reminder_enabled")]
+    walk_reminder_enabled: bool,
+    #[serde(default = "default_walk_reminder_interval_days")]
+    walk_reminder_interval_days: u32,
 }
 
 impl Default for VerificationSection {
@@ -81,6 +134,8 @@ impl Default for VerificationSection {
             super_strict: default_super_strict(),
             token_warn: default_token_warn(),
             commit_msg_enforce: default_commit_msg_enforce(),
+            walk_reminder_enabled: default_walk_reminder_enabled(),
+            walk_reminder_interval_days: default_walk_reminder_interval_days(),
         }
     }
 }
@@ -94,15 +149,48 @@ pub fn parse_v3(toml_str: &str) -> Result<StorageConfig> {
         super_strict: doc.verification.super_strict,
         token_warn: doc.verification.token_warn,
         commit_msg_enforce: doc.verification.commit_msg_enforce,
+        walk_reminder_enabled: doc.verification.walk_reminder_enabled,
+        walk_reminder_interval_days: doc.verification.walk_reminder_interval_days,
     })
 }
 
 /// Render the full v3 document (storage + verify policy sections).
 pub fn render_v3(cfg: &StorageConfig) -> String {
     format!(
-        "# residual v3 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\n",
-        cfg.format_version, cfg.change_detection, cfg.super_strict, cfg.token_warn, cfg.commit_msg_enforce
+        "# residual v4 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\nwalk_reminder_enabled = {}\nwalk_reminder_interval_days = {}\n",
+        cfg.format_version,
+        cfg.change_detection,
+        cfg.super_strict,
+        cfg.token_warn,
+        cfg.commit_msg_enforce,
+        cfg.walk_reminder_enabled,
+        cfg.walk_reminder_interval_days
     )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SidecarStorageConfig {
+    pub git_sidecar_enabled: bool,
+    pub git_sidecar_branch: String,
+    pub git_sidecar_remote: String,
+    pub config_host: String,
+    pub working_tree_policy: String,
+    pub branch_mode: bool,
+    pub branch_pattern: String,
+}
+
+/// Parse [storage] sidecar keys from config TOML.
+pub fn parse_sidecar_section(toml_str: &str) -> Result<SidecarStorageConfig> {
+    let doc: V3Document = toml::from_str(toml_str).with_context(|| "parse sidecar TOML")?;
+    Ok(SidecarStorageConfig {
+        git_sidecar_enabled: doc.storage.git_sidecar_enabled,
+        git_sidecar_branch: doc.storage.git_sidecar_branch,
+        git_sidecar_remote: doc.storage.git_sidecar_remote,
+        config_host: doc.storage.config_host,
+        working_tree_policy: doc.storage.git_sidecar.working_tree_policy,
+        branch_mode: doc.storage.branch_mode,
+        branch_pattern: doc.storage.branch_pattern,
+    })
 }
 
 #[cfg(test)]
@@ -146,5 +234,96 @@ token_warn = 777
         assert!(rendered.contains("super_strict"));
         assert!(rendered.contains("token_warn"));
         assert!(rendered.contains("[storage]"));
+    }
+
+    #[test]
+    fn parse_sidecar_section_reads_git_sidecar_enabled() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+change_detection = true
+git_sidecar_enabled = true
+git_sidecar_branch = "residual/metadata"
+git_sidecar_remote = "origin"
+config_host = "parent"
+
+[storage.git_sidecar]
+working_tree_policy = "warn"
+
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(sidecar.git_sidecar_enabled);
+        assert_eq!(sidecar.git_sidecar_branch, "residual/metadata");
+        assert_eq!(sidecar.config_host, "parent");
+        assert_eq!(sidecar.working_tree_policy, "warn");
+    }
+
+    #[test]
+    fn parse_sidecar_section_defaults_disabled() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+change_detection = true
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(!sidecar.git_sidecar_enabled);
+    }
+
+    #[test]
+    fn parse_sidecar_section_branch_mode_defaults_off_with_default_pattern() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+git_sidecar_enabled = true
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(!sidecar.branch_mode, "branch_mode must default to false");
+        assert_eq!(sidecar.branch_pattern, "residual/branch-{prefix}{suffix}");
+    }
+
+    #[test]
+    fn parse_sidecar_section_reads_branch_mode_and_custom_pattern() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+git_sidecar_enabled = true
+branch_mode = true
+branch_pattern = "meta/{suffix}"
+[verification]
+super_strict = true
+token_warn = 1000
+"#;
+        let sidecar = parse_sidecar_section(raw).unwrap();
+        assert!(sidecar.branch_mode);
+        assert_eq!(sidecar.branch_pattern, "meta/{suffix}");
+    }
+
+    #[test]
+    fn parse_v3_reads_walk_reminder_policy() {
+        let raw = r#"
+format_version = "v4"
+[storage]
+change_detection = true
+[verification]
+super_strict = true
+token_warn = 1000
+walk_reminder_enabled = false
+walk_reminder_interval_days = 14
+"#;
+        let cfg = parse_v3(raw).unwrap();
+        assert!(!cfg.walk_reminder_enabled);
+        assert_eq!(cfg.walk_reminder_interval_days, 14);
+        let rendered = render_v3(&cfg);
+        assert!(rendered.contains("walk_reminder_enabled = false"));
+        assert!(rendered.contains("walk_reminder_interval_days = 14"));
     }
 }

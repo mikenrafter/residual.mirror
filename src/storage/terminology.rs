@@ -41,3 +41,40 @@ pub fn term_index(residual_dir: &Path) -> Result<TermIndex> {
 
     Ok(TermIndex { words, phrases })
 }
+
+/// Update fields on an existing lexicon term in place, keyed by its canonical
+/// spelling; unspecified fields are unchanged. Errors on unknown term, with no
+/// partial writes.
+pub fn update(
+    residual_dir: &Path,
+    term: &str,
+    definition: Option<String>,
+    domain: Option<String>,
+    related: Option<String>,
+) -> Result<()> {
+    let mut terms = crate::storage::format::read_lexicon(residual_dir)?;
+    let Some(row) = terms.iter_mut().find(|t| t.term == term) else {
+        anyhow::bail!("term '{term}' does not exist");
+    };
+    if let Some(v) = definition {
+        row.definition = v;
+    }
+    if let Some(v) = domain {
+        row.domain = v;
+    }
+    if let Some(v) = related {
+        row.aliases = v;
+    }
+    crate::storage::format::write_lexicon(residual_dir, &terms)
+}
+
+pub fn remove(residual_dir: &Path, term: &str) -> Result<bool> {
+    let mut terms = crate::storage::format::read_lexicon(residual_dir)?;
+    let before = terms.len();
+    terms.retain(|candidate| candidate.term != term);
+    if terms.len() == before {
+        return Ok(false);
+    }
+    crate::storage::format::write_lexicon(residual_dir, &terms)?;
+    Ok(true)
+}

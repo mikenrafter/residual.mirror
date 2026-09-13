@@ -6,6 +6,7 @@
 /// - Missing subcommand: `residue` absent from `add` completions after it was added
 /// - Ghost subcommand: `skill-check` listed under `skill` after rename to `check-install`
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::process::Command;
 
 fn bin() -> std::path::PathBuf {
@@ -133,6 +134,39 @@ fn skill_names() -> HashSet<String> {
 }
 
 // --- tests ---
+
+#[test]
+fn generate_completions_works_without_git_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = dir.path().join("proj");
+    fs::create_dir_all(project.join("residual")).unwrap();
+    fs::write(
+        project.join("residual/config.toml"),
+        r#"
+format_version = "v4"
+[storage]
+git_sidecar_enabled = true
+git_sidecar_branch = "residual/metadata"
+config_host = "repo"
+"#,
+    )
+    .unwrap();
+    let out = Command::new(bin())
+        .args(["generate", "completions"])
+        .current_dir(&project)
+        .output()
+        .expect("residual generate completions");
+    assert!(
+        out.status.success(),
+        "generate completions must not require git: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("__fish_seen_subcommand_from skill"),
+        "expected skill completion entries, got: {text}"
+    );
+}
 
 #[test]
 fn no_ghost_top_level_commands() {

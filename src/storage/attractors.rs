@@ -13,6 +13,35 @@ pub fn append(residual_dir: &Path, attractor: Attractor) -> Result<()> {
     crate::storage::format::write_attractors_v3(residual_dir, &existing)
 }
 
+/// Update fields on an existing attractor in place; unspecified fields are unchanged.
+/// Errors on unknown id, with no partial writes.
+pub fn update(
+    residual_dir: &Path,
+    id: &str,
+    name: Option<String>,
+    description: Option<String>,
+    positive_state: Option<String>,
+    negative_state: Option<String>,
+) -> Result<()> {
+    let mut all = load(residual_dir)?;
+    let Some(row) = all.iter_mut().find(|a| a.id == id) else {
+        anyhow::bail!("attractor id '{}' not found", id);
+    };
+    if let Some(v) = name {
+        row.name = v;
+    }
+    if let Some(v) = description {
+        row.description = v;
+    }
+    if let Some(v) = positive_state {
+        row.positive_state = v;
+    }
+    if let Some(v) = negative_state {
+        row.negative_state = v;
+    }
+    crate::storage::format::write_attractors_v3(residual_dir, &all)
+}
+
 pub fn next_id(attractors: &[Attractor]) -> String {
     let max = attractors
         .iter()

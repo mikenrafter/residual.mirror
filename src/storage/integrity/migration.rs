@@ -4,15 +4,18 @@
 //! - config.toml (`[validation]`/`[skills]` → storage-config)
 //! - terminology.csv → lexicon.csv (related_terms → aliases)
 //! - attractors.csv (valence/phase_state → positive_state/negative_state)
+//! - v3 → v4: inline force `components` columns → matrix `residues.csv` (NKP source)
 
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
+use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::storage::config::StorageConfig;
 use crate::storage::format::{self, write_attractors_v3};
 use crate::structure::analysis::attractors::Attractor as V3Attractor;
+use crate::structure::analysis::residues::Residue;
 use crate::structure::definition::lexicon::Term as LexiconTerm;
 
 #[derive(Debug, Clone)]
@@ -27,6 +30,9 @@ pub struct MigrateReport {
     pub config_migrated: bool,
     pub attractors: usize,
     pub lexicon_terms: usize,
+    /// v3→v4: force×component couplings written to residues.csv.
+    pub v4_residue_couplings: usize,
+    pub v4_forces_decoupled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,6 +72,8 @@ pub fn migrate_naive_to_v3(naive_toml: &str) -> Result<MigratedV3> {
         super_strict: naive.validation.strict,
         token_warn: naive.skills.token_warn,
         commit_msg_enforce: false,
+        walk_reminder_enabled: true,
+        walk_reminder_interval_days: 30,
     };
     let toml_out = crate::storage::config::render_v3(&storage);
     Ok(MigratedV3 {
@@ -222,6 +230,20 @@ pub fn migrate_residual_dir(residual_dir: &Path, force: bool) -> Result<MigrateR
         fs::remove_file(&forces_path)?;
     }
 
+    // --- v3 → v4: inline force components → residues.csv (before force CSV rewrite) ---
+    let config_path = residual_dir.join("config.toml");
+    let format_version = if config_path.exists() {
+        crate::storage::config::parse_v3(&fs::read_to_string(&config_path)?)?
+            .format_version
+    } else {
+        String::new()
+    };
+    if format_version != "v4" {
+        let (n, decoupled) = migrate_v3_to_v4_residues(residual_dir)?;
+        report.v4_residue_couplings = n;
+        report.v4_forces_decoupled = decoupled;
+    }
+
     // --- stressors.csv — normalize to current column names ---
     let stressors_path = residual_dir.join("stressors.csv");
     if stressors_path.exists() {
@@ -259,7 +281,268 @@ pub fn migrate_residual_dir(residual_dir: &Path, force: bool) -> Result<MigrateR
     }
 
     session.commit()?;
+
     Ok(report)
+}
+
+#[derive(serde::Deserialize)]
+struct LegacyForceRow {
+    id: String,
+    #[serde(default, alias = "components_affected", alias = "components_enabled")]
+    components: String,
+}
+
+fn csv_header_has(path: &Path, column: &str) -> Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    let header = fs::read_to_string(path)?
+        .lines()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    Ok(header
+        .split(',')
+        .any(|h| h.trim().eq_ignore_ascii_case(column)))
+}
+
+fn legacy_force_components(path: &Path) -> Result<Vec<(String, String)>> {
+    if !csv_header_has(path, "components")? {
+        return Ok(vec![]);
+    }
+    let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_path(path)?;
+    let mut out = Vec::new();
+    for rec in rdr.deserialize() {
+        let row: LegacyForceRow = rec?;
+        out.push((row.id, row.components));
+    }
+    Ok(out)
+}
+
+fn ingest_component_field(couplings: &mut BTreeSet<(String, String)>, force_id: &str, field: &str) {
+    for comp in field.split(',') {
+        let comp = comp.trim();
+        if !comp.is_empty() {
+            couplings.insert((force_id.to_string(), comp.to_string()));
+        }
+    }
+}
+
+/// Move inline force `components` columns into matrix-shaped `residues.csv` (v4).
+fn migrate_v3_to_v4_residues(residual_dir: &Path) -> Result<(usize, bool)> {
+    let mut couplings: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut decoupled = false;
+
+    for (force_id, comps) in legacy_force_components(&residual_dir.join("stressors.csv"))? {
+        ingest_component_field(&mut couplings, &force_id, &comps);
+        decoupled = true;
+    }
+    for (force_id, comps) in legacy_force_components(&residual_dir.join("purposes.csv"))? {
+        ingest_component_field(&mut couplings, &force_id, &comps);
+        decoupled = true;
+    }
+
+    for r in format::read_residues(residual_dir)? {
+        if r.is_coupled() {
+            couplings.insert((r.force_id.clone(), r.component_id.clone()));
+        }
+    }
+
+    let residues: Vec<Residue> = couplings
+        .into_iter()
+        .enumerate()
+        .map(|(i, (force_id, component_id))| {
+            if component_id == crate::structure::analysis::residues::WHOLE_SYSTEM_COMPONENT {
+                Residue::whole_system(format!("R-{:02}", i + 1), force_id, "")
+            } else {
+                Residue::coupling(format!("R-{:02}", i + 1), force_id, component_id)
+            }
+        })
+        .collect();
+    let count = residues.len();
+    format::write_residues(residual_dir, &residues)?;
+
+    if decoupled {
+        let stressors = crate::storage::stressors::load(residual_dir)?;
+        crate::storage::stressors::write_all_pub(residual_dir, &stressors)?;
+        let purposes = crate::storage::purposes::load(residual_dir)?;
+        crate::storage::purposes::write_all_pub(residual_dir, &purposes)?;
+    }
+
+    let config_path = residual_dir.join("config.toml");
+    let mut cfg = if config_path.exists() {
+        crate::storage::config::parse_v3(&fs::read_to_string(&config_path)?)?
+    } else {
+        StorageConfig::default()
+    };
+    cfg.format_version = "v4".to_string();
+    fs::write(&config_path, crate::storage::config::render_v3(&cfg))?;
+
+    Ok((count, decoupled))
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct MigrateSidecarReport {
+    pub sidecar_branch: String,
+    pub config_path: PathBuf,
+    pub lifted_files: usize,
+}
+
+/// Lift inline working-tree residual/ to sidecar branch (migrate --sidecar).
+pub fn migrate_inline_to_sidecar(repo_root: &Path, force: bool) -> Result<MigrateSidecarReport> {
+    let residual_dir = repo_root.join("residual");
+    if !residual_dir.is_dir() {
+        bail!("no residual/ directory at {}", residual_dir.display());
+    }
+
+    let branch = "residual/metadata".to_string();
+    let config_path = residual_dir.join("config.toml");
+    let prev = git_current_branch(repo_root)?;
+
+    if git_branch_exists(repo_root, &branch)? {
+        if force {
+            let out = git_cmd(repo_root)
+                .args(["branch", "-D", &branch])
+                .output()
+                .context("git branch -D sidecar")?;
+            if !out.status.success() {
+                bail!(
+                    "git branch -D {branch} failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            }
+        } else {
+            bail!(
+                "sidecar branch {branch} already exists; use --force to recreate metadata-only branch"
+            );
+        }
+    }
+
+    let orphan_out = git_cmd(repo_root)
+        .args(["checkout", "--orphan", &branch])
+        .output()
+        .context("git checkout --orphan sidecar")?;
+    if !orphan_out.status.success() {
+        bail!(
+            "git checkout --orphan {branch} failed: {}",
+            String::from_utf8_lossy(&orphan_out.stderr)
+        );
+    }
+
+    let sidecar_toml = enable_sidecar_in_toml(&fs::read_to_string(&config_path).unwrap_or_default());
+    fs::write(&config_path, &sidecar_toml)?;
+
+    git_cmd(repo_root)
+        .args(["rm", "-rf", "--cached", "."])
+        .output()
+        .ok();
+    git_cmd(repo_root)
+        .args(["add", "-f", "residual/"])
+        .output()
+        .context("git add residual on sidecar")?;
+    let commit_out = git_cmd(repo_root)
+        .args([
+            "commit",
+            "-m",
+            "storage: S-01: migrate inline residual to sidecar branch",
+        ])
+        .output()
+        .context("git commit sidecar migration")?;
+    if !commit_out.status.success() {
+        bail!(
+            "git commit sidecar migration failed: {}",
+            String::from_utf8_lossy(&commit_out.stderr)
+        );
+    }
+
+    let list_out = git_cmd(repo_root)
+        .args(["ls-tree", "-r", "--name-only", "HEAD"])
+        .output()
+        .context("git ls-tree sidecar branch")?;
+    let tree_raw = String::from_utf8_lossy(&list_out.stdout);
+    let tree_paths: Vec<&str> = tree_raw
+        .lines()
+        .filter(|l| !l.is_empty())
+        .collect();
+    if tree_paths.iter().any(|p| !p.starts_with("residual/")) {
+        bail!(
+            "sidecar branch must contain only residual/ paths; found: {}",
+            tree_paths
+                .iter()
+                .filter(|p| !p.starts_with("residual/"))
+                .copied()
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    let lifted_files = tree_paths
+        .iter()
+        .filter(|p| !p.ends_with('/'))
+        .count();
+
+    let checkout = git_cmd(repo_root)
+        .args(["checkout", "-f", &prev])
+        .output()
+        .context("git checkout previous branch")?;
+    if !checkout.status.success() {
+        bail!(
+            "git checkout {prev} failed: {}",
+            String::from_utf8_lossy(&checkout.stderr)
+        );
+    }
+
+    Ok(MigrateSidecarReport {
+        sidecar_branch: branch,
+        config_path,
+        lifted_files,
+    })
+}
+
+fn git_cmd(repo_root: &Path) -> std::process::Command {
+    let mut cmd = std::process::Command::new("git");
+    cmd.current_dir(repo_root);
+    cmd
+}
+
+fn git_branch_exists(repo_root: &Path, branch: &str) -> Result<bool> {
+    let out = git_cmd(repo_root)
+        .args(["rev-parse", "--verify", &format!("refs/heads/{branch}")])
+        .output()
+        .context("git rev-parse branch")?;
+    Ok(out.status.success())
+}
+
+fn git_current_branch(repo_root: &Path) -> Result<String> {
+    let out = git_cmd(repo_root)
+        .args(["symbolic-ref", "--short", "HEAD"])
+        .output()
+        .context("git symbolic-ref")?;
+    if out.status.success() {
+        return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
+    }
+    Ok("main".to_string())
+}
+
+fn enable_sidecar_in_toml(raw: &str) -> String {
+    if raw.contains("git_sidecar_enabled") {
+        return raw.to_string();
+    }
+    let mut cfg = if raw.trim().is_empty() {
+        StorageConfig::default()
+    } else if let Ok(c) = crate::storage::config::parse_v3(raw) {
+        c
+    } else {
+        StorageConfig::default()
+    };
+    cfg.format_version = "v4".to_string();
+    format!(
+        "# residual v4 configuration\nformat_version = \"{}\"\n\n[storage]\nchange_detection = {}\ngit_sidecar_enabled = true\ngit_sidecar_branch = \"residual/metadata\"\ngit_sidecar_remote = \"origin\"\n\n[storage.git_sidecar]\nworking_tree_policy = \"warn\"\n\n[verification]\nsuper_strict = {}\ntoken_warn = {}\ncommit_msg_enforce = {}\n",
+        cfg.format_version,
+        cfg.change_detection,
+        cfg.super_strict,
+        cfg.token_warn,
+        cfg.commit_msg_enforce
+    )
 }
 
 #[cfg(test)]
@@ -309,7 +592,7 @@ mod tests {
         assert_eq!(report.lexicon_terms, 2);
 
         let cfg = fs::read_to_string(residual.join("config.toml")).unwrap();
-        assert!(cfg.contains("format_version = \"v3\""));
+        assert!(cfg.contains("format_version = \"v4\""));
 
         assert!(!residual.join("terminology.csv").exists(), "terminology.csv should be deleted");
 
@@ -334,15 +617,132 @@ mod tests {
         let dir = tempdir().unwrap();
         let residual = dir.path().join("residual");
         fs::create_dir_all(&residual).unwrap();
-        fs::write(residual.join("config.toml"), "# residual v3 configuration\n[storage]\nformat_version = \"v3\"\n[verification]\n").unwrap();
+        fs::write(residual.join("config.toml"), "# residual v3 configuration\nformat_version = \"v3\"\n\n[storage]\n\n[verification]\n").unwrap();
         fs::write(residual.join("forces.csv"), "id,kind,shortname\nS-01,stressor,foo\n").unwrap();
         let _report = migrate_residual_dir(&residual, true).unwrap();
         assert!(!residual.join("forces.csv").exists(), "forces.csv should be deleted by migrate");
     }
 
     #[test]
-    fn map_component_token_covers_dogfood_aliases() {
-        // No longer needed — component mapping was part of the removed forces generation.
-        // Kept as a compile-time no-op.
+    fn migrate_v3_force_components_to_residues_matrix() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        fs::create_dir_all(&residual).unwrap();
+        fs::write(
+            residual.join("config.toml"),
+            "# residual v3 configuration\nformat_version = \"v3\"\n\n[storage]\n\n[verification]\n",
+        )
+        .unwrap();
+        fs::write(
+            residual.join("stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,components,attractor_id\n\
+S-01,alpha,desc,change,outcome text,\"auth,db\",A-01\n",
+        )
+        .unwrap();
+        fs::write(
+            residual.join("purposes.csv"),
+            "id,shortname,description,naive_change,outcomes,components,attractor_id\n",
+        )
+        .unwrap();
+        fs::write(
+            residual.join("residues.csv"),
+            "force,auth,db\n",
+        )
+        .unwrap();
+
+        let report = migrate_residual_dir(&residual, true).unwrap();
+        assert!(report.v4_forces_decoupled);
+        assert_eq!(report.v4_residue_couplings, 2);
+
+        let cfg = fs::read_to_string(residual.join("config.toml")).unwrap();
+        assert!(cfg.contains("format_version = \"v4\""));
+
+        let stressors = fs::read_to_string(residual.join("stressors.csv")).unwrap();
+        assert!(!stressors.contains(",components,"));
+        assert!(!stressors.lines().nth(1).unwrap_or("").contains("auth"));
+
+        let residues = fs::read_to_string(residual.join("residues.csv")).unwrap();
+        assert!(residues.starts_with("force,"));
+        assert!(residues.contains("S-01"));
+        assert!(residues.contains("auth"));
+        assert!(residues.contains("db"));
+    }
+
+    #[test]
+    fn migrate_sidecar_lifts_inline_to_branch() {
+        use std::process::Command;
+
+        let dir = tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir_all(repo.join("residual")).unwrap();
+        std::fs::write(
+            repo.join("residual/config.toml"),
+            "# residual v4 configuration\nformat_version = \"v4\"\n\n[storage]\nchange_detection = true\n\n[verification]\n",
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("residual/stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n\
+S-01,alpha,desc,change,outcome,A-01\n",
+        )
+        .unwrap();
+
+        Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(&repo)
+            .output()
+            .expect("git init");
+        Command::new("git")
+            .args(["config", "user.email", "t@example.com"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.name", "T"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["commit", "-m", "inline residual"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        let report = migrate_inline_to_sidecar(&repo, true).unwrap();
+        assert_eq!(report.sidecar_branch, "residual/metadata");
+        assert!(report.lifted_files > 0, "must lift at least stressors.csv to sidecar");
+
+        let branch_out = Command::new("git")
+            .args(["branch", "--list", "residual/metadata"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let branch_list = String::from_utf8_lossy(&branch_out.stdout);
+        assert!(
+            branch_list.contains("residual/metadata"),
+            "migrate --sidecar must create sidecar branch"
+        );
+
+        let tree_out = Command::new("git")
+            .args(["ls-tree", "-r", "--name-only", "residual/metadata"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let tree = String::from_utf8_lossy(&tree_out.stdout);
+        for line in tree.lines().filter(|l| !l.is_empty()) {
+            assert!(
+                line.starts_with("residual/"),
+                "sidecar branch must be metadata-only; found {line}"
+            );
+        }
+        assert!(
+            !tree.contains("Cargo.toml"),
+            "sidecar branch must not include application source tree"
+        );
     }
 }

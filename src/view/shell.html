@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>residual landscape</title>
+    <style>
+      :root {
+        --bg: #12141a;
+        --surface: #1a1d26;
+        --ink: #e6e8ee;
+        --muted: #8b91a0;
+        --line: #2a3040;
+        --accent: #3d9b8f;
+        --coupled: #c4a35a;
+        --warn: #c45c5c;
+        --danger: #e6453e;
+        --mono: "IBM Plex Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+        --sans: "IBM Plex Sans", "Source Sans 3", "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(1200px 600px at 10% -10%, #1c2230 0%, var(--bg) 55%);
+        color: var(--ink);
+        font: 14px/1.45 var(--sans);
+      }
+      header {
+        padding: 1.25rem 1.5rem 0.75rem;
+        border-bottom: 1px solid var(--line);
+      }
+      header h1 {
+        margin: 0;
+        font: 600 1.35rem/1.2 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: lowercase;
+      }
+      header p { margin: 0.35rem 0 0; color: var(--muted); max-width: 52rem; }
+      .view-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 1.5rem;
+        background: color-mix(in srgb, var(--bg) 94%, black);
+        border-bottom: 1px solid var(--line);
+      }
+      .view-toolbar input[data-force-filter] {
+        flex: 1 1 18rem;
+        margin: 0;
+      }
+      .view-toolbar label {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font: 600 0.72rem/1 var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        white-space: nowrap;
+        margin: 0;
+      }
+      .view-toolbar input[type="checkbox"] { width: auto; margin: 0; }
+      .view-toolbar input[type="range"] { width: 8rem; margin: 0; }
+      .view-toolbar output {
+        color: var(--ink);
+        font: 600 0.75rem var(--mono);
+        min-width: 1.4rem;
+        text-align: right;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        padding: 1.25rem 1.5rem 3rem;
+      }
+      section {
+        background: color-mix(in srgb, var(--surface) 92%, black);
+        border: 1px solid var(--line);
+        padding: 1rem 1.1rem 1.15rem;
+        min-width: 0;
+      }
+      section[data-view="matrix"] {
+        /* Break out of main's horizontal padding so calc(100vw - 4em) on
+           .matrix-scroll below measures from the real viewport edge, not
+           from inside an already-padded ancestor (which caused page-level
+           horizontal scroll — the padding chain ate into the 4em budget). */
+        margin-left: -1.5rem;
+        margin-right: -1.5rem;
+        padding: 1rem 2em 1.15rem;
+        border-left: none;
+        border-right: none;
+      }
+      section h2 {
+        margin: 0 0 0.75rem;
+        font: 600 0.78rem/1.2 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      input[data-force-filter],
+      input[type="text"],
+      textarea,
+      select {
+        width: 100%;
+        background: #0e1016;
+        color: var(--ink);
+        border: 1px solid var(--line);
+        padding: 0.45rem 0.55rem;
+        font: 13px/1.35 var(--mono);
+        margin: 0 0 0.55rem;
+      }
+      textarea { min-height: 4rem; resize: vertical; }
+      label {
+        display: block;
+        font: 600 0.72rem/1.2 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0.35rem 0 0.2rem;
+      }
+      .matrix-scroll {
+        /* section[data-view="matrix"] already breaks out to the viewport
+           edge with 2em of padding each side, so 100% here *is* the
+           calc(100vw - 4em) the table should occupy. */
+        width: 100%;
+        height: calc(100vh - 5em);
+        max-width: 100%;
+        overflow: auto;
+        border: 1px solid var(--line);
+      }
+      table.matrix {
+        border-collapse: separate;
+        border-spacing: 0;
+        font: 12px/1.2 var(--mono);
+        width: max-content;
+        min-width: 100%;
+      }
+      table.matrix th, table.matrix td {
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 0.4rem 0.55rem;
+        text-align: center;
+        background: var(--surface);
+        white-space: nowrap;
+      }
+      table.matrix thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        color: var(--muted);
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+      }
+      table.matrix thead th:hover { color: var(--accent); }
+      table.matrix tfoot th, table.matrix tfoot td {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        font-weight: 700;
+        background: color-mix(in srgb, var(--surface) 78%, black);
+      }
+      table.matrix tbody th {
+        text-align: left;
+        white-space: normal;
+        max-width: 22rem;
+        vertical-align: top;
+      }
+      table.matrix .sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        background: color-mix(in srgb, var(--surface) 96%, black);
+      }
+      table.matrix .sticky-col-right {
+        position: sticky;
+        right: 0;
+        z-index: 3;
+        background: color-mix(in srgb, var(--surface) 96%, black);
+      }
+      /* Must out-specificity table.matrix .sticky-col(-right) (2 classes)
+         and table.matrix thead/tfoot th (3 type selectors) — a bare .corner
+         class loses to both and lets scrolling cells paint over the pinned
+         corner. */
+      table.matrix th.corner, table.matrix td.corner { z-index: 9; }
+      th[data-sort-key].sort-asc::after { content: " \25B2"; }
+      th[data-sort-key].sort-desc::after { content: " \25BC"; }
+      .status-dot {
+        display: inline-block;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        margin-right: 0.35rem;
+      }
+      .status-dot.status-proposed { background: var(--coupled); }
+      .status-dot.status-actual { background: var(--accent); }
+      .status-dot.status-deprecated { background: var(--warn); }
+      .status-dot.status-other { background: var(--muted); }
+      .force-accordion-toggle {
+        background: transparent;
+        border: none;
+        color: var(--coupled);
+        font: 600 13px var(--mono);
+        cursor: pointer;
+        padding: 0;
+      }
+      .force-detail {
+        margin-top: 0.4rem;
+        font: 12px/1.4 var(--sans);
+        color: var(--muted);
+      }
+      .force-detail-editor {
+        display: flex;
+        flex-flow: column wrap;
+        gap: 0.5rem;
+        align-items: stretch;
+      }
+      .force-detail-editor > label {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+      }
+      .force-detail-editor > label > input,
+      .force-detail-editor > label > textarea,
+      .force-detail-editor > label > select {
+        margin-bottom: 0;
+      }
+      .force-detail-editor > label > textarea {
+        min-height: 4.5rem;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        resize: vertical;
+      }
+      .force-detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        align-self: flex-start;
+      }
+      .force-detail dl { margin: 0; }
+      .force-detail dt {
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.65rem;
+        color: var(--accent);
+        margin-top: 0.35rem;
+      }
+      .force-detail dd { margin: 0; }
+      table.matrix tbody tr.force-row[hidden] { display: none; }
+      [data-residue-cell][data-coupled="1"] {
+        background: color-mix(in srgb, var(--coupled) 28%, transparent);
+        color: var(--coupled);
+        font-weight: 700;
+      }
+      th[data-fission="1"], td[data-fission="1"] {
+        outline: 2px solid var(--warn);
+        outline-offset: -2px;
+      }
+      th[data-fusion="1"], td[data-fusion="1"] {
+        outline: 2px solid var(--coupled);
+        outline-offset: -2px;
+      }
+      th.sticky-col.row-invalid,
+      tr.force-row.row-invalid,
+      tr.force-row.row-invalid td,
+      th[data-component].row-invalid {
+        background: color-mix(in srgb, var(--danger) 30%, transparent);
+        outline: 2px solid var(--danger);
+        outline-offset: -2px;
+      }
+      [role="menu"] {
+        position: absolute;
+        z-index: 50;
+        list-style: none;
+        margin: 0;
+        padding: 0.25rem;
+        min-width: 10rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+      [role="menuitem"] {
+        padding: 0.4rem 0.6rem;
+        font: 12px/1.3 var(--mono);
+        color: var(--ink);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      [role="menuitem"]:hover {
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+        color: var(--accent);
+      }
+      .import-modal {
+        margin-top: 0.75rem;
+        padding: 1rem 1.1rem 1.15rem;
+        background: color-mix(in srgb, var(--surface) 92%, black);
+        border: 1px solid var(--line);
+      }
+      .import-modal[hidden] { display: none; }
+      .import-modal-hint { color: var(--muted); margin: 0 0 0.5rem; }
+      .import-error-list {
+        margin: 0 0 0.55rem;
+        padding-left: 1.1rem;
+        color: var(--warn);
+        font: 12px/1.4 var(--mono);
+      }
+      .generators {
+        display: grid;
+        gap: 0.85rem;
+      }
+      @media (min-width: 800px) {
+        .generators { grid-template-columns: 1fr 1fr; }
+      }
+      form[data-command-generator] {
+        border: 1px solid var(--line);
+        padding: 0.75rem;
+        background: #12151d;
+      }
+      form[data-command-generator] legend {
+        font: 600 0.78rem/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+        padding: 0 0.25rem;
+      }
+      button {
+        background: transparent;
+        color: var(--ink);
+        border: 1px solid var(--line);
+        font: 600 0.75rem/1 var(--mono);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); color: var(--accent); }
+      #staged-commands {
+        width: 100%;
+        min-height: 8rem;
+        background: #0a0c10;
+        color: #cfd6e4;
+        border: 1px solid var(--line);
+        font: 12.5px/1.45 var(--mono);
+        padding: 0.65rem;
+        white-space: pre;
+      }
+      .copy-bar { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+      .defense-records { margin-top: 0.75rem; font: 12.5px/1.4 var(--mono); color: var(--muted); }
+      .defense-records li { margin: 0.2rem 0; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>residual</h1>
+      <p>Read-only force landscape. Stage <code>residual add …</code> commands here; run them yourself. Nothing on this page mutates the ledger.</p>
+    </header>
+    <div class="view-toolbar" data-view-toolbar>
+      <input
+        type="search"
+        data-force-filter
+        placeholder="filter by id, shortname, kind, attractor, architecture_set…"
+        aria-label="Filter forces"
+      />
+      <label><input type="checkbox" data-fusion-fission-filter /> fusion/fission candidates only</label>
+      <label><input type="checkbox" data-show-proposed-toggle checked /> show proposed</label>
+      <label><input type="checkbox" data-show-unrelated-toggle checked /> show unrelated</label>
+      <label>fission threshold
+        <input type="range" data-threshold-input min="1" max="1" value="1" />
+        <output data-threshold-value>1</output>
+      </label>
+    </div>
+    <main>
+      <section data-view="matrix">
+        <h2>Residue matrix</h2>
+        <div class="matrix-scroll">{{MATRIX}}</div>
+      </section>
+
+      {{DEFENSE_RECORDS}}
+
+      <section>
+        <h2>Stage adds</h2>
+        <div class="generators">
+          <form data-command-generator="stressor">
+            <fieldset>
+              <legend>stressor</legend>
+              <label>description</label>
+              <input name="description" type="text" required />
+              <label>attractor-shortname</label>
+              <input name="attractor_shortname" type="text" required />
+              <label>naive-change</label>
+              <input name="naive_change" type="text" required />
+              <label>shortname</label>
+              <input name="shortname" type="text" required />
+              <label>outcomes</label>
+              <input name="outcomes" type="text" />
+              <button type="submit">stage</button>
+            </fieldset>
+          </form>
+          <form data-command-generator="purpose">
+            <fieldset>
+              <legend>purpose</legend>
+              <label>description</label>
+              <input name="description" type="text" required />
+              <label>attractor-shortname</label>
+              <input name="attractor_shortname" type="text" required />
+              <label>naive-change</label>
+              <input name="naive_change" type="text" required />
+              <label>shortname</label>
+              <input name="shortname" type="text" required />
+              <label>outcomes</label>
+              <input name="outcomes" type="text" />
+              <button type="submit">stage</button>
+            </fieldset>
+          </form>
+          <form data-command-generator="attractor">
+            <fieldset>
+              <legend>attractor</legend>
+              <label>name</label>
+              <input name="name" type="text" required />
+              <label>description</label>
+              <input name="description" type="text" required />
+              <label>positive-state</label>
+              <input name="positive_state" type="text" required />
+              <label>negative-state</label>
+              <input name="negative_state" type="text" required />
+              <button type="submit">stage</button>
+            </fieldset>
+          </form>
+          <form data-command-generator="component">
+            <fieldset>
+              <legend>component</legend>
+              <label>name</label>
+              <input name="name" type="text" required />
+              <label>description</label>
+              <input name="description" type="text" required />
+              <label>status</label>
+              <input name="status" type="text" required />
+              <label>architecture-set</label>
+              <input name="architecture_set" type="text" required />
+              <button type="submit">stage</button>
+            </fieldset>
+          </form>
+          <p data-component-form-error></p>
+          {{DEFENSE_FORMS}}
+        </div>
+      </section>
+
+      <section data-copy-commands>
+        <h2>Copy commands</h2>
+        <div class="copy-bar">
+          <button type="button" id="copy-staged">copy</button>
+          <button type="button" id="clear-staged">clear</button>
+          <button type="button" data-generate-script>generate bash script</button>
+          <button type="button" data-import-trigger>import</button>
+        </div>
+        <textarea id="staged-commands" readonly placeholder="staged residual add … commands appear here"></textarea>
+      </section>
+
+      <div class="import-modal" data-import-modal hidden>
+        <h2>Import staged commands</h2>
+        <p class="import-modal-hint">
+          Paste <code>residual add …</code> / <code>residual update …</code> lines below.
+        </p>
+        <label>commands</label>
+        <textarea data-import-primary placeholder="residual add stressor --description …"></textarea>
+        <label>lines that failed to parse</label>
+        <textarea data-import-errors readonly placeholder="unparsed lines appear here"></textarea>
+        <ul data-import-error-list class="import-error-list"></ul>
+        <div class="copy-bar">
+          <button type="button" data-import-run>import</button>
+          <button type="button" data-import-retry>retry</button>
+        </div>
+      </div>
+    </main>
+
+    <script id="residual-snapshot" type="application/json">{{SNAPSHOT_JSON}}</script>
+    <script type="module">{{APP_JS}}</script>
+  </body>
+</html>

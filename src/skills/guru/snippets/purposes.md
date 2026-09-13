@@ -1,0 +1,1 @@
+**Purposes** — behavioral contracts that must hold for the attractor to remain stable. Each purpose is a feature or behavior that, if absent or broken, moves the system toward its negative attractor state.

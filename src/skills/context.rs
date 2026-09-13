@@ -2,42 +2,25 @@ use anyhow::Result;
 use crate::config::Config;
 
 pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
-    let dir = &cfg.residual_dir;
+    let dir = crate::storage::metadata_dir(cfg)?;
 
-    let attractors = crate::storage::attractors::load(dir).unwrap_or_default();
-    let stressors  = crate::storage::stressors::load(dir).unwrap_or_default();
-    let purposes   = crate::storage::purposes::load(dir).unwrap_or_default();
-    let terms      = crate::storage::format::read_lexicon(dir).unwrap_or_default();
-    let personas   = crate::storage::personas::load_all(dir).unwrap_or_default();
+    let attractors = crate::storage::attractors::load(&dir).unwrap_or_default();
+    let stressors  = crate::storage::stressors::load(&dir).unwrap_or_default();
+    let purposes   = crate::storage::purposes::load(&dir).unwrap_or_default();
+    let terms      = crate::storage::format::read_lexicon(&dir).unwrap_or_default();
+    let personas   = crate::storage::personas::load_all(&dir).unwrap_or_default();
 
-    // NKP summary: N = stressors + unique components (matrix semantics), not entity bag count.
-    let mut component_set = std::collections::BTreeSet::new();
-    for s in &stressors {
-        for c in s.components.split(',') {
-            let c = c.trim();
-            if !c.is_empty() {
-                component_set.insert(c.to_string());
-            }
+    // NKP summary from residues.csv (v4 canonical coupling source).
+    let nkp = crate::nkp::matrix::NkpMatrix::build_from_dir(&dir).unwrap_or_else(|_| {
+        crate::nkp::matrix::NkpMatrix {
+            force_ids: vec![],
+            attractor_ids: vec![],
+            components: vec![],
+            cells: vec![],
         }
-    }
-    for p in &purposes {
-        for c in p.components.split(',') {
-            let c = c.trim();
-            if !c.is_empty() {
-                component_set.insert(c.to_string());
-            }
-        }
-    }
-    let n = stressors.len() + component_set.len();
-    let k: usize = stressors
-        .iter()
-        .map(|s| {
-            s.components
-                .split(',')
-                .filter(|c| !c.trim().is_empty())
-                .count()
-        })
-        .sum();
+    });
+    let n = nkp.n();
+    let k = nkp.k();
     let k_per_n = if n == 0 { 0.0 } else { k as f64 / n as f64 };
 
     let want_attractors;
@@ -46,6 +29,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
     let want_terminology;
     let want_personas;
     let want_nkp;
+    let want_defense;
 
     match skill_name {
         "purpose-walk" => {
@@ -55,6 +39,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = false;
             want_nkp         = false;
+            want_defense     = false;
         }
         "stressor-walk" => {
             want_attractors  = true;
@@ -63,6 +48,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = true;
             want_nkp         = false;
+            want_defense     = false;
         }
         "integrate" => {
             want_attractors  = true;
@@ -71,6 +57,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = false;
             want_nkp         = true;
+            want_defense     = false;
         }
         "fmea" | "atam" => {
             want_attractors  = true;
@@ -79,6 +66,7 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = true;
             want_nkp         = true;
+            want_defense     = false;
         }
         "naive-draft" => {
             want_attractors  = false;
@@ -87,6 +75,16 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = false;
             want_nkp         = false;
+            want_defense     = false;
+        }
+        "defense-walk" => {
+            want_attractors  = false;
+            want_stressors   = false;
+            want_purposes    = false;
+            want_terminology = false;
+            want_personas    = false;
+            want_nkp         = false;
+            want_defense     = true;
         }
         _ => {
             // default: everything
@@ -96,29 +94,24 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
             want_terminology = true;
             want_personas    = true;
             want_nkp         = true;
+            want_defense     = false;
         }
     }
 
     let mut out = String::new();
     out.push_str(&format!("# Residual Context — {}\n\n", skill_name));
-    if let Some(bootstrap) = bootstrap_status_section(attractors.len(), stressors.len(), purposes.len()) {
-        out.push_str(&bootstrap);
+    if !want_defense {
+        if let Some(bootstrap) = bootstrap_status_section(attractors.len(), stressors.len(), purposes.len()) {
+            out.push_str(&bootstrap);
+        }
+        out.push_str(&verify_status_section(cfg)?);
     }
-    out.push_str(&verify_status_section(cfg)?);
     out.push_str(
         "## Fluent capture\n\
          Metadata (`residual add stressor|purpose|attractor|term|persona`) works in **any order**, \
          at **any phase**, without invoking a skill. Skills are **selectable analytical lenses** — \
          not mandatory gates. `verify all` enforces structure, not ceremony order.\n\n",
     );
-    if matches!(skill_name, "stressor-walk" | "fmea" | "integrate") {
-        out.push_str("## Whole-system-residue\n");
-        out.push_str(
-            "Examine **whole-system-residue** (hardware, process, organization, policy zig) \
-             before defaulting to a software-only patch. Use `--whole-system --notes` when the \
-             surviving change leaves the software boundary.\n\n",
-        );
-    }
     if want_personas {
         let persona_names: Vec<&str> = personas.iter().map(|p| p.name.as_str()).collect();
         if matches!(skill_name, "stressor-walk" | "fmea" | "atam") {
@@ -146,12 +139,12 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
 
     if want_stressors {
         out.push_str("## Stressors\n");
-        out.push_str("| id | description | attractor_id | components |\n");
+        out.push_str("| id | shortname | description | attractor_id |\n");
         out.push_str("|---|---|---|---|\n");
         for s in &stressors {
             out.push_str(&format!(
                 "| {} | {} | {} | {} |\n",
-                s.id, s.description, s.attractor_id, s.components
+                s.id, s.shortname, s.description, s.attractor_id
             ));
         }
         out.push('\n');
@@ -198,6 +191,33 @@ pub fn build(cfg: &Config, skill_name: &str) -> Result<String> {
         out.push('\n');
     }
 
+    if want_defense {
+        out.push_str(&defense_summary_section(&dir)?);
+    }
+
+    crate::skills::guru::inject_for_skill(skill_name, &out)
+}
+
+fn defense_summary_section(residual_dir: &std::path::Path) -> Result<String> {
+    let meta_stressors =
+        crate::storage::defense::meta_stressors::load(residual_dir).unwrap_or_default();
+
+    let mut out = String::from("## Defense ledger summary\n\n");
+    out.push_str(
+        "Defense-layer meta forces and artifacts — isolated from the main ledger (MS-/MA-/MP-). \
+         Route only vetted `defense/pitches/` artifacts to hostile channels; block raw walk internals.\n\n",
+    );
+    out.push_str("### Meta-stressors\n");
+    if meta_stressors.is_empty() {
+        out.push_str("none\n");
+    } else {
+        out.push_str("| shortname | description |\n");
+        out.push_str("|---|---|\n");
+        for s in &meta_stressors {
+            out.push_str(&format!("| {} | {} |\n", s.shortname, s.description));
+        }
+    }
+    out.push('\n');
     Ok(out)
 }
 
@@ -309,11 +329,7 @@ mod tests {
     use crate::storage::{format, stressors};
 
     fn cfg_for(dir: &std::path::Path) -> Config {
-        Config {
-            validation: crate::config::ValidationConfig { strict: true },
-            skills: crate::config::SkillsConfig { token_warn: 1000 },
-            residual_dir: dir.to_path_buf(),
-        }
+        Config::for_test_residual_dir(dir)
     }
 
     #[test]
@@ -363,8 +379,17 @@ mod tests {
                 attractor_id: "".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "system handles auth".to_string(),
-                components: "auth,db".to_string(),
             },
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-01", "S-01", "auth"),
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-02", "S-01", "db"),
         )
         .unwrap();
         let out = build(&cfg, "integrate").unwrap();
@@ -403,7 +428,6 @@ mod tests {
                 attractor_id: "A-01".into(),
                 naive_change: "none".into(),
                 outcomes: "system handles load".into(),
-                components: "api".into(),
             },
         ).unwrap();
         crate::storage::purposes::append(
@@ -415,7 +439,6 @@ mod tests {
                 attractor_id: "A-01".into(),
                 naive_change: "request handling".into(),
                 outcomes: "system serves requests".into(),
-                components: "api".into(),
             },
         ).unwrap();
         let out = build(&cfg, "naive-draft").unwrap();
@@ -443,7 +466,6 @@ mod tests {
                 attractor_id: "A-01".into(),
                 naive_change: "none".into(),
                 outcomes: "system handles load".into(),
-                components: "api".into(),
             },
         ).unwrap();
         let out = build(&cfg, "integrate").unwrap();
@@ -465,8 +487,12 @@ mod tests {
                 attractor_id: "".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "x".to_string(),
             },
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-01", "S-01", "x"),
         )
         .unwrap();
         let out = build(&cfg, "purpose-walk").unwrap();
@@ -476,6 +502,42 @@ mod tests {
             "strict config should instruct fix-before-analysis, got: {}",
             &out[..out.len().min(400)]
         );
+    }
+
+    #[test]
+    fn build_stressor_walk_succeeds_without_personas() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        assert!(
+            build(&cfg, "stressor-walk").is_ok(),
+            "stressor-walk context should build even with zero personas recorded"
+        );
+    }
+
+    // @stressor: phase-rigidity-assumption
+    #[test]
+    fn build_includes_fluent_capture_preamble() {
+        let dir = tempdir().unwrap();
+        let cfg = cfg_for(dir.path());
+        let out = build(&cfg, "integrate").unwrap();
+        assert!(
+            out.contains("Fluent capture") || out.to_lowercase().contains("any phase"),
+            "expected Fluent capture preamble in skill data context"
+        );
+    }
+
+    // @stressor: software-only-zag
+    #[test]
+    fn build_includes_whole_system_reminder_for_relevant_skills() {
+        for name in ["stressor-walk", "fmea", "integrate"] {
+            let dir = tempdir().unwrap();
+            let cfg = cfg_for(dir.path());
+            let out = build(&cfg, name).unwrap();
+            assert!(
+                out.to_lowercase().contains("whole-system"),
+                "{name} skill-data context should remind whole-system-residue"
+            );
+        }
     }
 
     #[test]
@@ -492,8 +554,12 @@ mod tests {
                 attractor_id: "".to_string(),
                 naive_change: "none".to_string(),
                 outcomes: "widget frobs blorple".to_string(),
-                components: "x".to_string(),
             },
+        )
+        .unwrap();
+        crate::storage::residues::append(
+            dir.path(),
+            crate::structure::analysis::residues::Residue::coupling("R-01", "S-01", "x"),
         )
         .unwrap();
         let out = build(&cfg, "purpose-walk").unwrap();
@@ -501,6 +567,36 @@ mod tests {
             out.contains("Advisory mode") || out.contains("note and proceed"),
             "non-strict should advise note-and-proceed, got: {}",
             &out[..out.len().min(400)]
+        );
+    }
+
+    #[test]
+    fn build_defense_walk_includes_defense_summary_excludes_main_meta_bleed() {
+        let dir = tempdir().unwrap();
+        let residual = dir.path().join("residual");
+        std::fs::create_dir_all(residual.join("defense")).unwrap();
+        std::fs::write(
+            residual.join("defense/meta-stressors.csv"),
+            "id,shortname,description\nMS-01,meta-only,Defense stressor\n",
+        )
+        .unwrap();
+        std::fs::write(
+            residual.join("stressors.csv"),
+            "id,shortname,description,naive_change,outcomes,attractor_id\n\
+S-01,main-only,Main ledger,,,A-01\n",
+        )
+        .unwrap();
+
+        let cfg = cfg_for(&residual);
+        let out = build(&cfg, "defense-walk").unwrap();
+        assert!(
+            out.contains("## Defense") || out.contains("defense summary") || out.contains("MS-01"),
+            "defense-walk skill-data must include defense ledger summary"
+        );
+        assert!(
+            !out.contains("main-only") && !out.contains("S-01"),
+            "defense-walk must exclude main-only meta bleed from stressors section, got: {}",
+            &out[..out.len().min(500)]
         );
     }
 }

@@ -4,35 +4,54 @@
 use anyhow::Result;
 
 pub fn generate_completions() -> Result<()> {
-    print!(r#"# residual fish completions
+    print!(
+        r#"# residual fish completions
 complete -c residual -f
 complete -c residual -n '__fish_use_subcommand' -a 'init' -d 'Initialize residual/ directory'
 complete -c residual -n '__fish_use_subcommand' -a 'add' -d 'Add entries'
+complete -c residual -n '__fish_use_subcommand' -a 'remove' -d 'Remove entries'
+complete -c residual -n '__fish_use_subcommand' -a 'purpose' -d 'Purpose force commands'
+complete -c residual -n '__fish_use_subcommand' -a 'stressor' -d 'Stressor force commands'
+complete -c residual -n '__fish_use_subcommand' -a 'write' -d 'Authorize metadata writes'
 complete -c residual -n '__fish_use_subcommand' -a 'list' -d 'List entries'
 complete -c residual -n '__fish_use_subcommand' -a 'verify' -d 'Verify data integrity'
 complete -c residual -n '__fish_use_subcommand' -a 'matrix' -d 'NKP matrix operations'
 complete -c residual -n '__fish_use_subcommand' -a 'skill' -d 'Phase + installer skills'
 complete -c residual -n '__fish_use_subcommand' -a 'tag' -d 'Tag operations'
 complete -c residual -n '__fish_use_subcommand' -a 'generate' -d 'Generate artifacts'
+complete -c residual -n '__fish_use_subcommand' -a 'migrate' -d 'Migrate legacy residual/ layout'
 complete -c residual -n '__fish_use_subcommand' -a 'config' -d 'Show configuration'
 complete -c residual -n '__fish_seen_subcommand_from skill' -a 'show data list install check-install'
-complete -c residual -n '__fish_seen_subcommand_from skill' -a 'purpose-walk naive-draft stressor-walk integrate fmea atam'
+complete -c residual -n '__fish_seen_subcommand_from skill' -a 'purpose-walk naive-draft stressor-walk integrate fmea atam tdd-implement defense-walk'
 complete -c residual -n '__fish_seen_subcommand_from skill' -l agent -a 'claude cursor copilot agnostic'
 complete -c residual -n '__fish_seen_subcommand_from skill' -l global -d 'Install user-wide'
-complete -c residual -n '__fish_seen_subcommand_from add' -a 'stressor residue purpose attractor term persona iteration'
-complete -c residual -n '__fish_seen_subcommand_from list' -a 'stressors residues purposes attractors terminology personas iterations'
-complete -c residual -n '__fish_seen_subcommand_from verify' -a 'outcomes links all commit-msg'
+complete -c residual -n '__fish_seen_subcommand_from add' -a 'stressor residue purpose attractor term persona iteration component meta-stressor meta-attractor meta-purpose defense-persona defense-strategy defense-progress defense-pitch'
+complete -c residual -n '__fish_seen_subcommand_from remove' -a 'stressor purpose residue term'
+complete -c residual -n '__fish_seen_subcommand_from purpose' -a 'remove'
+complete -c residual -n '__fish_seen_subcommand_from stressor' -a 'remove'
+complete -c residual -n '__fish_seen_subcommand_from write' -a 'authorize'
+complete -c residual -n '__fish_seen_subcommand_from list' -a 'stressors residues purposes attractors terminology personas iterations meta-stressors meta-attractors meta-purposes defense-personas defense-strategies defense-progress defense-pitches'
+complete -c residual -n '__fish_use_subcommand' -a 'walk' -d 'Record architecture walk cadence'
+complete -c residual -n '__fish_seen_subcommand_from verify' -a 'outcomes links all walk-reminder commit-msg'
+complete -c residual -n '__fish_seen_subcommand_from walk' -a 'record'
+complete -c residual -n '__fish_use_subcommand' -a 'hook' -d 'Agent lifecycle hooks (skill-hooks)'
+complete -c residual -n '__fish_seen_subcommand_from hook' -a 'pre-compaction post-compaction periodic-turn'
 complete -c residual -n '__fish_use_subcommand' -a 'commit' -d 'Check/suggest commit messages'
 complete -c residual -n '__fish_seen_subcommand_from commit' -a 'check suggest template'
 complete -c residual -n '__fish_seen_subcommand_from matrix' -a 'show calc criticality ri fusion fission'
 complete -c residual -n '__fish_seen_subcommand_from tag' -a 'scan report'
 complete -c residual -n '__fish_seen_subcommand_from generate' -a 'completions man hook'
-"#);
+"#
+    );
     Ok(())
 }
 
 pub fn generate_man() -> Result<()> {
-    print!(r#".TH RESIDUAL 1 "2026" "residual 0.1.0" "NKP Residuality CLI"
+    print!("{MAN_TEXT}");
+    Ok(())
+}
+
+const MAN_TEXT: &str = r#".TH RESIDUAL 1 "2026" "residual 0.1.0" "NKP Residuality CLI"
 .SH NAME
 residual \- NKP Residuality architecture CLI
 .SH SYNOPSIS
@@ -52,10 +71,10 @@ skills are selectable analytical lenses, not mandatory gates.
 Initialize the residual/ directory in the current project.
 .TP
 .B add \fITARGET\fR
-Add a new entry. Targets: stressor, purpose, attractor, term, persona, iteration.
+Add a new entry. Targets: stressor, residue, purpose, attractor, term, persona, iteration.
 .TP
 .B list \fITARGET\fR
-List entries. Targets: stressors, purposes, attractors, terminology, personas, iterations.
+List entries. Targets: stressors, residues, purposes, attractors, terminology, personas, iterations.
 .TP
 .B verify \fICHECK\fR
 Verify data integrity. Checks: outcomes, links, all, commit-msg. Policy from storage-config.
@@ -70,7 +89,7 @@ Phase skills (skills-phases). Includes ATAM/FMEA prose.
 Installer (skills-installer). \fIskill-check\fR remains an alias.
 .TP
 .B tag scan [\fIPATH\fR]
-Scan source files for @residue: and @stressor: tags (suggestions).
+Scan source files for @stressor:/@purpose:/@component: tags (suggestions).
 .TP
 .B generate completions / man
 Owned by cli-help.
@@ -81,6 +100,14 @@ Write pre-commit and commit-msg hooks (verification-git-hook).
 .B commit check / suggest / template
 Validate or compose commit subjects using project vocabulary.
 .TP
+.B migrate [\-\-force]
+Migrate residual/ from legacy on-disk shape (naive→v3, v3→v4 coupling lift).
+.TP
+.B hook pre-compaction / post-compaction / periodic-turn
+Agent lifecycle hooks (skill-hooks): compact pre-compaction prompt, post-compaction
+skills-guru reminder, and cadence-gated periodic-turn topic suggestions. Does not
+register with any agent's config.
+.TP
 .B config
 Show the current configuration.
 .SH FILES
@@ -88,6 +115,21 @@ Show the current configuration.
 The project's residual data directory.
 .SH AUTHOR
 Mike Nrafter
-"#);
-    Ok(())
+"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @stressor: phase-rigidity-assumption
+    #[test]
+    fn man_text_leads_with_fluent_entry_model() {
+        let lower = MAN_TEXT.to_lowercase();
+        let description_pos = lower.find(".sh description").unwrap_or(0);
+        let fluent_pos = lower.find("fluent").or_else(|| lower.find("a-la-carte"));
+        assert!(
+            fluent_pos.is_some_and(|p| p <= description_pos + 800),
+            "expected fluent/a-la-carte mention near the top of the man page"
+        );
+    }
 }

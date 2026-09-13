@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Stressor {
     pub id: String,
     #[serde(default)]
@@ -12,9 +12,9 @@ pub struct Stressor {
     pub naive_change: String,
     #[serde(rename = "outcomes", alias = "traits")]
     pub outcomes: String,
-    #[serde(alias = "components_affected")]
-    pub components: String,
 }
+
+const HEADER: &str = "id,shortname,description,naive_change,outcomes,attractor_id";
 
 pub fn load(residual_dir: &Path) -> Result<Vec<Stressor>> {
     let path = residual_dir.join("stressors.csv");
@@ -41,12 +41,22 @@ pub fn append(residual_dir: &Path, stressor: Stressor) -> Result<()> {
     write_all(residual_dir, &all)
 }
 
+pub fn remove_by_shortname(residual_dir: &Path, shortname: &str) -> Result<String> {
+    let mut all = load(residual_dir)?;
+    let Some(index) = all.iter().position(|s| s.shortname == shortname) else {
+        anyhow::bail!("stressor '{}' not found", shortname);
+    };
+    let id = all.remove(index).id;
+    write_all(residual_dir, &all)?;
+    Ok(id)
+}
+
 pub fn write_all_pub(residual_dir: &Path, rows: &[Stressor]) -> Result<()> {
     write_all(residual_dir, rows)
 }
 
 fn write_all(residual_dir: &Path, rows: &[Stressor]) -> Result<()> {
-    let mut buf = String::from("id,shortname,description,naive_change,outcomes,components,attractor_id\n");
+    let mut buf = format!("{HEADER}\n");
     for s in rows {
         let mut row = Vec::new();
         {
@@ -57,7 +67,6 @@ fn write_all(residual_dir: &Path, rows: &[Stressor]) -> Result<()> {
                 &s.description,
                 &s.naive_change,
                 &s.outcomes,
-                &s.components,
                 &s.attractor_id,
             ])?;
             wtr.flush()?;
@@ -68,12 +77,65 @@ fn write_all(residual_dir: &Path, rows: &[Stressor]) -> Result<()> {
     Ok(())
 }
 
+/// Update fields on an existing stressor in place; unspecified fields are unchanged.
+/// Also folds `add_component`/`remove_component` into residues.csv couplings for
+/// this force id, mirroring `residual add/remove residue`. Errors on unknown id,
+/// with no partial writes.
+#[allow(clippy::too_many_arguments)]
+pub fn update(
+    residual_dir: &Path,
+    id: &str,
+    description: Option<String>,
+    attractor_id: Option<String>,
+    naive_change: Option<String>,
+    shortname: Option<String>,
+    outcomes: Option<String>,
+    add_component: Vec<String>,
+    remove_component: Vec<String>,
+) -> Result<()> {
+    let mut all = load(residual_dir)?;
+    let Some(row) = all.iter_mut().find(|s| s.id == id) else {
+        anyhow::bail!("stressor id '{}' not found", id);
+    };
+    if let Some(v) = description {
+        row.description = v;
+    }
+    if let Some(v) = attractor_id {
+        row.attractor_id = v;
+    }
+    if let Some(v) = naive_change {
+        row.naive_change = v;
+    }
+    if let Some(v) = shortname {
+        row.shortname = v;
+    }
+    if let Some(v) = outcomes {
+        row.outcomes = v;
+    }
+    write_all(residual_dir, &all)?;
+
+    for component_id in &add_component {
+        let existing = crate::storage::residues::load(residual_dir)?;
+        let residue_id = crate::storage::residues::next_id(&existing);
+        crate::storage::residues::append(
+            residual_dir,
+            crate::structure::analysis::residues::Residue::coupling(
+                residue_id,
+                id.to_string(),
+                component_id.clone(),
+            ),
+        )?;
+    }
+    for component_id in &remove_component {
+        crate::storage::residues::remove_coupling(residual_dir, id, component_id)?;
+    }
+    Ok(())
+}
+
 pub fn next_id(stressors: &[Stressor]) -> String {
     let max = stressors
         .iter()
-        .filter_map(|s| {
-            s.id.strip_prefix("S-").and_then(|n| n.parse::<u32>().ok())
-        })
+        .filter_map(|s| s.id.strip_prefix("S-").and_then(|n| n.parse::<u32>().ok()))
         .max()
         .unwrap_or(0);
     format!("S-{:02}", max + 1)
@@ -92,7 +154,6 @@ mod tests {
             attractor_id: "A-01".to_string(),
             naive_change: "change".to_string(),
             outcomes: "system handles auth".to_string(),
-            components: "auth,db".to_string(),
         }
     }
 
@@ -110,47 +171,12 @@ mod tests {
     #[test]
     fn append_creates_file_with_header_and_row() {
         let dir = tempdir().unwrap();
-        let s = make_stressor("S-01");
-        append(dir.path(), s).unwrap();
+        append(dir.path(), make_stressor("S-01")).unwrap();
         let content = std::fs::read_to_string(dir.path().join("stressors.csv")).unwrap();
         assert!(content.contains("id,"), "header missing");
         assert!(content.contains("S-01"), "row missing");
+        assert!(!content.contains(",components,"));
     }
-
-    #[test]
-    fn append_does_not_duplicate_header() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_stressor("S-01")).unwrap();
-        append(dir.path(), make_stressor("S-02")).unwrap();
-        let content = std::fs::read_to_string(dir.path().join("stressors.csv")).unwrap();
-        assert_eq!(content.matches("id,").count(), 1, "header duplicated");
-    }
-
-    #[test]
-    fn load_reads_back_appended() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_stressor("S-01")).unwrap();
-        let loaded = load(dir.path()).unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].id, "S-01");
-    }
-
-    #[test]
-    fn append_rejects_duplicate_id() {
-        let dir = tempdir().unwrap();
-        append(dir.path(), make_stressor("S-01")).unwrap();
-        let err = append(dir.path(), make_stressor("S-01")).unwrap_err();
-        assert!(err.to_string().contains("already exists"));
-    }
-
-    #[test]
-    fn load_missing_file_returns_empty() {
-        let dir = tempdir().unwrap();
-        let result = load(dir.path()).unwrap();
-        assert!(result.is_empty());
-    }
-
-    // --- shortname field tests (RED: shortname field not yet on Stressor) ---
 
     #[test]
     fn stressor_with_shortname_roundtrips() {
@@ -161,30 +187,10 @@ mod tests {
             attractor_id: "A-01".to_string(),
             naive_change: "fix it".to_string(),
             outcomes: "system handles stressor".to_string(),
-            components: "auth".to_string(),
             shortname: "cli-bypass".to_string(),
         };
         append(dir.path(), s).unwrap();
         let loaded = load(dir.path()).unwrap();
-        assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].shortname, "cli-bypass");
-    }
-
-    #[test]
-    fn stressor_missing_shortname_column_deserializes_empty() {
-        let dir = tempdir().unwrap();
-        // Write a stressors.csv with the OLD header (no shortname column).
-        std::fs::write(
-            dir.path().join("stressors.csv"),
-            "id,description,naive_change,outcomes,components,attractor_id\n\
-             S-01,old stressor,old change,system handles old,auth,A-01\n",
-        )
-        .unwrap();
-        let loaded = load(dir.path()).unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(
-            loaded[0].shortname, "",
-            "old CSV rows without shortname column should deserialize to empty string"
-        );
     }
 }

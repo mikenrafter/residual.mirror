@@ -18,6 +18,27 @@ fn init(dir: &TempDir) {
     assert!(out.status.success(), "init failed: {}", String::from_utf8_lossy(&out.stderr));
 }
 
+fn add_couplings(dir: &TempDir, shortname: &str, components: &[&str]) {
+    for component_id in components {
+        let out = run(
+            dir,
+            &[
+                "add",
+                "residue",
+                "--shortname",
+                shortname,
+                "--component-shortname",
+                component_id,
+            ],
+        );
+        assert!(
+            out.status.success(),
+            "add residue failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
 // --- init ---
 
 #[test]
@@ -69,8 +90,9 @@ fn add_stressor_then_list() {
     run(&dir, &["add", "attractor", "--name", "Stability", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
     let add = run(&dir, &["add", "stressor",
         "--description", "auth service overwhelmed",
-        "--attractor-id", "A-01",
+        "--attractor-shortname", "A-01",
         "--naive-change", "scale out",
+        "--shortname", "auth-overload",
     ]);
     assert!(add.status.success(), "add stressor failed: {}", String::from_utf8_lossy(&add.stderr));
     let list = run(&dir, &["list", "stressors"]);
@@ -132,8 +154,8 @@ fn commit_check_accepts_force_subject() {
     .unwrap();
     std::fs::write(
         dir.path().join("residual/stressors.csv"),
-        "id,shortname,description,naive_change,outcomes,components,attractor_id\n\
-         S-28,lexicon-commit-drift,drift,add hook,git hook enforces lexicon,,A-02\n",
+        "id,shortname,description,naive_change,outcomes,attractor_id\n\
+         S-28,lexicon-commit-drift,drift,add hook,git hook enforces lexicon,A-02\n",
     )
     .unwrap();
     let out = run(
@@ -156,16 +178,16 @@ fn commit_template_prints_scaffold() {
     init(&dir);
     std::fs::write(
         dir.path().join("residual/purposes.csv"),
-        "id,shortname,description,naive_change,outcomes,components,attractor_id\n\
-         P-18,git-log-lexicon,desc,add hook,git log uses lexicon,,A-01\n",
+        "id,shortname,description,naive_change,outcomes,attractor_id\n\
+         P-18,git-log-lexicon,desc,add hook,git log uses lexicon,A-01\n",
     )
     .unwrap();
     std::fs::write(
         dir.path().join("residual/residues.csv"),
-        "id,force_id,component_id,status,notes\nR-1,P-18,verification-git-hook,proposed,hook\n",
+        "force,verification-git-hook\nP-18,1\n",
     )
     .unwrap();
-    let out = run(&dir, &["commit", "template", "P-18"]);
+    let out = run(&dir, &["commit", "template", "git-log-lexicon"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("verification-git-hook: P-18:"), "got: {stdout}");
@@ -175,11 +197,12 @@ fn commit_template_prints_scaffold() {
 fn verify_links_catches_dangling_attractor() {
     let dir = TempDir::new().unwrap();
     init(&dir);
-    run(&dir, &["add", "stressor",
-        "--description", "test stressor",
-        "--attractor-id", "A-99",
-        "--naive-change", "none",
-    ]);
+    std::fs::write(
+        dir.path().join("residual/stressors.csv"),
+        "id,shortname,description,naive_change,outcomes,attractor_id\n\
+         S-01,dangling-attractor,test stressor,none,,A-99\n",
+    )
+    .unwrap();
     let out = run(&dir, &["verify", "links"]);
     assert!(!out.status.success(), "verify links should fail on dangling attractor");
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -238,10 +261,11 @@ fn matrix_calc_reports_n_k_and_ratio() {
     run(&dir, &["add", "attractor", "--name", "X", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
     run(&dir, &["add", "stressor",
         "--description", "test",
-        "--attractor-id", "A-01",
+        "--attractor-shortname", "A-01",
         "--naive-change", "none",
-        "--components", "auth,db",
+        "--shortname", "test-force",
     ]);
+    add_couplings(&dir, "test-force", &["auth", "db"]);
     let out = run(&dir, &["matrix", "calc"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("N"), "expected 'N' in matrix calc output");
@@ -255,12 +279,12 @@ fn matrix_show_csv_emits_header_and_cells() {
     run(&dir, &["add", "attractor", "--name", "X", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
     run(&dir, &["add", "stressor",
         "--description", "skill versions drift after binary update",
-        "--attractor-id", "A-01",
+        "--attractor-shortname", "A-01",
         "--naive-change", "pin skill versions",
-        "--components", "auth,db",
         "--outcomes", "skill residue stays current",
         "--shortname", "skill-version-drift",
     ]);
+    add_couplings(&dir, "skill-version-drift", &["auth", "db"]);
     let out = run(&dir, &["matrix", "show", "--csv"]);
     assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -279,20 +303,20 @@ fn matrix_show_filter_keeps_matching_attractor() {
     run(&dir, &["add", "attractor", "--name", "Two", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
     run(&dir, &["add", "stressor",
         "--description", "first force hits auth",
-        "--attractor-id", "A-01",
+        "--attractor-shortname", "A-01",
         "--naive-change", "none",
-        "--components", "auth",
         "--outcomes", "operator records a stressor against attractor one",
         "--shortname", "alpha-force",
     ]);
+    add_couplings(&dir, "alpha-force", &["auth"]);
     run(&dir, &["add", "stressor",
         "--description", "second force hits db",
-        "--attractor-id", "A-02",
+        "--attractor-shortname", "A-02",
         "--naive-change", "none",
-        "--components", "db",
         "--outcomes", "operator records a stressor against attractor two",
         "--shortname", "beta-force",
     ]);
+    add_couplings(&dir, "beta-force", &["db"]);
     let out = run(&dir, &["matrix", "show", "--csv", "--filter", "A-02"]);
     assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -308,20 +332,20 @@ fn matrix_show_sort_by_alphabetical() {
     run(&dir, &["add", "attractor", "--name", "X", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
     run(&dir, &["add", "stressor",
         "--description", "zeta force",
-        "--attractor-id", "A-01",
+        "--attractor-shortname", "A-01",
         "--naive-change", "none",
-        "--components", "auth",
         "--outcomes", "operator records residue zeta",
         "--shortname", "zeta-force",
     ]);
+    add_couplings(&dir, "zeta-force", &["auth"]);
     run(&dir, &["add", "stressor",
         "--description", "alpha force",
-        "--attractor-id", "A-01",
+        "--attractor-shortname", "A-01",
         "--naive-change", "none",
-        "--components", "db",
         "--outcomes", "operator records residue alpha",
         "--shortname", "alpha-force",
     ]);
+    add_couplings(&dir, "alpha-force", &["db"]);
     let out = run(&dir, &["matrix", "show", "--csv", "--sort-by", "alphabetical"]);
     assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -351,8 +375,8 @@ fn stressor_append_rewrite_preserves_all_rows() {
     let dir = TempDir::new().unwrap();
     init(&dir);
     run(&dir, &["add", "attractor", "--name", "X", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
-    run(&dir, &["add", "stressor", "--description", "first", "--attractor-id", "A-01", "--naive-change", "cache"]);
-    run(&dir, &["add", "stressor", "--description", "second", "--attractor-id", "A-01", "--naive-change", "lock"]);
+    run(&dir, &["add", "stressor", "--description", "first", "--attractor-shortname", "A-01", "--naive-change", "cache", "--shortname", "first-stressor"]);
+    run(&dir, &["add", "stressor", "--description", "second", "--attractor-shortname", "A-01", "--naive-change", "lock", "--shortname", "second-stressor"]);
     let content = std::fs::read_to_string(dir.path().join("residual/stressors.csv")).unwrap();
     assert_eq!(content.matches("id,").count(), 1);
     assert!(content.contains("first"));
@@ -364,14 +388,14 @@ fn residues_csv_is_matrix_shaped_after_write() {
     let dir = TempDir::new().unwrap();
     init(&dir);
     run(&dir, &["add", "attractor", "--name", "X", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
-    run(&dir, &["add", "stressor", "--description", "lag", "--attractor-id", "A-01", "--naive-change", "cache"]);
+    run(&dir, &["add", "stressor", "--description", "lag", "--attractor-shortname", "A-01", "--naive-change", "cache", "--shortname", "lag-force"]);
     std::fs::write(
         dir.path().join("residual/components.csv"),
         "name,description,status,architecture_set\nverification,path,proposed,baseline\n",
     )
     .unwrap();
     assert!(
-        run(&dir, &["add", "--force", "residue", "--force-id", "S-01", "--component-id", "verification", "--status", "proposed"]).status.success()
+        run(&dir, &["add", "--force", "residue", "--shortname", "lag-force", "--component-shortname", "verification"]).status.success()
     );
     assert!(std::fs::read_to_string(dir.path().join("residual/residues.csv")).unwrap().starts_with("force,"));
 }
@@ -381,14 +405,14 @@ fn verify_links_accepts_purpose_residue() {
     let dir = TempDir::new().unwrap();
     init(&dir);
     run(&dir, &["add", "attractor", "--name", "L", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
-    run(&dir, &["add", "purpose", "--description", "d", "--attractor-id", "A-01", "--feature", "f", "--outcomes", "operator reads commit history using defined outcome", "--shortname", "git-log-lexicon"]);
+    run(&dir, &["add", "purpose", "--description", "d", "--attractor-shortname", "A-01", "--feature", "f", "--outcomes", "operator reads commit history using defined outcome", "--shortname", "git-log-lexicon"]);
     std::fs::write(
         dir.path().join("residual/components.csv"),
         "name,description,status,architecture_set\nhook,desc,proposed,baseline\n",
     )
     .unwrap();
     assert!(
-        run(&dir, &["add", "--force", "residue", "--force-id", "P-01", "--component-id", "hook", "--status", "proposed"]).status.success()
+        run(&dir, &["add", "--force", "residue", "--shortname", "git-log-lexicon", "--component-shortname", "hook"]).status.success()
     );
     assert!(run(&dir, &["verify", "links"]).status.success());
 }
@@ -415,7 +439,7 @@ fn add_stressor_cli_stores_shortname() {
         &[
             "add", "stressor",
             "--description", "test stressor",
-            "--attractor-id", "A-01",
+            "--attractor-shortname", "A-01",
             "--naive-change", "fix it",
             "--outcomes", "operator records stressor",
             "--shortname", "cli-bypass",
@@ -449,7 +473,7 @@ fn add_purpose_cli_stores_shortname() {
         &[
             "add", "purpose",
             "--description", "test purpose",
-            "--attractor-id", "A-01",
+            "--attractor-shortname", "A-01",
             "--feature", "add purpose CLI",
             "--outcomes", "operator adds purposes",
             "--shortname", "persona-subagent-depth",
@@ -482,7 +506,7 @@ fn list_stressors_shows_shortname() {
         &[
             "add", "stressor",
             "--description", "test stressor",
-            "--attractor-id", "A-01",
+            "--attractor-shortname", "A-01",
             "--naive-change", "fix it",
             "--outcomes", "operator records stressor",
             "--shortname", "cli-bypass",
@@ -515,7 +539,7 @@ fn list_purposes_shows_shortname() {
         &[
             "add", "purpose",
             "--description", "test purpose",
-            "--attractor-id", "A-01",
+            "--attractor-shortname", "A-01",
             "--feature", "add purpose CLI",
             "--outcomes", "operator adds purposes",
             "--shortname", "persona-subagent-depth",
@@ -534,14 +558,33 @@ fn list_residues_prints_matrix() {
     let dir = TempDir::new().unwrap();
     init(&dir);
     run(&dir, &["add", "attractor", "--name", "X", "--description", "d", "--positive-state", "ok", "--negative-state", "bad"]);
-    run(&dir, &["add", "stressor", "--description", "d", "--attractor-id", "A-01", "--naive-change", "c"]);
+    run(&dir, &["add", "stressor", "--description", "d", "--attractor-shortname", "A-01", "--naive-change", "c", "--shortname", "d-force"]);
     std::fs::write(
         dir.path().join("residual/components.csv"),
         "name,description,status,architecture_set\ncli,desc,proposed,baseline\n",
     )
     .unwrap();
-    run(&dir, &["add", "--force", "residue", "--force-id", "S-01", "--component-id", "cli", "--status", "active"]);
+    run(&dir, &["add", "--force", "residue", "--shortname", "d-force", "--component-shortname", "cli"]);
     let list = run(&dir, &["list", "residues"]);
     assert!(list.status.success());
     assert!(String::from_utf8_lossy(&list.stdout).starts_with("force,"));
+}
+
+#[test]
+fn skill_check_install_subcommand_help_succeeds() {
+    let dir = TempDir::new().unwrap();
+    let out = run(&dir, &["skill", "check-install", "--help"]);
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.status.success(),
+        "residual skill check-install --help should succeed: {text}"
+    );
+    assert!(
+        text.contains("check-install") || text.contains("check_install"),
+        "help should mention check-install, got: {text}"
+    );
 }

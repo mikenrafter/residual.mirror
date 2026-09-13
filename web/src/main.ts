@@ -60,7 +60,16 @@ if (table) {
 
   const matrixMount = mountMatrix(table, getState, setState, { onChange });
 
-  mountForms(container as HTMLElement, getState, setState, { onChange });
+  mountForms(container as HTMLElement, getState, setState, {
+    onChange,
+    onClear: () => {
+      matrixMount.resetDom();
+      for (const form of Array.from(container.querySelectorAll<HTMLFormElement>("form"))) form.reset();
+      for (const toggle of Array.from(container.querySelectorAll<HTMLInputElement>("[data-show-proposed-toggle], [data-show-unrelated-toggle]"))) {
+        toggle.checked = true;
+      }
+    },
+  });
   mountImportModal(container as HTMLElement, getState, setState, { onChange });
   mountExportScript(container as HTMLElement, getState, { onChange });
 

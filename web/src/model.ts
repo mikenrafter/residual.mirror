@@ -134,6 +134,8 @@ export interface PendingState {
   updatedPersonas: Record<string, PersonaUpdate>;
   /** Keyed by term text. */
   updatedTerms: Record<string, TermUpdate>;
+  /** Existing force ids staged for removal, keyed by id with their CLI kind. */
+  removedForces?: Record<string, "stressor" | "purpose">;
 }
 
 /** Required (non-outcomes) field names for a stressor/purpose, per cli-schema.json. */
@@ -212,6 +214,7 @@ export function computeStateValidity(state: PendingState): StateValidity {
   };
 
   for (const base of state.baseForces) {
+    if (state.removedForces?.[base.id] !== undefined) continue;
     const update = state.updatedForces[base.id];
     evaluate(base.id, {
       description: update?.description ?? base.description,
@@ -275,6 +278,7 @@ export function orderedEntries(state: PendingState): OrderedEntry[] {
     // added force after its synthetic entry was already emitted above —
     // excluded here to avoid a second, ambiguous entry for the same tempId).
     ...Object.keys(state.updatedForces)
+      .filter((k) => state.removedForces?.[k] === undefined)
       .filter((k) => !addedForceTempIds.has(k))
       .map((k): OrderedEntry => ({ bucket: "force", action: "update", key: k })),
   ];
@@ -456,7 +460,7 @@ export function toCommandLines(state: PendingState): CommandLine[] {
     return { line: parts.join(" "), valid };
   };
 
-  return entries.map((entry): CommandLine => {
+  const lines = entries.map((entry): CommandLine => {
     if (entry.bucket === "component") {
       return entry.action === "add" ? renderComponentAdd(entry.key) : renderComponentUpdate(entry.key);
     }
@@ -475,4 +479,12 @@ export function toCommandLines(state: PendingState): CommandLine[] {
       ? renderForceUpdateSynthetic(entry.key)
       : renderForceUpdateReal(entry.key);
   });
+
+  for (const [id, kind] of Object.entries(state.removedForces ?? {})) {
+    const force = baseForceById.get(id);
+    if (force !== undefined) {
+      lines.push({ line: `residual ${kind} remove ${flagText("shortname", force.shortname)}`, valid: true });
+    }
+  }
+  return lines;
 }

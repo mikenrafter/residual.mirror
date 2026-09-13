@@ -26,6 +26,7 @@ export interface MountFormsOptions {
    * MountOptions.onChange.
    */
   onChange?: () => void;
+  onClear?: () => void;
 }
 
 /**
@@ -64,6 +65,7 @@ export function emptyPendingState(base: PendingState): PendingState {
     updatedForces: {},
     updatedPersonas: {},
     updatedTerms: {},
+    removedForces: {},
   };
 }
 
@@ -249,9 +251,17 @@ export function mountForms(
     const unrelatedToggle = container.querySelector<HTMLInputElement>("[data-show-unrelated-toggle]");
     const showProposed = proposedToggle?.checked ?? true;
     const showUnrelated = unrelatedToggle?.checked ?? true;
+    const filteredForceIds = Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr.force-row"))
+      .filter((row) => !row.hidden)
+      .map((row) => row.getAttribute("data-force-id"))
+      .filter((id): id is string => id !== null);
 
     const visible = new Set(
-      visibleComponents(getState(), { showProposed, showUnrelated, filteredForceIds: null }),
+      visibleComponents(getState(), {
+        showProposed,
+        showUnrelated,
+        filteredForceIds,
+      }),
     );
 
     for (const el of Array.from(table.querySelectorAll<HTMLElement>("[data-component]"))) {
@@ -271,6 +281,7 @@ export function mountForms(
     const unrelatedToggle = container.querySelector<HTMLInputElement>("[data-show-unrelated-toggle]");
     proposedToggle?.addEventListener("change", applyVisibility);
     unrelatedToggle?.addEventListener("change", applyVisibility);
+    container.querySelector("[data-force-filter]")?.addEventListener("input", applyVisibility);
   }
 
   function wireClearButton(): void {
@@ -278,6 +289,7 @@ export function mountForms(
     clearButton?.addEventListener("click", () => {
       setState(emptyPendingState(getState()));
       regenerate();
+      options?.onClear?.();
       options?.onChange?.();
     });
   }

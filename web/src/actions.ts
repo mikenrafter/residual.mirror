@@ -143,6 +143,23 @@ export function updateForceField(
   };
 }
 
+/** Stages removal of an existing force, or drops a not-yet-added force entirely. */
+export function removeForce(state: PendingState, forceKey: string): PendingState {
+  const addedForces = state.addedForces.filter((force) => force.tempId !== forceKey);
+  const updatedForces = { ...state.updatedForces };
+  delete updatedForces[forceKey];
+  if (addedForces.length !== state.addedForces.length) {
+    return { ...state, addedForces, updatedForces };
+  }
+  const base = state.baseForces.find((force) => force.id === forceKey);
+  if (base === undefined) return state;
+  return {
+    ...state,
+    updatedForces,
+    removedForces: { ...state.removedForces, [forceKey]: base.kind },
+  };
+}
+
 /** Sets the kind (stressor/purpose) of an added force that hasn't been staged as a real CLI record yet. No-op if `tempId` isn't in addedForces — an existing base force's kind is immutable (the CLI has no "change a stressor into a purpose" operation). */
 export function setAddedForceKind(
   state: PendingState,

@@ -130,6 +130,22 @@ function updateForceField(state, forceKey, field, value) {
     }
   };
 }
+function removeForce(state, forceKey) {
+  const addedForces = state.addedForces.filter((force) => force.tempId !== forceKey);
+  const updatedForces = { ...state.updatedForces };
+  delete updatedForces[forceKey];
+  if (addedForces.length !== state.addedForces.length) {
+    return { ...state, addedForces, updatedForces };
+  }
+  const base = state.baseForces.find((force) => force.id === forceKey);
+  if (base === undefined)
+    return state;
+  return {
+    ...state,
+    updatedForces,
+    removedForces: { ...state.removedForces, [forceKey]: base.kind }
+  };
+}
 function setAddedForceKind(state, tempId, kind) {
   const addedIndex = state.addedForces.findIndex((f) => f.tempId === tempId);
   if (addedIndex === -1)
@@ -178,6 +194,8 @@ function computeStateValidity(state) {
     }
   };
   for (const base of state.baseForces) {
+    if (state.removedForces?.[base.id] !== undefined)
+      continue;
     const update = state.updatedForces[base.id];
     evaluate(base.id, {
       description: update?.description ?? base.description,
@@ -214,7 +232,7 @@ function orderedEntries(state) {
     ...Object.keys(state.updatedPersonas).map((k) => ({ bucket: "persona", action: "update", key: k })),
     ...Object.keys(state.updatedTerms).map((k) => ({ bucket: "term", action: "update", key: k })),
     ...state.addedForces.filter((f) => f.components.length > 0).map((f) => ({ bucket: "force", action: "update", key: f.tempId })),
-    ...Object.keys(state.updatedForces).filter((k) => !addedForceTempIds.has(k)).map((k) => ({ bucket: "force", action: "update", key: k }))
+    ...Object.keys(state.updatedForces).filter((k) => state.removedForces?.[k] === undefined).filter((k) => !addedForceTempIds.has(k)).map((k) => ({ bucket: "force", action: "update", key: k }))
   ];
   return [...adds, ...updates];
 }
@@ -355,8 +373,9 @@ function toCommandLines(state) {
     const parts = [`residual update ${base.kind}`, flagText("shortname", base.shortname)];
     if (update.description !== undefined)
       parts.push(flagText("description", update.description));
-    if (update.attractorId !== undefined)
+    if (update.attractorId !== undefined) {
       parts.push(flagText("attractor-shortname", attractorShortname(update.attractorId)));
+    }
     if (update.naiveChangeOrFeature !== undefined)
       parts.push(flagText("naive-change", update.naiveChangeOrFeature));
     if (update.outcomes !== undefined)
@@ -375,7 +394,7 @@ function toCommandLines(state) {
     }
     return { line: parts.join(" "), valid };
   };
-  return entries.map((entry) => {
+  const lines = entries.map((entry) => {
     if (entry.bucket === "component") {
       return entry.action === "add" ? renderComponentAdd(entry.key) : renderComponentUpdate(entry.key);
     }
@@ -392,6 +411,13 @@ function toCommandLines(state) {
       return renderForceAdd(entry.key);
     return addedForceByTempId.has(entry.key) ? renderForceUpdateSynthetic(entry.key) : renderForceUpdateReal(entry.key);
   });
+  for (const [id, kind] of Object.entries(state.removedForces ?? {})) {
+    const force = baseForceById.get(id);
+    if (force !== undefined) {
+      lines.push({ line: `residual ${kind} remove ${flagText("shortname", force.shortname)}`, valid: true });
+    }
+  }
+  return lines;
 }
 
 // src/render-decisions.ts
@@ -454,7 +480,15 @@ function getAttractorLabel(state, attractorId) {
   const attractor = [...state.baseAttractors, ...state.addedAttractors].find((a) => a.id === attractorId);
   return attractor ? `${attractor.id} · ${attractor.name}` : attractorId;
 }
-function createTextInput(name, value) {
+function createTextInput(name, value, multiline = false) {
+  if (multiline) {
+    const input2 = document.createElement("textarea");
+    input2.name = name;
+    input2.value = value;
+    input2.rows = 3;
+    input2.wrap = "soft";
+    return input2;
+  }
   const input = document.createElement("input");
   input.type = "text";
   input.name = name;
@@ -518,6 +552,21 @@ function mount(table, getState, setState, options) {
     button.addEventListener("click", () => enterEditMode(detail, forceKey));
     detail.appendChild(button);
   }
+  function appendRemoveButton(detail, forceKey) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Remove";
+    button.addEventListener("click", () => {
+      const next = removeForce(getState(), forceKey);
+      setState(next);
+      const row = detail.closest("tr.force-row");
+      if (row instanceof HTMLTableRowElement)
+        row.hidden = true;
+      applyInvalidMarks();
+      options?.onChange?.();
+    });
+    detail.appendChild(button);
+  }
   function renderReadOnly(detail, forceKey) {
     detail.innerHTML = "";
     const values = getEffectiveForceValues(getState(), forceKey);
@@ -543,9 +592,9 @@ function mount(table, getState, setState, options) {
     const state = getState();
     const values = getEffectiveForceValues(state, forceKey);
     const shortnameInput = createTextInput("shortname", values.shortname);
-    const descriptionInput = createTextInput("description", values.description);
-    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
-    const outcomesInput = createTextInput("outcomes", values.outcomes);
+    const descriptionInput = createTextInput("description", values.description, true);
+    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature, true);
+    const outcomesInput = createTextInput("outcomes", values.outcomes, true);
     const attractorSelect = createAttractorSelect(state, values.attractorId);
     const okButton = document.createElement("button");
     okButton.type = "button";
@@ -577,7 +626,11 @@ function mount(table, getState, setState, options) {
     });
     const editor = document.createElement("div");
     editor.className = "force-detail-editor";
-    editor.append(labeledField("shortname", shortnameInput), labeledField("description", descriptionInput), labeledField("naive change", naiveChangeInput), labeledField("outcomes", outcomesInput), labeledField("attractor", attractorSelect), okButton, cancelButton);
+    const actions = document.createElement("div");
+    actions.className = "force-detail-actions";
+    actions.append(okButton, cancelButton);
+    editor.append(labeledField("shortname", shortnameInput), labeledField("description", descriptionInput), labeledField("naive change", naiveChangeInput), labeledField("outcomes", outcomesInput), labeledField("attractor", attractorSelect), actions);
+    appendRemoveButton(actions, forceKey);
     detail.appendChild(editor);
   }
   function wireLiveField(el, eventName, forceKey, field) {
@@ -603,9 +656,9 @@ function mount(table, getState, setState, options) {
     detail.className = "force-detail";
     const kindSelect = createKindSelect(kind);
     const shortnameInput = createTextInput("shortname", values.shortname);
-    const descriptionInput = createTextInput("description", values.description);
-    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
-    const outcomesInput = createTextInput("outcomes", values.outcomes);
+    const descriptionInput = createTextInput("description", values.description, true);
+    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature, true);
+    const outcomesInput = createTextInput("outcomes", values.outcomes, true);
     const attractorSelect = createAttractorSelect(state, values.attractorId);
     const saveButton = document.createElement("button");
     saveButton.type = "button";
@@ -629,7 +682,11 @@ function mount(table, getState, setState, options) {
     });
     const editor = document.createElement("div");
     editor.className = "force-detail-editor";
-    editor.append(labeledField("kind", kindSelect), labeledField("shortname", shortnameInput), labeledField("description", descriptionInput), labeledField("naive change", naiveChangeInput), labeledField("outcomes", outcomesInput), labeledField("attractor", attractorSelect), saveButton);
+    const actions = document.createElement("div");
+    actions.className = "force-detail-actions";
+    actions.append(saveButton);
+    editor.append(labeledField("kind", kindSelect), labeledField("shortname", shortnameInput), labeledField("description", descriptionInput), labeledField("naive change", naiveChangeInput), labeledField("outcomes", outcomesInput), labeledField("attractor", attractorSelect), actions);
+    appendRemoveButton(actions, tempId);
     detail.appendChild(editor);
     th.appendChild(detail);
     tr.appendChild(th);
@@ -758,8 +815,43 @@ function mount(table, getState, setState, options) {
     }
     applyInvalidMarks();
   }
+  function resetDom() {
+    const state = getState();
+    const baseIds = new Set(state.baseForces.map((force) => force.id));
+    for (const row of Array.from(table.querySelectorAll("tbody tr.force-row"))) {
+      const key = row.getAttribute("data-force-id");
+      if (key === null)
+        continue;
+      if (!baseIds.has(key)) {
+        row.remove();
+        continue;
+      }
+      row.hidden = false;
+      const base = state.baseForces.find((force) => force.id === key);
+      if (base !== undefined) {
+        for (const cell of Array.from(row.querySelectorAll("td[data-residue-cell]"))) {
+          const component = cell.getAttribute("data-component");
+          const coupled = component !== null && base.components.includes(component);
+          cell.setAttribute("data-coupled", coupled ? "1" : "0");
+          cell.textContent = coupled ? "1" : "";
+        }
+      }
+      const detail = row.querySelector(".force-detail");
+      if (detail !== null) {
+        detail.hidden = true;
+        renderReadOnly(detail, key);
+      }
+    }
+    const baseComponents = new Set(state.baseComponents.map((component) => component.name));
+    for (const element of Array.from(table.querySelectorAll("[data-component]"))) {
+      const name = element.getAttribute("data-component");
+      if (name !== null && !baseComponents.has(name))
+        element.remove();
+    }
+    applyInvalidMarks();
+  }
   applyInvalidMarks();
-  return { syncNewRows };
+  return { syncNewRows, resetDom };
 }
 
 // src/forms.ts
@@ -787,7 +879,8 @@ function emptyPendingState(base) {
     updatedComponents: {},
     updatedForces: {},
     updatedPersonas: {},
-    updatedTerms: {}
+    updatedTerms: {},
+    removedForces: {}
   };
 }
 function readInput(form, name) {
@@ -949,7 +1042,12 @@ function mountForms(container, getState, setState, options) {
     const unrelatedToggle = container.querySelector("[data-show-unrelated-toggle]");
     const showProposed = proposedToggle?.checked ?? true;
     const showUnrelated = unrelatedToggle?.checked ?? true;
-    const visible = new Set(visibleComponents(getState(), { showProposed, showUnrelated, filteredForceIds: null }));
+    const filteredForceIds = Array.from(table.querySelectorAll("tbody tr.force-row")).filter((row) => !row.hidden).map((row) => row.getAttribute("data-force-id")).filter((id) => id !== null);
+    const visible = new Set(visibleComponents(getState(), {
+      showProposed,
+      showUnrelated,
+      filteredForceIds
+    }));
     for (const el of Array.from(table.querySelectorAll("[data-component]"))) {
       const name = el.getAttribute("data-component");
       if (name === null)
@@ -967,12 +1065,14 @@ function mountForms(container, getState, setState, options) {
     const unrelatedToggle = container.querySelector("[data-show-unrelated-toggle]");
     proposedToggle?.addEventListener("change", applyVisibility);
     unrelatedToggle?.addEventListener("change", applyVisibility);
+    container.querySelector("[data-force-filter]")?.addEventListener("input", applyVisibility);
   }
   function wireClearButton() {
     const clearButton = container.querySelector("#clear-staged");
     clearButton?.addEventListener("click", () => {
       setState(emptyPendingState(getState()));
       regenerate();
+      options?.onClear?.();
       options?.onChange?.();
     });
   }
@@ -1089,6 +1189,13 @@ function applyUpdateForce(state, item) {
   next = applyComponentToggles(next, forceKey, item);
   return next;
 }
+function applyRemoveForce(state, item) {
+  const shortname = item.fields.shortname;
+  if (shortname === undefined)
+    return state;
+  const force = state.baseForces.find((candidate) => candidate.kind === item.type && candidate.shortname === shortname);
+  return force === undefined ? state : removeForce(state, force.id);
+}
 function isMergeable(item) {
   if (item.kind === "add") {
     return item.type === "stressor" || item.type === "purpose" || item.type === "component" || item.type === "attractor";
@@ -1103,6 +1210,9 @@ function applyItem(state, item) {
       return applyAddComponent(state, item);
     if (item.type === "attractor")
       return applyAddAttractor(state, item);
+  }
+  if (item.kind === "remove" && (item.type === "stressor" || item.type === "purpose")) {
+    return applyRemoveForce(state, item);
   }
   return applyUpdateForce(state, item);
 }
@@ -1345,7 +1455,7 @@ var cli_schema_default = [
     subcommand: "add purpose",
     flags: [
       {
-        name: "attractor-id",
+        name: "attractor-shortname",
         required: true,
         multiple: false
       },
@@ -1375,7 +1485,7 @@ var cli_schema_default = [
     subcommand: "add residue",
     flags: [
       {
-        name: "component-id",
+        name: "component-shortname",
         required: false,
         multiple: false
       },
@@ -1405,7 +1515,7 @@ var cli_schema_default = [
     subcommand: "add stressor",
     flags: [
       {
-        name: "attractor-id",
+        name: "attractor-shortname",
         required: true,
         multiple: false
       },
@@ -1459,6 +1569,51 @@ var cli_schema_default = [
         required: false,
         multiple: false
       },
+      {
+        name: "term",
+        required: true,
+        multiple: false
+      }
+    ]
+  },
+  {
+    subcommand: "remove purpose",
+    flags: [
+      {
+        name: "shortname",
+        required: true,
+        multiple: false
+      }
+    ]
+  },
+  {
+    subcommand: "remove residue",
+    flags: [
+      {
+        name: "component-shortname",
+        required: true,
+        multiple: false
+      },
+      {
+        name: "shortname",
+        required: true,
+        multiple: false
+      }
+    ]
+  },
+  {
+    subcommand: "remove stressor",
+    flags: [
+      {
+        name: "shortname",
+        required: true,
+        multiple: false
+      }
+    ]
+  },
+  {
+    subcommand: "remove term",
+    flags: [
       {
         name: "term",
         required: true,
@@ -1555,7 +1710,7 @@ var cli_schema_default = [
         multiple: true
       },
       {
-        name: "attractor-id",
+        name: "attractor-shortname",
         required: false,
         multiple: false
       },
@@ -1600,7 +1755,7 @@ var cli_schema_default = [
         multiple: true
       },
       {
-        name: "attractor-id",
+        name: "attractor-shortname",
         required: false,
         multiple: false
       },
@@ -1738,11 +1893,12 @@ function parseLine(line) {
   if (tokens[0] !== "residual") {
     return { message: "not a residual add/update command" };
   }
-  const verb = tokens[1];
-  if (verb !== "add" && verb !== "update") {
+  const typeFirst = tokens[1] === "stressor" || tokens[1] === "purpose";
+  const verb = typeFirst ? tokens[2] : tokens[1];
+  if (verb !== "add" && verb !== "update" && verb !== "remove") {
     return { message: "not a residual add/update command" };
   }
-  const type = tokens[2];
+  const type = typeFirst ? tokens[1] : tokens[2];
   if (type === undefined) {
     return { message: "not a residual add/update command" };
   }
@@ -1754,7 +1910,7 @@ function parseLine(line) {
   const knownFlagsByName = new Map(knownFlags.map((f) => [f.name, f]));
   const fields = {};
   const multipleFields = {};
-  let i = 3;
+  let i = typeFirst ? 3 : 3;
   while (i < tokens.length) {
     const flagToken = tokens[i];
     if (!flagToken.startsWith("--")) {
@@ -2100,7 +2256,17 @@ if (table) {
     matrixView.recomputeFusionFission();
   };
   const matrixMount = mount(table, getState, setState, { onChange });
-  mountForms(container, getState, setState, { onChange });
+  mountForms(container, getState, setState, {
+    onChange,
+    onClear: () => {
+      matrixMount.resetDom();
+      for (const form of Array.from(container.querySelectorAll("form")))
+        form.reset();
+      for (const toggle of Array.from(container.querySelectorAll("[data-show-proposed-toggle], [data-show-unrelated-toggle]"))) {
+        toggle.checked = true;
+      }
+    }
+  });
   mountImportModal(container, getState, setState, { onChange });
   mountExportScript(container, getState, { onChange });
   matrixView.recomputeFusionFission();

@@ -1,4 +1,4 @@
-//! cli-schema — introspects the live clap `Command` tree for `add`/`update`
+//! cli-schema — introspects the live clap `Command` tree for mutation
 //! subcommands and emits a machine-derived, sorted JSON schema.
 //!
 //! Process: never hand-list flag names here. Everything must come from
@@ -9,7 +9,7 @@
 use clap::CommandFactory;
 use serde::Serialize;
 
-/// One flag on an `add`/`update` subcommand, as introspected from clap.
+/// One flag on a mutation subcommand, as introspected from clap.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FlagSchema {
     pub name: String,
@@ -17,7 +17,7 @@ pub struct FlagSchema {
     pub multiple: bool,
 }
 
-/// One `add <target>` or `update <target>` subcommand and its flags.
+/// One mutation subcommand and its flags.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SubcommandSchema {
     pub subcommand: String,
@@ -25,7 +25,7 @@ pub struct SubcommandSchema {
 }
 
 /// Walk `<Cli as clap::CommandFactory>::command()` and produce a sorted,
-/// deterministic schema covering only `add *` and `update *` subcommands.
+/// deterministic schema covering `add *`, `update *`, and force-removal subcommands.
 ///
 /// Process: purely derived from clap's introspection API — no hand-listing
 /// of subcommand or flag names anywhere in this function.
@@ -34,7 +34,9 @@ pub fn cli_schema() -> Vec<SubcommandSchema> {
 
     let mut schema: Vec<SubcommandSchema> = root
         .get_subcommands()
-        .filter(|parent| parent.get_name() == "add" || parent.get_name() == "update")
+        .filter(|parent| {
+            parent.get_name() == "add" || parent.get_name() == "update" || parent.get_name() == "remove"
+        })
         .flat_map(|parent| {
             let parent_name = parent.get_name().to_string();
             parent.get_subcommands().map(move |leaf| {

@@ -70,7 +70,7 @@
 //   does not special-case that emptiness, it just naturally does nothing
 //   when the set is empty.
 
-import { addForceRow, setAddedForceKind, toggleComponent, updateForceField } from "./actions";
+import { addForceRow, removeForce, setAddedForceKind, toggleComponent, updateForceField } from "./actions";
 import type { PendingState } from "./model";
 import { attractorOptions, computeInvalidMarks } from "./render-decisions";
 
@@ -124,7 +124,15 @@ function getAttractorLabel(state: PendingState, attractorId: string): string {
   return attractor ? `${attractor.id} · ${attractor.name}` : attractorId;
 }
 
-function createTextInput(name: string, value: string): HTMLInputElement {
+function createTextInput(name: string, value: string, multiline = false): HTMLInputElement | HTMLTextAreaElement {
+  if (multiline) {
+    const input = document.createElement("textarea");
+    input.name = name;
+    input.value = value;
+    input.rows = 3;
+    input.wrap = "soft";
+    return input;
+  }
   const input = document.createElement("input");
   input.type = "text";
   input.name = name;
@@ -195,6 +203,7 @@ function createResidueCell(forceKey: string, componentName: string): HTMLTableCe
  * toggling regardless of which UI surface created it. */
 export interface MountResult {
   syncNewRows: () => void;
+  resetDom: () => void;
 }
 
 export function mount(
@@ -220,6 +229,21 @@ export function mount(
     button.type = "button";
     button.textContent = "Edit";
     button.addEventListener("click", () => enterEditMode(detail, forceKey));
+    detail.appendChild(button);
+  }
+
+  function appendRemoveButton(detail: HTMLElement, forceKey: string): void {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Remove";
+    button.addEventListener("click", () => {
+      const next = removeForce(getState(), forceKey);
+      setState(next);
+      const row = detail.closest("tr.force-row");
+      if (row instanceof HTMLTableRowElement) row.hidden = true;
+      applyInvalidMarks();
+      options?.onChange?.();
+    });
     detail.appendChild(button);
   }
 
@@ -250,9 +274,9 @@ export function mount(
     const values = getEffectiveForceValues(state, forceKey);
 
     const shortnameInput = createTextInput("shortname", values.shortname);
-    const descriptionInput = createTextInput("description", values.description);
-    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
-    const outcomesInput = createTextInput("outcomes", values.outcomes);
+    const descriptionInput = createTextInput("description", values.description, true);
+    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature, true);
+    const outcomesInput = createTextInput("outcomes", values.outcomes, true);
     const attractorSelect = createAttractorSelect(state, values.attractorId);
 
     const okButton = document.createElement("button");
@@ -288,20 +312,23 @@ export function mount(
 
     const editor = document.createElement("div");
     editor.className = "force-detail-editor";
+    const actions = document.createElement("div");
+    actions.className = "force-detail-actions";
+    actions.append(okButton, cancelButton);
     editor.append(
       labeledField("shortname", shortnameInput),
       labeledField("description", descriptionInput),
       labeledField("naive change", naiveChangeInput),
       labeledField("outcomes", outcomesInput),
       labeledField("attractor", attractorSelect),
-      okButton,
-      cancelButton,
+      actions,
     );
+    appendRemoveButton(actions, forceKey);
     detail.appendChild(editor);
   }
 
   function wireLiveField(
-    el: HTMLInputElement | HTMLSelectElement,
+    el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
     eventName: "input" | "change",
     forceKey: string,
     field: EditableField,
@@ -333,9 +360,9 @@ export function mount(
 
     const kindSelect = createKindSelect(kind);
     const shortnameInput = createTextInput("shortname", values.shortname);
-    const descriptionInput = createTextInput("description", values.description);
-    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature);
-    const outcomesInput = createTextInput("outcomes", values.outcomes);
+    const descriptionInput = createTextInput("description", values.description, true);
+    const naiveChangeInput = createTextInput("naiveChangeOrFeature", values.naiveChangeOrFeature, true);
+    const outcomesInput = createTextInput("outcomes", values.outcomes, true);
     const attractorSelect = createAttractorSelect(state, values.attractorId);
     const saveButton = document.createElement("button");
     saveButton.type = "button";
@@ -362,6 +389,9 @@ export function mount(
 
     const editor = document.createElement("div");
     editor.className = "force-detail-editor";
+    const actions = document.createElement("div");
+    actions.className = "force-detail-actions";
+    actions.append(saveButton);
     editor.append(
       labeledField("kind", kindSelect),
       labeledField("shortname", shortnameInput),
@@ -369,8 +399,9 @@ export function mount(
       labeledField("naive change", naiveChangeInput),
       labeledField("outcomes", outcomesInput),
       labeledField("attractor", attractorSelect),
-      saveButton,
+      actions,
     );
+    appendRemoveButton(actions, tempId);
     detail.appendChild(editor);
     th.appendChild(detail);
     tr.appendChild(th);
@@ -524,7 +555,41 @@ export function mount(
     applyInvalidMarks();
   }
 
+  function resetDom(): void {
+    const state = getState();
+    const baseIds = new Set(state.baseForces.map((force) => force.id));
+    for (const row of Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr.force-row"))) {
+      const key = row.getAttribute("data-force-id");
+      if (key === null) continue;
+      if (!baseIds.has(key)) {
+        row.remove();
+        continue;
+      }
+      row.hidden = false;
+      const base = state.baseForces.find((force) => force.id === key);
+      if (base !== undefined) {
+        for (const cell of Array.from(row.querySelectorAll<HTMLTableCellElement>("td[data-residue-cell]"))) {
+          const component = cell.getAttribute("data-component");
+          const coupled = component !== null && base.components.includes(component);
+          cell.setAttribute("data-coupled", coupled ? "1" : "0");
+          cell.textContent = coupled ? "1" : "";
+        }
+      }
+      const detail = row.querySelector<HTMLElement>(".force-detail");
+      if (detail !== null) {
+        detail.hidden = true;
+        renderReadOnly(detail, key);
+      }
+    }
+    const baseComponents = new Set(state.baseComponents.map((component) => component.name));
+    for (const element of Array.from(table.querySelectorAll<HTMLElement>("[data-component]"))) {
+      const name = element.getAttribute("data-component");
+      if (name !== null && !baseComponents.has(name)) element.remove();
+    }
+    applyInvalidMarks();
+  }
+
   applyInvalidMarks();
 
-  return { syncNewRows };
+  return { syncNewRows, resetDom };
 }

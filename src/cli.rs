@@ -41,6 +41,16 @@ pub enum Command {
         #[command(subcommand)]
         target: RemoveTarget,
     },
+    /// Mutate a purpose force using the type-first command spelling.
+    Purpose {
+        #[command(subcommand)]
+        command: ForceCommand,
+    },
+    /// Mutate a stressor force using the type-first command spelling.
+    Stressor {
+        #[command(subcommand)]
+        command: ForceCommand,
+    },
     /// Update fields on an existing residual record in place.
     ///
     /// Process: keyed by the same id/name the record was created with. Every
@@ -458,6 +468,16 @@ pub enum AddTarget {
 
 #[derive(Subcommand)]
 pub enum RemoveTarget {
+    /// Remove a stressor force by shortname.
+    Stressor {
+        #[arg(long)]
+        shortname: String,
+    },
+    /// Remove a purpose force by shortname.
+    Purpose {
+        #[arg(long)]
+        shortname: String,
+    },
     /// Clear force×component coupling from residues.csv.
     Residue {
         /// Shortname of the stressor or purpose (as set by `--shortname` on add).
@@ -470,6 +490,14 @@ pub enum RemoveTarget {
     Term {
         #[arg(long)]
         term: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ForceCommand {
+    Remove {
+        #[arg(long)]
+        shortname: String,
     },
 }
 
@@ -719,6 +747,20 @@ pub fn run() -> Result<()> {
         Command::Init { force } => crate::storage::init(&cfg, force),
         Command::Add { force, target } => crate::storage::add(&cfg, target, force),
         Command::Remove { force, target } => crate::storage::remove(&cfg, target, force),
+        Command::Purpose { command } => match command {
+            ForceCommand::Remove { shortname } => crate::storage::remove(
+                &cfg,
+                RemoveTarget::Purpose { shortname },
+                false,
+            ),
+        },
+        Command::Stressor { command } => match command {
+            ForceCommand::Remove { shortname } => crate::storage::remove(
+                &cfg,
+                RemoveTarget::Stressor { shortname },
+                false,
+            ),
+        },
         Command::Update { force, target } => crate::storage::update(&cfg, target, force),
         Command::Write { op } => match op {
             WriteOp::Authorize { minutes } => {

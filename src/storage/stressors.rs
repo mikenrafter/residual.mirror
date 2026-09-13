@@ -41,6 +41,16 @@ pub fn append(residual_dir: &Path, stressor: Stressor) -> Result<()> {
     write_all(residual_dir, &all)
 }
 
+pub fn remove_by_shortname(residual_dir: &Path, shortname: &str) -> Result<String> {
+    let mut all = load(residual_dir)?;
+    let Some(index) = all.iter().position(|s| s.shortname == shortname) else {
+        anyhow::bail!("stressor '{}' not found", shortname);
+    };
+    let id = all.remove(index).id;
+    write_all(residual_dir, &all)?;
+    Ok(id)
+}
+
 pub fn write_all_pub(residual_dir: &Path, rows: &[Stressor]) -> Result<()> {
     write_all(residual_dir, rows)
 }

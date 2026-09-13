@@ -345,6 +345,51 @@
     ]
   },
   {
+    "subcommand": "remove purpose",
+    "flags": [
+      {
+        "name": "shortname",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "remove residue",
+    "flags": [
+      {
+        "name": "component-shortname",
+        "required": true,
+        "multiple": false
+      },
+      {
+        "name": "shortname",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "remove stressor",
+    "flags": [
+      {
+        "name": "shortname",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
+    "subcommand": "remove term",
+    "flags": [
+      {
+        "name": "term",
+        "required": true,
+        "multiple": false
+      }
+    ]
+  },
+  {
     "subcommand": "update attractor",
     "flags": [
       {

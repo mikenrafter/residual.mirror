@@ -311,6 +311,24 @@ fn update_entry(dir: &Path, target: UpdateTarget) -> Result<()> {
 
 fn remove_entry(dir: &Path, target: RemoveTarget) -> Result<()> {
     match target {
+        RemoveTarget::Stressor { shortname } => {
+            let force_id = stressors::remove_by_shortname(dir, &shortname)?;
+            let residues = residues::load(dir)?
+                .into_iter()
+                .filter(|r| r.force_id != force_id)
+                .collect::<Vec<_>>();
+            crate::storage::format::write_residues(dir, &residues)?;
+            println!("Removed stressor '{}'", shortname);
+        }
+        RemoveTarget::Purpose { shortname } => {
+            let force_id = purposes::remove_by_shortname(dir, &shortname)?;
+            let residues = residues::load(dir)?
+                .into_iter()
+                .filter(|r| r.force_id != force_id)
+                .collect::<Vec<_>>();
+            crate::storage::format::write_residues(dir, &residues)?;
+            println!("Removed purpose '{}'", shortname);
+        }
         RemoveTarget::Residue {
             shortname,
             component_shortname,

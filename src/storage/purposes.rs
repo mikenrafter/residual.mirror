@@ -42,6 +42,16 @@ pub fn append(residual_dir: &Path, purpose: Purpose) -> Result<()> {
     write_all(residual_dir, &all)
 }
 
+pub fn remove_by_shortname(residual_dir: &Path, shortname: &str) -> Result<String> {
+    let mut all = load(residual_dir)?;
+    let Some(index) = all.iter().position(|p| p.shortname == shortname) else {
+        anyhow::bail!("purpose '{}' not found", shortname);
+    };
+    let id = all.remove(index).id;
+    write_all(residual_dir, &all)?;
+    Ok(id)
+}
+
 pub fn write_all_pub(residual_dir: &Path, rows: &[Purpose]) -> Result<()> {
     write_all(residual_dir, rows)
 }

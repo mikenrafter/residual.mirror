@@ -8,7 +8,7 @@
 /** A single pending mutation parsed from one line of import text. */
 export interface PendingItem {
   /** "add" or "update" — mirrors the residual CLI verb. */
-  kind: "add" | "update";
+  kind: "add" | "update" | "remove";
   /** The force/entity type, e.g. "stressor", "component", "term". */
   type: string;
   /**
@@ -184,12 +184,13 @@ function parseLine(
     return { message: "not a residual add/update command" };
   }
 
-  const verb = tokens[1];
-  if (verb !== "add" && verb !== "update") {
+  const typeFirst = tokens[1] === "stressor" || tokens[1] === "purpose";
+  const verb = typeFirst ? tokens[2] : tokens[1];
+  if (verb !== "add" && verb !== "update" && verb !== "remove") {
     return { message: "not a residual add/update command" };
   }
 
-  const type = tokens[2];
+  const type = typeFirst ? tokens[1] : tokens[2];
   if (type === undefined) {
     return { message: "not a residual add/update command" };
   }
@@ -204,7 +205,7 @@ function parseLine(
   const fields: Record<string, string> = {};
   const multipleFields: Record<string, string[]> = {};
 
-  let i = 3;
+  let i = typeFirst ? 3 : 3;
   while (i < tokens.length) {
     const flagToken = tokens[i]!;
     if (!flagToken.startsWith("--")) {

@@ -52,7 +52,7 @@
 //   identically here rather than modifying forms.ts (out of scope per the
 //   task's file-immutability list).
 
-import { addAttractorOption, addComponentColumn, addForceRow, toggleComponent, updateForceField } from "./actions";
+import { addAttractorOption, addComponentColumn, addForceRow, removeForce, toggleComponent, updateForceField } from "./actions";
 import type { PendingState } from "./model";
 import type { PendingItem } from "./import-parser";
 
@@ -172,6 +172,13 @@ function applyUpdateForce(state: PendingState, item: PendingItem): PendingState 
   return next;
 }
 
+function applyRemoveForce(state: PendingState, item: PendingItem): PendingState {
+  const shortname = item.fields.shortname;
+  if (shortname === undefined) return state;
+  const force = state.baseForces.find((candidate) => candidate.kind === item.type && candidate.shortname === shortname);
+  return force === undefined ? state : removeForce(state, force.id);
+}
+
 /** Whether this PendingItem has reducer support to actually apply. */
 function isMergeable(item: PendingItem): boolean {
   if (item.kind === "add") {
@@ -186,6 +193,9 @@ function applyItem(state: PendingState, item: PendingItem): PendingState {
     if (item.type === "stressor" || item.type === "purpose") return applyAddForce(state, item.type, item);
     if (item.type === "component") return applyAddComponent(state, item);
     if (item.type === "attractor") return applyAddAttractor(state, item);
+  }
+  if (item.kind === "remove" && (item.type === "stressor" || item.type === "purpose")) {
+    return applyRemoveForce(state, item);
   }
   // item.kind === "update", item.type === "stressor" | "purpose"
   return applyUpdateForce(state, item);
